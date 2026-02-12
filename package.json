@@ -1,0 +1,24 @@
+{
+  "name": "site-caseg-protege",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+     "start": "node backend/src/server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SergioProjetos/site-caseg-protege.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/SergioProjetos/site-caseg-protege/issues"
+  },
+  "homepage": "https://github.com/SergioProjetos/site-caseg-protege#readme",
+  "dependencies": {
+    "express": "^5.2.1"
+  }
+}
