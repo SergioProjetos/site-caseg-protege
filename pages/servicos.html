@@ -6,6 +6,16 @@
     <title>Serviços - CASEG Protege</title>
 
     <link rel="stylesheet" href="../assets/css/style.css">
+
+    <script>
+        const token = localStorage.getItem("access_token");
+
+        if (!token) {
+        alert("Você precisa fazer login.");
+        window.location.href = "login.html";
+     }
+    </script>
+
 </head>
 <body>
 

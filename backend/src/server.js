@@ -12,6 +12,19 @@ console.log("KEY:", process.env.SUPABASE_SERVICE_ROLE_KEY ? "OK" : "NÃO CARREGO
 const app = express();
 app.use(express.json());
 
+// Permitir que o navegador (Live Server) acesse a API
+app.use((req, res, next) => {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(200);
+  }
+
+  next();
+});
+
 const PORT = 3000;
 
 app.get('/', (req, res) => {
@@ -62,7 +75,61 @@ app.post('/primeiro-acesso', async (req, res) => {
   }
 });
 
-console.log("Rotas configuradas: GET / e POST /primeiro-acesso");
+app.post('/login', async (req, res) => {
+  try {
+    const { cpf_cnpj, password } = req.body;
+
+    if (!cpf_cnpj || !password) {
+      return res.status(400).json({ error: 'cpf_cnpj e password são obrigatórios' });
+    }
+
+    // 1️⃣ Buscar o email pelo CPF/CNPJ
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('user_id, email, role, full_name, company_name')
+      .eq('cpf_cnpj', cpf_cnpj)
+      .single();
+
+    if (profileError) {
+  return res.status(400).json({
+    error: "Erro ao buscar CPF/CNPJ",
+    detail: profileError.message
+  });
+}
+
+if (!profile?.email) {
+  return res.status(400).json({ error: "CPF/CNPJ não encontrado" });
+}
+
+    // 2️⃣ Fazer login usando o email encontrado
+    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+      email: profile.email,
+      password
+    });
+
+    if (authError) {
+      return res.status(401).json({ error: 'Senha inválida' });
+    }
+
+   res.json({
+    message: 'Login realizado com sucesso',
+    profile: {
+    user_id: profile.user_id,
+    cpf_cnpj,
+    role: profile.role,
+    full_name: profile.full_name,
+    company_name: profile.company_name,
+    email: profile.email
+  },
+  session: authData.session
+});
+
+  } catch (error) {
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+console.log("Rotas configuradas: GET /, POST /primeiro-acesso, POST /login");
 
 app.listen(PORT, () => {
   console.log(`Servidor rodando em http://localhost:${PORT}`);
