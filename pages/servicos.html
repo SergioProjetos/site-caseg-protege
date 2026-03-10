@@ -32,13 +32,39 @@
 </header>
 
 <main>
-    <h2>Serviços</h2>
-    <p>Conheça os serviços oferecidos pela CASEG Protege.</p>
+    <h2>Painel do Cliente</h2>
+
+    <div class="client-info">
+        <h3 id="welcomeMessage"></h3>
+        <p id="companyName"></p>
+        <p>Bem-vindo ao painel do cliente da CASEG Protege.</p>
+    </div>
+
+   <div class="client-cards">
+    <section class="client-card">
+        <h3>Documentos</h3>
+         <div id="documentsList">
+           <p>Os documentos serão organizados por categoria e ano.</p>
+         </div>
+    </section>
+
+    <section class="client-card">
+        <h3>Avisos</h3>
+          <div id="noticesList">
+             <p>Em breve você verá comunicados e informações importantes aqui.</p>
+          </div>
+    </section>
+   </div>
+
+    <button id="logoutBtn">Sair da conta</button>
 </main>
 
 <footer>
     <p>© CASEG Protege</p>
 </footer>
+
+
+<script src="../assets/js/client-panel.js"></script>
 
 </body>
 </html>
