@@ -11,9 +11,9 @@
         const token = localStorage.getItem("access_token");
 
         if (!token) {
-        alert("Você precisa fazer login.");
-        window.location.href = "login.html";
-     }
+            alert("Você precisa fazer login.");
+            window.location.href = "login.html";
+        }
     </script>
 
 </head>
@@ -40,29 +40,115 @@
         <p>Bem-vindo ao painel do cliente da CASEG Protege.</p>
     </div>
 
-   <div class="client-cards">
-    <section class="client-card">
-        <h3>Documentos</h3>
-         <div id="documentsList">
-           <p>Os documentos serão organizados por categoria e ano.</p>
-         </div>
-    </section>
+    <div class="client-cards">
 
-    <section class="client-card">
-        <h3>Avisos</h3>
-          <div id="noticesList">
-             <p>Em breve você verá comunicados e informações importantes aqui.</p>
-          </div>
-    </section>
-   </div>
+        <section class="client-card">
+            <h3>Documentos</h3>
+
+            <div id="documentsList">
+
+                <div class="doc-category">
+                    <button class="doc-category-toggle">ASOs</button>
+
+                    <div class="doc-subcategories">
+
+                        <div class="doc-subcategory">
+                            <button class="doc-subcategory-toggle">Admissional</button>
+
+                            <div class="doc-years">
+
+                                <div class="doc-year">
+                                    <button class="doc-year-toggle">2026</button>
+
+                                    <div class="doc-files">
+                                        <ul>
+                                            <li>aso-admissional-2026.pdf</li>
+                                        </ul>
+                                    </div>
+
+                                </div>
+
+                            </div>
+                        </div>
+
+
+                        <div class="doc-subcategory">
+                            <button class="doc-subcategory-toggle">Demissional</button>
+
+                            <div class="doc-years">
+
+                                <div class="doc-year">
+                                    <button class="doc-year-toggle">2025</button>
+
+                                    <div class="doc-files">
+                                        <ul>
+                                            <li>aso-demissional-2025.pdf</li>
+                                        </ul>
+                                    </div>
+
+                                </div>
+
+                            </div>
+                        </div>
+
+
+                        <div class="doc-subcategory">
+                            <button class="doc-subcategory-toggle">Periódico</button>
+
+                            <div class="doc-years">
+
+                                <div class="doc-year">
+                                    <button class="doc-year-toggle">2026</button>
+
+                                    <div class="doc-files">
+                                        <ul>
+                                            <li>aso-periodico-joao-2026.pdf</li>
+                                            <li>aso-periodico-maria-2026.pdf</li>
+                                        </ul>
+                                    </div>
+
+                                </div>
+
+
+                                <div class="doc-year">
+                                    <button class="doc-year-toggle">2025</button>
+
+                                    <div class="doc-files">
+                                        <ul>
+                                            <li>aso-periodico-carlos-2025.pdf</li>
+                                        </ul>
+                                    </div>
+
+                                </div>
+
+                            </div>
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <section class="client-card">
+            <h3>Avisos</h3>
+            <div id="noticesList">
+                <p>Em breve você verá comunicados e informações importantes aqui.</p>
+            </div>
+        </section>
+
+    </div>
 
     <button id="logoutBtn">Sair da conta</button>
+
 </main>
 
 <footer>
     <p>© CASEG Protege</p>
 </footer>
-
 
 <script src="../assets/js/client-panel.js"></script>
 

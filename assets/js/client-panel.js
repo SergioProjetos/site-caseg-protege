@@ -51,8 +51,70 @@ function loadNotices() {
 }
 
 function initClientPanel() {
-  loadDocuments();
+  // loadDocuments();
   loadNotices();
 }
 
 initClientPanel();
+const categoryButtons = document.querySelectorAll(".doc-category-toggle");
+
+categoryButtons.forEach(button => {
+  button.addEventListener("click", () => {
+    const subcategories = button.nextElementSibling;
+
+    if (subcategories.style.display === "block") {
+      subcategories.style.display = "none";
+    } else {
+      subcategories.style.display = "block";
+    }
+  });
+});
+const subcategoryButtons = document.querySelectorAll(".doc-subcategory-toggle");
+
+subcategoryButtons.forEach(button => {
+  button.addEventListener("click", () => {
+    const years = button.nextElementSibling;
+
+    if (years.style.display === "block") {
+      years.style.display = "none";
+    } else {
+      years.style.display = "block";
+    }
+  });
+});
+const yearButtons = document.querySelectorAll(".doc-year-toggle");
+
+yearButtons.forEach(button => {
+  button.addEventListener("click", () => {
+    const files = button.nextElementSibling;
+
+    if (files.style.display === "block") {
+      files.style.display = "none";
+    } else {
+      files.style.display = "block";
+    }
+  });
+});
+async function loadDocuments() {
+
+  const profile = JSON.parse(localStorage.getItem("profile"));
+
+  if (!profile) return;
+
+  try {
+
+    const response = await fetch(
+      `http://localhost:3000/documents/${profile.user_id}`
+    );
+
+    const documents = await response.json();
+
+    console.log("DOCUMENTOS DO CLIENTE:", documents);
+
+  } catch (error) {
+    console.error("Erro ao buscar documentos:", error);
+  }
+
+}
+
+loadDocuments();

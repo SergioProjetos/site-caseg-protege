@@ -30,9 +30,16 @@ const PORT = 3000;
 app.get('/', (req, res) => {
   res.send('Servidor Caseg Protege rodando 🚀');
 });
+
+
+/* ===============================
+   PRIMEIRO ACESSO
+================================ */
 app.post('/primeiro-acesso', async (req, res) => {
   try {
+
     console.log("CHEGOU NO /primeiro-acesso", req.body);
+
     const {
       company_name,
       full_name,
@@ -42,11 +49,12 @@ app.post('/primeiro-acesso', async (req, res) => {
     } = req.body;
 
     // 1️⃣ Criar usuário no Supabase Auth
-    const { data: userData, error: userError } = await supabase.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true
-    });
+    const { data: userData, error: userError } =
+      await supabase.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true
+      });
 
     if (userError) {
       return res.status(400).json({ error: userError.message });
@@ -75,15 +83,22 @@ app.post('/primeiro-acesso', async (req, res) => {
   }
 });
 
+
+/* ===============================
+   LOGIN
+================================ */
 app.post('/login', async (req, res) => {
   try {
+
     const { cpf_cnpj, password } = req.body;
 
     if (!cpf_cnpj || !password) {
-      return res.status(400).json({ error: 'cpf_cnpj e password são obrigatórios' });
+      return res.status(400).json({
+        error: 'cpf_cnpj e password são obrigatórios'
+      });
     }
 
-    // 1️⃣ Buscar o email pelo CPF/CNPJ
+    // 1️⃣ Buscar email pelo CPF/CNPJ
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('user_id, email, role, full_name, company_name')
@@ -91,45 +106,88 @@ app.post('/login', async (req, res) => {
       .single();
 
     if (profileError) {
-  return res.status(400).json({
-    error: "Erro ao buscar CPF/CNPJ",
-    detail: profileError.message
-  });
-}
-
-if (!profile?.email) {
-  return res.status(400).json({ error: "CPF/CNPJ não encontrado" });
-}
-
-    // 2️⃣ Fazer login usando o email encontrado
-    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-      email: profile.email,
-      password
-    });
-
-    if (authError) {
-      return res.status(401).json({ error: 'Senha inválida' });
+      return res.status(400).json({
+        error: "Erro ao buscar CPF/CNPJ",
+        detail: profileError.message
+      });
     }
 
-   res.json({
-    message: 'Login realizado com sucesso',
-    profile: {
-    user_id: profile.user_id,
-    cpf_cnpj,
-    role: profile.role,
-    full_name: profile.full_name,
-    company_name: profile.company_name,
-    email: profile.email
-  },
-  session: authData.session
-});
+    if (!profile?.email) {
+      return res.status(400).json({
+        error: "CPF/CNPJ não encontrado"
+      });
+    }
+
+    // 2️⃣ Login no Supabase Auth
+    const { data: authData, error: authError } =
+      await supabase.auth.signInWithPassword({
+        email: profile.email,
+        password
+      });
+
+    if (authError) {
+      return res.status(401).json({
+        error: 'Senha inválida'
+      });
+    }
+
+    res.json({
+      message: 'Login realizado com sucesso',
+      profile: {
+        user_id: profile.user_id,
+        cpf_cnpj,
+        role: profile.role,
+        full_name: profile.full_name,
+        company_name: profile.company_name,
+        email: profile.email
+      },
+      session: authData.session
+    });
 
   } catch (error) {
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
 
-console.log("Rotas configuradas: GET /, POST /primeiro-acesso, POST /login");
+
+/* ===============================
+   BUSCAR DOCUMENTOS DO CLIENTE
+================================ */
+app.get("/documents/:clientId", async (req, res) => {
+
+  const { clientId } = req.params;
+
+  try {
+
+    const { data, error } = await supabase
+      .from("documents")
+      .select("*")
+      .eq("client_id", clientId)
+      .order("year", { ascending: false });
+
+    if (error) {
+      return res.status(500).json({
+        error: error.message
+      });
+    }
+
+    res.json(data);
+
+  } catch (err) {
+    res.status(500).json({
+      error: "Erro ao buscar documentos."
+    });
+  }
+
+});
+
+
+console.log("Rotas configuradas:");
+console.log("GET /");
+console.log("POST /primeiro-acesso");
+console.log("POST /login");
+console.log("GET /documents/:clientId");
+
 
 app.listen(PORT, () => {
   console.log(`Servidor rodando em http://localhost:${PORT}`);
