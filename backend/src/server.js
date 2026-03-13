@@ -37,7 +37,6 @@ app.get('/', (req, res) => {
 ================================ */
 app.post('/primeiro-acesso', async (req, res) => {
   try {
-
     console.log("CHEGOU NO /primeiro-acesso", req.body);
 
     const {
@@ -89,7 +88,6 @@ app.post('/primeiro-acesso', async (req, res) => {
 ================================ */
 app.post('/login', async (req, res) => {
   try {
-
     const { cpf_cnpj, password } = req.body;
 
     if (!cpf_cnpj || !password) {
@@ -154,11 +152,9 @@ app.post('/login', async (req, res) => {
    BUSCAR DOCUMENTOS DO CLIENTE
 ================================ */
 app.get("/documents/:clientId", async (req, res) => {
-
   const { clientId } = req.params;
 
   try {
-
     const { data, error } = await supabase
       .from("documents")
       .select("*")
@@ -178,7 +174,41 @@ app.get("/documents/:clientId", async (req, res) => {
       error: "Erro ao buscar documentos."
     });
   }
+});
 
+
+/* ===============================
+   GERAR LINK TEMPORÁRIO DO DOCUMENTO
+================================ */
+app.post("/documents/download", async (req, res) => {
+  const { file_path } = req.body;
+
+  if (!file_path) {
+    return res.status(400).json({
+      error: "file_path é obrigatório"
+    });
+  }
+
+  try {
+    const { data, error } = await supabase.storage
+      .from("documents")
+      .createSignedUrl(file_path, 60);
+
+    if (error) {
+      return res.status(500).json({
+        error: error.message
+      });
+    }
+
+    res.json({
+      url: data.signedUrl
+    });
+
+  } catch (err) {
+    res.status(500).json({
+      error: "Erro ao gerar link do documento."
+    });
+  }
 });
 
 
@@ -187,7 +217,7 @@ console.log("GET /");
 console.log("POST /primeiro-acesso");
 console.log("POST /login");
 console.log("GET /documents/:clientId");
-
+console.log("POST /documents/download");
 
 app.listen(PORT, () => {
   console.log(`Servidor rodando em http://localhost:${PORT}`);
