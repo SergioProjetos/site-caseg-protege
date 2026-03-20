@@ -132,3 +132,11 @@ main {
 .doc-year-toggle:hover {
     background-color: #f1f1f1;
 }
+.doc-file-link {
+    text-decoration: none;
+    color: #0d47a1;
+}
+
+.doc-file-link:hover {
+    text-decoration: underline;
+}

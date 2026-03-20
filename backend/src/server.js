@@ -12,7 +12,9 @@ console.log("KEY:", process.env.SUPABASE_SERVICE_ROLE_KEY ? "OK" : "NÃO CARREGO
 const app = express();
 app.use(express.json());
 
-// Permitir que o navegador (Live Server) acesse a API
+/* ===============================
+   CORS (PERMITIR FRONTEND)
+================================ */
 app.use((req, res, next) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
@@ -27,18 +29,18 @@ app.use((req, res, next) => {
 
 const PORT = 3000;
 
+/* ===============================
+   TESTE
+================================ */
 app.get('/', (req, res) => {
   res.send('Servidor Caseg Protege rodando 🚀');
 });
-
 
 /* ===============================
    PRIMEIRO ACESSO
 ================================ */
 app.post('/primeiro-acesso', async (req, res) => {
   try {
-    console.log("CHEGOU NO /primeiro-acesso", req.body);
-
     const {
       company_name,
       full_name,
@@ -47,7 +49,6 @@ app.post('/primeiro-acesso', async (req, res) => {
       password
     } = req.body;
 
-    // 1️⃣ Criar usuário no Supabase Auth
     const { data: userData, error: userError } =
       await supabase.auth.admin.createUser({
         email,
@@ -59,7 +60,6 @@ app.post('/primeiro-acesso', async (req, res) => {
       return res.status(400).json({ error: userError.message });
     }
 
-    // 2️⃣ Criar perfil na tabela profiles
     const { error: profileError } = await supabase
       .from('profiles')
       .insert({
@@ -82,7 +82,6 @@ app.post('/primeiro-acesso', async (req, res) => {
   }
 });
 
-
 /* ===============================
    LOGIN
 ================================ */
@@ -96,27 +95,18 @@ app.post('/login', async (req, res) => {
       });
     }
 
-    // 1️⃣ Buscar email pelo CPF/CNPJ
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('user_id, email, role, full_name, company_name')
       .eq('cpf_cnpj', cpf_cnpj)
       .single();
 
-    if (profileError) {
-      return res.status(400).json({
-        error: "Erro ao buscar CPF/CNPJ",
-        detail: profileError.message
-      });
-    }
-
-    if (!profile?.email) {
+    if (profileError || !profile) {
       return res.status(400).json({
         error: "CPF/CNPJ não encontrado"
       });
     }
 
-    // 2️⃣ Login no Supabase Auth
     const { data: authData, error: authError } =
       await supabase.auth.signInWithPassword({
         email: profile.email,
@@ -147,18 +137,35 @@ app.post('/login', async (req, res) => {
   }
 });
 
-
 /* ===============================
-   BUSCAR DOCUMENTOS DO CLIENTE
+   BUSCAR DOCUMENTOS (SEGURO)
 ================================ */
-app.get("/documents/:clientId", async (req, res) => {
-  const { clientId } = req.params;
-
+app.get("/documents", async (req, res) => {
   try {
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({
+        error: "Token não informado."
+      });
+    }
+
+    const token = authHeader.split(" ")[1];
+
+    const { data: userData, error: userError } = await supabase.auth.getUser(token);
+
+    if (userError || !userData?.user) {
+      return res.status(401).json({
+        error: "Usuário não autenticado."
+      });
+    }
+
+    const userId = userData.user.id;
+
     const { data, error } = await supabase
       .from("documents")
       .select("*")
-      .eq("client_id", clientId)
+      .eq("client_id", userId)
       .order("year", { ascending: false });
 
     if (error) {
@@ -170,17 +177,21 @@ app.get("/documents/:clientId", async (req, res) => {
     res.json(data);
 
   } catch (err) {
+    console.error("ERRO AO BUSCAR DOCUMENTOS:", err);
+
     res.status(500).json({
       error: "Erro ao buscar documentos."
     });
   }
 });
 
-
 /* ===============================
-   GERAR LINK TEMPORÁRIO DO DOCUMENTO
+   DOWNLOAD DOCUMENTO
 ================================ */
 app.post("/documents/download", async (req, res) => {
+  console.log("REQUISIÇÃO DE DOWNLOAD RECEBIDA");
+  console.log("BODY:", req.body);
+
   const { file_path } = req.body;
 
   if (!file_path) {
@@ -192,9 +203,11 @@ app.post("/documents/download", async (req, res) => {
   try {
     const { data, error } = await supabase.storage
       .from("documents")
-      .createSignedUrl(file_path, 60);
+      .createSignedUrl(file_path.trim(), 60);
 
     if (error) {
+      console.log("ERRO AO GERAR SIGNED URL:", error);
+
       return res.status(500).json({
         error: error.message
       });
@@ -205,19 +218,53 @@ app.post("/documents/download", async (req, res) => {
     });
 
   } catch (err) {
+    console.log("ERRO INTERNO:", err);
+
     res.status(500).json({
       error: "Erro ao gerar link do documento."
     });
   }
 });
 
+/* ===============================
+   BUSCAR AVISOS
+================================ */
+app.get("/notices", async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from("notices")
+      .select("*")
+      .order("created_at", { ascending: false });
 
+    if (error) {
+      return res.status(500).json({
+        error: error.message
+      });
+    }
+
+    const activeNotices = data.filter(notice => notice.is_active === true);
+
+    res.json(activeNotices);
+
+  } catch (err) {
+    console.log("ERRO NA ROTA /notices:", err);
+
+    res.status(500).json({
+      error: String(err)
+    });
+  }
+});
+
+/* ===============================
+   START SERVER
+================================ */
 console.log("Rotas configuradas:");
 console.log("GET /");
 console.log("POST /primeiro-acesso");
 console.log("POST /login");
-console.log("GET /documents/:clientId");
+console.log("GET /documents");
 console.log("POST /documents/download");
+console.log("GET /notices");
 
 app.listen(PORT, () => {
   console.log(`Servidor rodando em http://localhost:${PORT}`);

@@ -11,6 +11,9 @@ const documentsList = document.querySelector("#documentsList");
 const noticesList = document.querySelector("#noticesList");
 const logoutBtn = document.querySelector("#logoutBtn");
 
+/* ===============================
+   INFORMAÇÕES DO CLIENTE
+================================ */
 function loadClientInfo() {
   if (profile) {
     welcomeMessage.innerText = "Bem-vindo, " + profile.full_name;
@@ -18,6 +21,9 @@ function loadClientInfo() {
   }
 }
 
+/* ===============================
+   LOGOUT
+================================ */
 if (logoutBtn) {
   logoutBtn.addEventListener("click", function () {
     localStorage.removeItem("access_token");
@@ -28,19 +34,41 @@ if (logoutBtn) {
   });
 }
 
+/* ===============================
+   DOCUMENTOS
+================================ */
 async function loadDocuments() {
-
   if (!profile) return;
 
+  const token = localStorage.getItem("access_token");
+
+  console.log("PROFILE SALVO:", profile);
+  console.log("TOKEN ENCONTRADO:", token ? "SIM" : "NÃO");
+
+  if (!token) {
+    console.error("Token não encontrado.");
+
+    if (documentsList) {
+      documentsList.innerHTML =
+        "<p class='empty-message'>Sessão inválida. Faça login novamente.</p>";
+    }
+    return;
+  }
+
   if (documentsList) {
-    documentsList.innerHTML = "<p class='loading-message'>Carregando documentos...</p>";
+    documentsList.innerHTML =
+      "<p class='loading-message'>Carregando documentos...</p>";
   }
 
   try {
+    const response = await fetch("http://localhost:3000/documents", {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    });
 
-    const response = await fetch(
-      `http://localhost:3000/documents/${profile.user_id}`
-    );
+    console.log("STATUS /documents:", response.status);
 
     const documents = await response.json();
 
@@ -50,8 +78,15 @@ async function loadDocuments() {
 
     if (!documentsContainer) return;
 
-    if (!documents.length) {
-      documentsContainer.innerHTML = "<p class='empty-message'>Nenhum documento disponível no momento.</p>";
+    if (!response.ok) {
+      documentsContainer.innerHTML =
+        `<p class='empty-message'>${documents.error || "Erro ao carregar documentos."}</p>`;
+      return;
+    }
+
+    if (!Array.isArray(documents) || documents.length === 0) {
+      documentsContainer.innerHTML =
+        "<p class='empty-message'>Nenhum documento disponível no momento.</p>";
       return;
     }
 
@@ -61,18 +96,15 @@ async function loadDocuments() {
       if (!groupedByCategory[doc.category]) {
         groupedByCategory[doc.category] = [];
       }
-
       groupedByCategory[doc.category].push(doc);
     });
 
     const groupedBySubcategory = {};
 
     Object.keys(groupedByCategory).forEach(category => {
-
       groupedBySubcategory[category] = {};
 
       groupedByCategory[category].forEach(doc => {
-
         const subcategory = doc.subcategory ? doc.subcategory : null;
 
         if (!groupedBySubcategory[category][subcategory]) {
@@ -80,23 +112,18 @@ async function loadDocuments() {
         }
 
         groupedBySubcategory[category][subcategory].push(doc);
-
       });
-
     });
 
     const groupedByYear = {};
 
     Object.keys(groupedBySubcategory).forEach(category => {
-
       groupedByYear[category] = {};
 
       Object.keys(groupedBySubcategory[category]).forEach(subcategory => {
-
         groupedByYear[category][subcategory] = {};
 
         groupedBySubcategory[category][subcategory].forEach(doc => {
-
           const year = doc.year;
 
           if (!groupedByYear[category][subcategory][year]) {
@@ -104,210 +131,284 @@ async function loadDocuments() {
           }
 
           groupedByYear[category][subcategory][year].push(doc);
-
         });
-
       });
-
     });
 
     documentsContainer.innerHTML = "";
 
     Object.keys(groupedByYear).forEach(category => {
+      const categoryElement = document.createElement("div");
+      categoryElement.className = "doc-category";
 
-      const categoryHTML = `
-        <div class="doc-category">
-          <button class="doc-category-toggle">${category}</button>
-          <div class="doc-subcategories"></div>
-        </div>
-      `;
+      const categoryButton = document.createElement("button");
+      categoryButton.className = "doc-category-toggle";
+      categoryButton.textContent = category;
 
-      documentsContainer.innerHTML += categoryHTML;
+      const subcategoriesContainer = document.createElement("div");
+      subcategoriesContainer.className = "doc-subcategories";
 
-      const subcategoriesContainer =
-        documentsContainer.lastElementChild.querySelector(".doc-subcategories");
+      categoryElement.appendChild(categoryButton);
+      categoryElement.appendChild(subcategoriesContainer);
+      documentsContainer.appendChild(categoryElement);
 
       Object.keys(groupedByYear[category]).forEach(subcategory => {
-
         let yearsContainer;
 
-        if (subcategory === null) {
-
-          const yearsOnlyHTML = `
-            <div class="doc-years"></div>
-          `;
-
-          subcategoriesContainer.innerHTML += yearsOnlyHTML;
-
-          yearsContainer = subcategoriesContainer.lastElementChild;
-
+        if (subcategory === "null") {
+          yearsContainer = document.createElement("div");
+          yearsContainer.className = "doc-years";
+          yearsContainer.style.display = "block";
+          subcategoriesContainer.appendChild(yearsContainer);
         } else {
+          const subcategoryElement = document.createElement("div");
+          subcategoryElement.className = "doc-subcategory";
 
-          const subcategoryHTML = `
-            <div class="doc-subcategory">
-              <button class="doc-subcategory-toggle">${subcategory}</button>
-              <div class="doc-years"></div>
-            </div>
-          `;
+          const subcategoryButton = document.createElement("button");
+          subcategoryButton.className = "doc-subcategory-toggle";
+          subcategoryButton.textContent = subcategory;
 
-          subcategoriesContainer.innerHTML += subcategoryHTML;
+          yearsContainer = document.createElement("div");
+          yearsContainer.className = "doc-years";
 
-          yearsContainer =
-            subcategoriesContainer.lastElementChild.querySelector(".doc-years");
-
+          subcategoryElement.appendChild(subcategoryButton);
+          subcategoryElement.appendChild(yearsContainer);
+          subcategoriesContainer.appendChild(subcategoryElement);
         }
 
         Object.keys(groupedByYear[category][subcategory]).forEach(year => {
+          const yearElement = document.createElement("div");
+          yearElement.className = "doc-year";
 
-          const yearHTML = `
-            <div class="doc-year">
-              <button class="doc-year-toggle">${year}</button>
-              <div class="doc-files"></div>
-            </div>
-          `;
+          const yearButton = document.createElement("button");
+          yearButton.className = "doc-year-toggle";
+          yearButton.textContent = year;
 
-          yearsContainer.innerHTML += yearHTML;
+          const filesContainer = document.createElement("div");
+          filesContainer.className = "doc-files";
 
-          const filesContainer =
-            yearsContainer.lastElementChild.querySelector(".doc-files");
+          yearElement.appendChild(yearButton);
+          yearElement.appendChild(filesContainer);
+          yearsContainer.appendChild(yearElement);
 
           groupedByYear[category][subcategory][year].forEach(doc => {
+            const ul = document.createElement("ul");
+            const li = document.createElement("li");
+            const link = document.createElement("a");
 
-            const fileHTML = `
-              <ul>
-                <li>
-                  <a href="#" class="doc-file-link" data-path="${doc.file_path}">
-                    ${doc.file_name}
-                  </a>
-                </li>
-              </ul>
-            `;
+            link.href = "#";
+            link.className = "doc-file-link";
+            link.dataset.path = doc.file_path;
+            link.textContent = doc.file_name;
 
-            filesContainer.innerHTML += fileHTML;
-
+            li.appendChild(link);
+            ul.appendChild(li);
+            filesContainer.appendChild(ul);
           });
-
         });
-
       });
-
     });
 
     setupDocumentToggles();
     setupDocumentLinks();
 
   } catch (error) {
-
     console.error("Erro ao buscar documentos:", error);
 
     if (documentsList) {
-      documentsList.innerHTML = "<p class='empty-message'>Erro ao carregar documentos.</p>";
+      documentsList.innerHTML =
+        "<p class='empty-message'>Erro ao carregar documentos.</p>";
     }
-
   }
-
 }
 
+/* ===============================
+   TOGGLES (ABRIR/FECHAR)
+================================ */
 function setupDocumentToggles() {
-
   const categoryButtons = document.querySelectorAll(".doc-category-toggle");
 
   categoryButtons.forEach(button => {
-
     button.addEventListener("click", () => {
-
       const subcategories = button.nextElementSibling;
 
-      if (subcategories.style.display === "block") {
-        subcategories.style.display = "none";
-      } else {
-        subcategories.style.display = "block";
-      }
-
+      subcategories.style.display =
+        subcategories.style.display === "block" ? "none" : "block";
     });
-
   });
 
   const subcategoryButtons = document.querySelectorAll(".doc-subcategory-toggle");
 
   subcategoryButtons.forEach(button => {
-
     button.addEventListener("click", () => {
-
       const years = button.nextElementSibling;
 
-      if (years.style.display === "block") {
-        years.style.display = "none";
-      } else {
-        years.style.display = "block";
-      }
-
+      years.style.display =
+        years.style.display === "block" ? "none" : "block";
     });
-
   });
 
   const yearButtons = document.querySelectorAll(".doc-year-toggle");
 
   yearButtons.forEach(button => {
-
     button.addEventListener("click", () => {
-
       const files = button.nextElementSibling;
 
-      if (files.style.display === "block") {
-        files.style.display = "none";
-      } else {
-        files.style.display = "block";
-      }
-
+      files.style.display =
+        files.style.display === "block" ? "none" : "block";
     });
-
   });
-
 }
 
+/* ===============================
+   DOWNLOAD DOCUMENTOS
+================================ */
 function setupDocumentLinks() {
-
   const fileLinks = document.querySelectorAll(".doc-file-link");
 
   fileLinks.forEach(link => {
-
-    link.addEventListener("click", (event) => {
-
+    link.addEventListener("click", async (event) => {
       event.preventDefault();
 
       const filePath = link.dataset.path;
 
-      console.log("CLICOU NO ARQUIVO:", filePath);
+      console.log("FILE PATH CLICADO:", filePath);
 
+      try {
+        const response = await fetch(
+          "http://localhost:3000/documents/download",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ file_path: filePath })
+          }
+        );
+
+        console.log("STATUS /documents/download:", response.status);
+
+        const data = await response.json();
+
+        console.log("RESPOSTA DOWNLOAD:", data);
+
+        if (!response.ok) {
+          alert(data.error || "Erro ao gerar link do documento.");
+          return;
+        }
+
+        if (data.url) {
+          window.open(data.url, "_blank");
+        } else {
+          alert("Nenhuma URL foi retornada para o documento.");
+        }
+      } catch (error) {
+        console.error("Erro ao gerar link do documento:", error);
+      }
+    });
+  });
+}
+
+/* ===============================
+   AVISOS (CARROSSEL)
+================================ */
+async function loadNotices() {
+  if (!noticesList) return;
+
+  noticesList.innerHTML =
+    "<p class='loading-message'>Carregando avisos...</p>";
+
+  try {
+    const response = await fetch("http://localhost:3000/notices");
+
+    console.log("STATUS /notices:", response.status);
+
+    if (!response.ok) {
+      throw new Error("Erro na requisição de avisos");
+    }
+
+    const notices = await response.json();
+
+    console.log("AVISOS:", notices);
+
+    if (!Array.isArray(notices) || notices.length === 0) {
+      noticesList.innerHTML =
+        "<p class='empty-message'>Nenhum aviso disponível no momento.</p>";
+      return;
+    }
+
+    noticesList.innerHTML = `
+      <div class="notice-carousel">
+        <button id="prevNoticeBtn">‹</button>
+        <div id="noticeSlide"></div>
+        <button id="nextNoticeBtn">›</button>
+      </div>
+    `;
+
+    let currentNoticeIndex = 0;
+
+    function renderNotice() {
+      const notice = notices[currentNoticeIndex];
+      const noticeSlide = document.querySelector("#noticeSlide");
+
+      console.log("NOTICE ATUAL:", notice);
+
+      noticeSlide.innerHTML = `
+        <img src="${notice.image_url}" 
+             alt="${notice.title}" 
+             style="width:100%; border-radius:8px; cursor:pointer;" />
+      `;
+
+      const img = noticeSlide.querySelector("img");
+
+      if (img) {
+        img.addEventListener("error", () => {
+          console.error("Erro ao carregar imagem do aviso:", notice.image_url);
+        });
+      }
+
+      if (img && notice.link) {
+        img.addEventListener("click", () => {
+          window.open(notice.link, "_blank");
+        });
+      }
+    }
+
+    renderNotice();
+
+    document.querySelector("#prevNoticeBtn").addEventListener("click", () => {
+      currentNoticeIndex =
+        currentNoticeIndex === 0
+          ? notices.length - 1
+          : currentNoticeIndex - 1;
+
+      renderNotice();
     });
 
-  });
+    document.querySelector("#nextNoticeBtn").addEventListener("click", () => {
+      currentNoticeIndex =
+        currentNoticeIndex === notices.length - 1
+          ? 0
+          : currentNoticeIndex + 1;
 
-}
+      renderNotice();
+    });
 
-function loadNotices() {
+  } catch (error) {
+    console.error("Erro ao carregar avisos:", error);
 
-  if (noticesList) {
-
-    noticesList.innerHTML = "<p class='loading-message'>Carregando avisos...</p>";
-
-    setTimeout(() => {
-
-      noticesList.innerHTML = "<p class='empty-message'>Nenhum aviso disponível no momento.</p>";
-
-    }, 1000);
-
+    noticesList.innerHTML =
+      "<p class='empty-message'>Erro ao carregar avisos.</p>";
   }
-
 }
 
+/* ===============================
+   INIT
+================================ */
 function initClientPanel() {
-
   loadClientInfo();
   loadNotices();
-
+  loadDocuments();
 }
 
 initClientPanel();
-loadDocuments();
