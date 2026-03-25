@@ -12,6 +12,16 @@ const noticesList = document.querySelector("#noticesList");
 const logoutBtn = document.querySelector("#logoutBtn");
 
 /* ===============================
+   SESSÃO
+================================ */
+function clearSessionAndRedirect(message = "Sua sessão expirou. Faça login novamente.") {
+  localStorage.removeItem("access_token");
+  localStorage.removeItem("profile");
+  alert(message);
+  window.location.href = "login.html";
+}
+
+/* ===============================
    INFORMAÇÕES DO CLIENTE
 ================================ */
 function loadClientInfo() {
@@ -46,12 +56,7 @@ async function loadDocuments() {
   console.log("TOKEN ENCONTRADO:", token ? "SIM" : "NÃO");
 
   if (!token) {
-    console.error("Token não encontrado.");
-
-    if (documentsList) {
-      documentsList.innerHTML =
-        "<p class='empty-message'>Sessão inválida. Faça login novamente.</p>";
-    }
+    clearSessionAndRedirect("Sessão inválida. Faça login novamente.");
     return;
   }
 
@@ -77,6 +82,11 @@ async function loadDocuments() {
     const documentsContainer = document.querySelector("#documentsList");
 
     if (!documentsContainer) return;
+
+    if (response.status === 401) {
+      clearSessionAndRedirect("Sua sessão expirou. Faça login novamente.");
+      return;
+    }
 
     if (!response.ok) {
       documentsContainer.innerHTML =
@@ -198,7 +208,7 @@ async function loadDocuments() {
 
             link.href = "#";
             link.className = "doc-file-link";
-            link.dataset.path = doc.file_path;
+            link.dataset.documentId = doc.id;
             link.textContent = doc.file_name;
 
             li.appendChild(link);
@@ -265,14 +275,15 @@ function setupDocumentToggles() {
 ================================ */
 function setupDocumentLinks() {
   const fileLinks = document.querySelectorAll(".doc-file-link");
+  const token = localStorage.getItem("access_token");
 
   fileLinks.forEach(link => {
     link.addEventListener("click", async (event) => {
       event.preventDefault();
 
-      const filePath = link.dataset.path;
+      const documentId = link.dataset.documentId;
 
-      console.log("FILE PATH CLICADO:", filePath);
+      console.log("DOCUMENT ID CLICADO:", documentId);
 
       try {
         const response = await fetch(
@@ -280,9 +291,10 @@ function setupDocumentLinks() {
           {
             method: "POST",
             headers: {
-              "Content-Type": "application/json"
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${token}`
             },
-            body: JSON.stringify({ file_path: filePath })
+            body: JSON.stringify({ document_id: documentId })
           }
         );
 
@@ -291,6 +303,11 @@ function setupDocumentLinks() {
         const data = await response.json();
 
         console.log("RESPOSTA DOWNLOAD:", data);
+
+        if (response.status === 401) {
+          clearSessionAndRedirect("Sua sessão expirou. Faça login novamente.");
+          return;
+        }
 
         if (!response.ok) {
           alert(data.error || "Erro ao gerar link do documento.");
