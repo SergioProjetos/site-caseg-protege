@@ -87,6 +87,35 @@ async function getAuthenticatedUser(req) {
 }
 
 /* ===============================
+   FUNÇÃO AUXILIAR - BUSCAR PERFIL
+================================ */
+async function getUserProfile(userId) {
+  try {
+    const { data, error } = await adminSupabase
+      .from("profiles")
+      .select("*")
+      .eq("user_id", userId)
+      .single();
+
+    if (error || !data) {
+      return {
+        error: "Perfil não encontrado.",
+        status: 404
+      };
+    }
+
+    return { profile: data };
+  } catch (err) {
+    console.error("ERRO EM getUserProfile:", err);
+
+    return {
+      error: "Erro ao buscar perfil do usuário.",
+      status: 500
+    };
+  }
+}
+
+/* ===============================
    TESTE
 ================================ */
 app.get("/", (req, res) => {
@@ -190,6 +219,91 @@ app.post("/login", async (req, res) => {
     });
   } catch (error) {
     console.error("ERRO EM /login:", error);
+    res.status(500).json({ error: "Erro interno do servidor" });
+  }
+});
+
+/* ===============================
+   CADASTRAR CLIENTE (BASE SEGURA ADMIN)
+================================ */
+app.post("/clients", async (req, res) => {
+  try {
+    const authResult = await getAuthenticatedUser(req);
+
+    if (authResult.error) {
+      return res.status(authResult.status).json({
+        error: authResult.error
+      });
+    }
+
+    const adminUserId = authResult.user.id;
+
+    const profileResult = await getUserProfile(adminUserId);
+
+    if (profileResult.error) {
+      return res.status(profileResult.status).json({
+        error: profileResult.error
+      });
+    }
+
+    const adminProfile = profileResult.profile;
+
+    if (adminProfile.role !== "admin") {
+      return res.status(403).json({
+        error: "Acesso restrito a administradores."
+      });
+    }
+
+    const {
+      full_name,
+      company_name,
+      cpf_cnpj,
+      email,
+      role,
+      address_zip,
+      address_street,
+      address_number,
+      address_complement,
+      address_neighborhood,
+      address_city,
+      address_state,
+      phone,
+      whatsapp
+    } = req.body;
+
+    if (!full_name || !company_name || !cpf_cnpj || !email) {
+      return res.status(400).json({
+        error: "Campos obrigatórios: full_name, company_name, cpf_cnpj e email."
+      });
+    }
+
+    if (role && role !== "client") {
+      return res.status(400).json({
+        error: "Esta rota permite apenas cadastro com role = client."
+      });
+    }
+
+    return res.status(200).json({
+      message: "Dados recebidos com sucesso. Próximo passo: criar usuário no Auth e salvar perfil.",
+      payload: {
+        full_name,
+        company_name,
+        cpf_cnpj,
+        email,
+        role: "client",
+        address_zip: address_zip || null,
+        address_street: address_street || null,
+        address_number: address_number || null,
+        address_complement: address_complement || null,
+        address_neighborhood: address_neighborhood || null,
+        address_city: address_city || null,
+        address_state: address_state || null,
+        phone: phone || null,
+        whatsapp: whatsapp || null
+      }
+    });
+  } catch (error) {
+    console.error("ERRO EM /clients:", error);
     res.status(500).json({ error: "Erro interno do servidor" });
   }
 });
@@ -347,6 +461,7 @@ console.log("Rotas configuradas:");
 console.log("GET /");
 console.log("POST /primeiro-acesso");
 console.log("POST /login");
+console.log("POST /clients");
 console.log("GET /documents");
 console.log("POST /documents/download");
 console.log("GET /notices");

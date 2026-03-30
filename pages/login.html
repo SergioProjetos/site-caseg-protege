@@ -80,7 +80,7 @@
 
 <main>
     <h2>Área do Cliente</h2>
-    <p>Acesso exclusivo para clientes.</p>
+    <p>Acesso exclusivo para clientes e administradores.</p>
 
     <form id="loginForm">
 
@@ -195,7 +195,11 @@
                 `<span style="color:green;">Login realizado com sucesso!</span>`;
 
             setTimeout(() => {
-                window.location.href = "servicos.html";
+                if (data.profile.role === "admin") {
+                    window.location.href = "admin.html";
+                } else {
+                    window.location.href = "servicos.html";
+                }
             }, 800);
 
         } catch (error) {
