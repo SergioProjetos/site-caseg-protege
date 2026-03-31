@@ -116,6 +116,14 @@ async function getUserProfile(userId) {
 }
 
 /* ===============================
+   FUNÇÃO AUXILIAR - GERAR SENHA TEMPORÁRIA
+================================ */
+function generateTemporaryPassword() {
+  const random = Math.random().toString(36).slice(-6);
+  return `Caseg@${random}1`;
+}
+
+/* ===============================
    TESTE
 ================================ */
 app.get("/", (req, res) => {
@@ -224,7 +232,7 @@ app.post("/login", async (req, res) => {
 });
 
 /* ===============================
-   CADASTRAR CLIENTE (BASE SEGURA ADMIN)
+   CADASTRAR CLIENTE REAL
 ================================ */
 app.post("/clients", async (req, res) => {
   try {
@@ -283,24 +291,85 @@ app.post("/clients", async (req, res) => {
       });
     }
 
-    return res.status(200).json({
-      message: "Dados recebidos com sucesso. Próximo passo: criar usuário no Auth e salvar perfil.",
-      payload: {
+    const normalizedEmail = email.trim().toLowerCase();
+    const normalizedCpfCnpj = String(cpf_cnpj).trim();
+    const normalizedZip = address_zip ? String(address_zip).trim() : null;
+    const normalizedPhone = phone ? String(phone).trim() : null;
+    const normalizedWhatsapp = whatsapp ? String(whatsapp).trim() : null;
+
+    const { data: existingProfiles, error: existingProfilesError } = await adminSupabase
+      .from("profiles")
+      .select("user_id, email, cpf_cnpj")
+      .or(`email.eq.${normalizedEmail},cpf_cnpj.eq.${normalizedCpfCnpj}`);
+
+    if (existingProfilesError) {
+      return res.status(500).json({
+        error: "Erro ao verificar duplicidade de cliente."
+      });
+    }
+
+    if (existingProfiles && existingProfiles.length > 0) {
+      return res.status(400).json({
+        error: "Já existe um cliente com este e-mail ou CPF/CNPJ."
+      });
+    }
+
+    const temporaryPassword = generateTemporaryPassword();
+
+    const { data: createdUserData, error: createUserError } =
+      await adminSupabase.auth.admin.createUser({
+        email: normalizedEmail,
+        password: temporaryPassword,
+        email_confirm: true
+      });
+
+    if (createUserError || !createdUserData || !createdUserData.user) {
+      return res.status(400).json({
+        error: createUserError?.message || "Erro ao criar usuário no Auth."
+      });
+    }
+
+    const newUserId = createdUserData.user.id;
+
+    const { error: insertProfileError } = await adminSupabase
+      .from("profiles")
+      .insert({
+        user_id: newUserId,
         full_name,
         company_name,
-        cpf_cnpj,
-        email,
+        cpf_cnpj: normalizedCpfCnpj,
+        email: normalizedEmail,
         role: "client",
-        address_zip: address_zip || null,
+        address_zip: normalizedZip,
         address_street: address_street || null,
         address_number: address_number || null,
         address_complement: address_complement || null,
         address_neighborhood: address_neighborhood || null,
         address_city: address_city || null,
         address_state: address_state || null,
-        phone: phone || null,
-        whatsapp: whatsapp || null
-      }
+        phone: normalizedPhone,
+        whatsapp: normalizedWhatsapp
+      });
+
+    if (insertProfileError) {
+      await adminSupabase.auth.admin.deleteUser(newUserId);
+
+      return res.status(400).json({
+        error: insertProfileError.message || "Erro ao salvar perfil do cliente."
+      });
+    }
+
+    return res.status(201).json({
+      message: "Cliente cadastrado com sucesso.",
+      client: {
+        user_id: newUserId,
+        full_name,
+        company_name,
+        cpf_cnpj: normalizedCpfCnpj,
+        email: normalizedEmail,
+        role: "client"
+      },
+      temporary_password: temporaryPassword
     });
   } catch (error) {
     console.error("ERRO EM /clients:", error);

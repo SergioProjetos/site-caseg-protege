@@ -126,10 +126,14 @@
 </footer>
 
 <script>
+    function onlyDigits(value) {
+        return value.replace(/\D/g, "");
+    }
+
     const cpfInput = document.querySelector("#cpf_cnpj");
 
     cpfInput.addEventListener("input", function () {
-        let value = cpfInput.value.replace(/\D/g, "");
+        let value = onlyDigits(cpfInput.value);
 
         if (value.length <= 11) {
             value = value
@@ -166,7 +170,7 @@
     loginForm.addEventListener("submit", async function (event) {
         event.preventDefault();
 
-        const cpf_cnpj = document.querySelector("#cpf_cnpj").value.trim();
+        const cpf_cnpj = onlyDigits(document.querySelector("#cpf_cnpj").value.trim());
         const password = document.querySelector("#password").value.trim();
 
         loginMessage.innerHTML = "<span style='color:#0b6b79;'>Entrando...</span>";

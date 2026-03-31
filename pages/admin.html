@@ -166,6 +166,25 @@
           </div>
 
           <p id="createClientMessage" class="form-message"></p>
+
+          <div id="temporaryPasswordBox" class="temporary-password-box hidden">
+            <h3>Acesso inicial do cliente</h3>
+            <p class="temporary-password-info">
+              Guarde esta senha temporária. Ela será usada para o primeiro acesso do cliente.
+            </p>
+
+            <div class="temporary-password-row">
+              <input
+                type="text"
+                id="temporaryPasswordField"
+                readonly
+                value=""
+              />
+              <button type="button" id="copyTemporaryPasswordBtn">
+                Copiar senha
+              </button>
+            </div>
+          </div>
         </form>
       </section>
 
