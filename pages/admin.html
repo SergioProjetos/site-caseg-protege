@@ -19,187 +19,203 @@
 
     <main class="admin-main">
       <section class="admin-section">
-        <h2>Cadastrar Cliente</h2>
-        <p class="section-description">
-          Crie o acesso inicial do cliente. Depois, ele poderá definir a própria senha.
-        </p>
-
-        <form id="createClientForm" class="admin-form">
-          <div class="form-grid">
-            <div class="form-group">
-              <label for="fullName">Nome do cliente</label>
-              <input
-                type="text"
-                id="fullName"
-                name="fullName"
-                placeholder="Digite o nome do cliente"
-                required
-              />
-            </div>
-
-            <div class="form-group">
-              <label for="companyName">Nome da empresa</label>
-              <input
-                type="text"
-                id="companyName"
-                name="companyName"
-                placeholder="Digite o nome da empresa"
-                required
-              />
-            </div>
-
-            <div class="form-group">
-              <label for="cpfCnpj">CPF ou CNPJ</label>
-              <input
-                type="text"
-                id="cpfCnpj"
-                name="cpfCnpj"
-                placeholder="Digite o CPF ou CNPJ"
-                required
-              />
-            </div>
-
-            <div class="form-group">
-              <label for="email">E-mail</label>
-              <input
-                type="email"
-                id="email"
-                name="email"
-                placeholder="Digite o e-mail do cliente"
-                required
-              />
-            </div>
-
-            <div class="form-group">
-              <label for="addressZip">CEP</label>
-              <input
-                type="text"
-                id="addressZip"
-                name="addressZip"
-                placeholder="Digite o CEP"
-              />
-            </div>
-
-            <div class="form-group">
-              <label for="addressStreet">Rua / Logradouro</label>
-              <input
-                type="text"
-                id="addressStreet"
-                name="addressStreet"
-                placeholder="Digite a rua"
-              />
-            </div>
-
-            <div class="form-group">
-              <label for="addressNumber">Número</label>
-              <input
-                type="text"
-                id="addressNumber"
-                name="addressNumber"
-                placeholder="Digite o número"
-              />
-            </div>
-
-            <div class="form-group">
-              <label for="addressComplement">Complemento</label>
-              <input
-                type="text"
-                id="addressComplement"
-                name="addressComplement"
-                placeholder="Digite o complemento"
-              />
-            </div>
-
-            <div class="form-group">
-              <label for="addressNeighborhood">Bairro</label>
-              <input
-                type="text"
-                id="addressNeighborhood"
-                name="addressNeighborhood"
-                placeholder="Digite o bairro"
-              />
-            </div>
-
-            <div class="form-group">
-              <label for="addressCity">Cidade</label>
-              <input
-                type="text"
-                id="addressCity"
-                name="addressCity"
-                placeholder="Digite a cidade"
-              />
-            </div>
-
-            <div class="form-group">
-              <label for="addressState">Estado</label>
-              <input
-                type="text"
-                id="addressState"
-                name="addressState"
-                placeholder="Digite o estado"
-              />
-            </div>
-
-            <div class="form-group">
-              <label for="phone">Telefone</label>
-              <input
-                type="text"
-                id="phone"
-                name="phone"
-                placeholder="Digite o telefone"
-              />
-            </div>
-
-            <div class="form-group">
-              <label for="whatsapp">WhatsApp</label>
-              <input
-                type="text"
-                id="whatsapp"
-                name="whatsapp"
-                placeholder="Digite o WhatsApp"
-              />
-            </div>
-          </div>
-
-          <div class="form-actions">
-            <button type="submit" id="createClientBtn">Cadastrar Cliente</button>
-          </div>
-
-          <p id="createClientMessage" class="form-message"></p>
-
-          <div id="temporaryPasswordBox" class="temporary-password-box hidden">
-            <h3>Acesso inicial do cliente</h3>
-            <p class="temporary-password-info">
-              Guarde esta senha temporária. Ela será usada para o primeiro acesso do cliente.
+        <div class="section-header">
+          <div>
+            <h2>Cadastrar Cliente</h2>
+            <p class="section-description">
+              Crie o acesso inicial do cliente. Depois, ele poderá definir a própria senha.
             </p>
-
-            <div class="temporary-password-row">
-              <input
-                type="text"
-                id="temporaryPasswordField"
-                readonly
-                value=""
-              />
-              <button type="button" id="copyTemporaryPasswordBtn">
-                Copiar senha
-              </button>
-            </div>
           </div>
-        </form>
+
+          <button type="button" id="toggleCreateClientBtn" class="section-action-btn">
+            Novo Cliente
+          </button>
+        </div>
+
+        <div id="createClientWrapper" class="hidden">
+          <form id="createClientForm" class="admin-form">
+            <div class="form-grid">
+              <div class="form-group">
+                <label for="fullName">Nome do cliente</label>
+                <input
+                  type="text"
+                  id="fullName"
+                  name="fullName"
+                  placeholder="Digite o nome do cliente"
+                  required
+                />
+              </div>
+
+              <div class="form-group">
+                <label for="companyName">Nome da empresa</label>
+                <input
+                  type="text"
+                  id="companyName"
+                  name="companyName"
+                  placeholder="Digite o nome da empresa"
+                  required
+                />
+              </div>
+
+              <div class="form-group">
+                <label for="cpfCnpj">CPF ou CNPJ</label>
+                <input
+                  type="text"
+                  id="cpfCnpj"
+                  name="cpfCnpj"
+                  placeholder="Digite o CPF ou CNPJ"
+                  required
+                />
+              </div>
+
+              <div class="form-group">
+                <label for="email">E-mail</label>
+                <input
+                  type="email"
+                  id="email"
+                  name="email"
+                  placeholder="Digite o e-mail do cliente"
+                  required
+                />
+              </div>
+
+              <div class="form-group">
+                <label for="addressZip">CEP</label>
+                <input
+                  type="text"
+                  id="addressZip"
+                  name="addressZip"
+                  placeholder="Digite o CEP"
+                />
+              </div>
+
+              <div class="form-group">
+                <label for="addressStreet">Rua / Logradouro</label>
+                <input
+                  type="text"
+                  id="addressStreet"
+                  name="addressStreet"
+                  placeholder="Digite a rua"
+                />
+              </div>
+
+              <div class="form-group">
+                <label for="addressNumber">Número</label>
+                <input
+                  type="text"
+                  id="addressNumber"
+                  name="addressNumber"
+                  placeholder="Digite o número"
+                />
+              </div>
+
+              <div class="form-group">
+                <label for="addressComplement">Complemento</label>
+                <input
+                  type="text"
+                  id="addressComplement"
+                  name="addressComplement"
+                  placeholder="Digite o complemento"
+                />
+              </div>
+
+              <div class="form-group">
+                <label for="addressNeighborhood">Bairro</label>
+                <input
+                  type="text"
+                  id="addressNeighborhood"
+                  name="addressNeighborhood"
+                  placeholder="Digite o bairro"
+                />
+              </div>
+
+              <div class="form-group">
+                <label for="addressCity">Cidade</label>
+                <input
+                  type="text"
+                  id="addressCity"
+                  name="addressCity"
+                  placeholder="Digite a cidade"
+                />
+              </div>
+
+              <div class="form-group">
+                <label for="addressState">Estado</label>
+                <input
+                  type="text"
+                  id="addressState"
+                  name="addressState"
+                  placeholder="Digite o estado"
+                />
+              </div>
+
+              <div class="form-group">
+                <label for="phone">Telefone</label>
+                <input
+                  type="text"
+                  id="phone"
+                  name="phone"
+                  placeholder="Digite o telefone"
+                />
+              </div>
+
+              <div class="form-group">
+                <label for="whatsapp">WhatsApp</label>
+                <input
+                  type="text"
+                  id="whatsapp"
+                  name="whatsapp"
+                  placeholder="Digite o WhatsApp"
+                />
+              </div>
+            </div>
+
+            <div class="form-actions">
+              <button type="submit" id="createClientBtn">Cadastrar Cliente</button>
+            </div>
+
+            <p id="createClientMessage" class="form-message"></p>
+
+            <div id="temporaryPasswordBox" class="temporary-password-box hidden">
+              <h3>Acesso inicial do cliente</h3>
+              <p class="temporary-password-info">
+                Guarde esta senha temporária. Ela será usada para o primeiro acesso do cliente.
+              </p>
+
+              <div class="temporary-password-row">
+                <input
+                  type="text"
+                  id="temporaryPasswordField"
+                  readonly
+                  value=""
+                />
+                <button type="button" id="copyTemporaryPasswordBtn">
+                  Copiar senha
+                </button>
+              </div>
+            </div>
+          </form>
+        </div>
       </section>
 
       <section class="admin-section">
-        <h2>Upload de Documentos</h2>
-        <p class="section-description">
-          Área reservada para envio de documentos aos clientes.
-        </p>
-      </section>
+        <div class="section-header">
+          <div>
+            <h2>Gerenciar Clientes</h2>
+            <p class="section-description">
+              Visualize os clientes cadastrados no sistema e acesse as ações de cada cliente.
+            </p>
+          </div>
 
-      <section class="admin-section">
-        <h2>Gerenciar Avisos</h2>
-        <p class="section-description">
-          Área reservada para cadastro e gerenciamento de avisos.
-        </p>
+          <button type="button" id="toggleClientsListBtn" class="section-action-btn">
+            Exibir Clientes
+          </button>
+        </div>
+
+        <div id="clientsSectionWrapper" class="hidden">
+          <div id="clientsListMessage" class="list-message">Carregando clientes...</div>
+          <div id="clientsList" class="clients-list"></div>
+        </div>
       </section>
     </main>
   </div>

@@ -378,6 +378,66 @@ app.post("/clients", async (req, res) => {
 });
 
 /* ===============================
+   LISTAR CLIENTES
+================================ */
+app.get("/clients", async (req, res) => {
+  try {
+    const authResult = await getAuthenticatedUser(req);
+
+    if (authResult.error) {
+      return res.status(authResult.status).json({
+        error: authResult.error
+      });
+    }
+
+    const adminUserId = authResult.user.id;
+
+    const profileResult = await getUserProfile(adminUserId);
+
+    if (profileResult.error) {
+      return res.status(profileResult.status).json({
+        error: profileResult.error
+      });
+    }
+
+    const adminProfile = profileResult.profile;
+
+    if (adminProfile.role !== "admin") {
+      return res.status(403).json({
+        error: "Acesso restrito a administradores."
+      });
+    }
+
+    const { data, error } = await adminSupabase
+      .from("profiles")
+      .select(`
+        user_id,
+        full_name,
+        company_name,
+        cpf_cnpj,
+        email,
+        phone,
+        whatsapp,
+        role,
+        created_at
+      `)
+      .eq("role", "client")
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      return res.status(500).json({
+        error: error.message || "Erro ao listar clientes."
+      });
+    }
+
+    return res.status(200).json(data || []);
+  } catch (error) {
+    console.error("ERRO EM GET /clients:", error);
+    res.status(500).json({ error: "Erro interno do servidor" });
+  }
+});
+
+/* ===============================
    BUSCAR DOCUMENTOS (SEGURO)
 ================================ */
 app.get("/documents", async (req, res) => {
@@ -531,6 +591,7 @@ console.log("GET /");
 console.log("POST /primeiro-acesso");
 console.log("POST /login");
 console.log("POST /clients");
+console.log("GET /clients");
 console.log("GET /documents");
 console.log("POST /documents/download");
 console.log("GET /notices");
