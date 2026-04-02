@@ -16,6 +16,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   const adminWelcome = document.getElementById("adminWelcome");
   const logoutBtn = document.getElementById("logoutBtn");
+  const adminFeedback = document.getElementById("adminFeedback");
 
   const toggleCreateClientBtn = document.getElementById("toggleCreateClientBtn");
   const createClientWrapper = document.getElementById("createClientWrapper");
@@ -36,6 +37,42 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   const clientsListMessage = document.getElementById("clientsListMessage");
   const clientsList = document.getElementById("clientsList");
+
+  let feedbackTimeout = null;
+
+  function showAdminFeedback(message, type = "info", autoHide = true) {
+    adminFeedback.textContent = message;
+    adminFeedback.className = `admin-feedback ${type}`;
+
+    if (feedbackTimeout) {
+      clearTimeout(feedbackTimeout);
+    }
+
+    if (autoHide) {
+      feedbackTimeout = setTimeout(() => {
+        adminFeedback.className = "admin-feedback hidden";
+        adminFeedback.textContent = "";
+      }, 4000);
+    }
+  }
+
+  function hideAdminFeedback() {
+    if (feedbackTimeout) {
+      clearTimeout(feedbackTimeout);
+    }
+
+    adminFeedback.className = "admin-feedback hidden";
+    adminFeedback.textContent = "";
+  }
+
+  function setInlineMessage(element, message, type = "info") {
+    if (!element) {
+      return;
+    }
+
+    element.textContent = message;
+    element.className = `upload-form-message ${type}`;
+  }
 
   function loadAdminInfo() {
     adminWelcome.textContent = `Bem-vindo, ${profile.full_name || "Administrador"}`;
@@ -145,39 +182,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     toggleClientsListBtn.textContent = "Ocultar Clientes";
   }
 
-  function getMockDocumentsByClient(clientId, clientName) {
-    const mockDatabase = {
-      "mock-client-1": [
-        {
-          file_name: "Contrato Social.pdf",
-          category: "Contrato",
-          subcategory: "Societário",
-          year: "2026",
-          created_at: "2026-03-18T10:30:00"
-        }
-      ]
-    };
+  function closeAllDocumentMenus() {
+    document.querySelectorAll(".document-actions-dropdown").forEach((dropdown) => {
+      dropdown.classList.add("hidden");
+    });
 
-    if (mockDatabase[clientId]) {
-      return mockDatabase[clientId];
-    }
-
-    return [
-      {
-        file_name: `${clientName || "Documento"} - Exemplo.pdf`,
-        category: "Financeiro",
-        subcategory: "Mensal",
-        year: "2026",
-        created_at: "2026-04-01T09:00:00"
-      },
-      {
-        file_name: "Relatorio de Servico.pdf",
-        category: "Operacional",
-        subcategory: "Relatório",
-        year: "2026",
-        created_at: "2026-04-02T14:15:00"
-      }
-    ];
+    document.querySelectorAll(".document-menu-toggle").forEach((button) => {
+      button.textContent = "▾";
+    });
   }
 
   function createDocumentsHtml(documents) {
@@ -193,35 +205,172 @@ document.addEventListener("DOMContentLoaded", async () => {
       <div class="documents-list">
         ${documents.map((document) => `
           <div class="document-item">
-            <div class="document-item-grid">
-              <div class="document-item-field">
-                <strong>Nome do arquivo</strong>
-                ${document.file_name || "-"}
+            <div class="document-item-top">
+              <div class="document-item-grid">
+                <div class="document-item-field">
+                  <strong>Nome do arquivo</strong>
+                  ${document.file_name || "-"}
+                </div>
+
+                <div class="document-item-field">
+                  <strong>Categoria</strong>
+                  ${document.category || "-"}
+                </div>
+
+                <div class="document-item-field">
+                  <strong>Subcategoria</strong>
+                  ${document.subcategory || "-"}
+                </div>
+
+                <div class="document-item-field">
+                  <strong>Ano</strong>
+                  ${document.year || "-"}
+                </div>
+
+                <div class="document-item-field">
+                  <strong>Data de envio</strong>
+                  ${formatDate(document.created_at)}
+                </div>
               </div>
 
-              <div class="document-item-field">
-                <strong>Categoria</strong>
-                ${document.category || "-"}
-              </div>
+              <div class="document-menu-wrapper">
+                <button
+                  type="button"
+                  class="document-menu-toggle"
+                  data-document-id="${document.id}"
+                >
+                  ▾
+                </button>
 
-              <div class="document-item-field">
-                <strong>Subcategoria</strong>
-                ${document.subcategory || "-"}
-              </div>
+                <div
+                  class="document-actions-dropdown hidden"
+                  id="documentActions-${document.id}"
+                >
+                  <button
+                    type="button"
+                    class="document-action-btn download-document-btn"
+                    data-document-id="${document.id}"
+                  >
+                    Baixar
+                  </button>
 
-              <div class="document-item-field">
-                <strong>Ano</strong>
-                ${document.year || "-"}
-              </div>
+                  <button
+                    type="button"
+                    class="document-action-btn replace-document-btn"
+                    data-document-id="${document.id}"
+                    data-client-id="${document.client_id}"
+                    data-file-name="${document.file_name || "Documento"}"
+                  >
+                    Substituir
+                  </button>
 
-              <div class="document-item-field">
-                <strong>Data de envio</strong>
-                ${formatDate(document.created_at)}
+                  <input
+                    type="file"
+                    class="replace-document-file-input hidden"
+                    id="replaceFileInput-${document.id}"
+                    data-document-id="${document.id}"
+                    data-client-id="${document.client_id}"
+                  />
+
+                  <button
+                    type="button"
+                    class="document-action-btn delete-document-btn"
+                    data-document-id="${document.id}"
+                    data-client-id="${document.client_id}"
+                    data-file-name="${document.file_name || "Documento"}"
+                  >
+                    Excluir
+                  </button>
+                </div>
               </div>
             </div>
           </div>
         `).join("")}
       </div>
+    `;
+  }
+
+  function createUploadPanelHtml(client) {
+    return `
+      <form
+        class="upload-form"
+        data-client-id="${client.user_id}"
+        id="uploadForm-${client.user_id}"
+      >
+        <div class="upload-form-grid">
+          <div class="form-group">
+            <label>Cliente</label>
+            <input type="text" value="${client.full_name || "-"}" readonly />
+          </div>
+
+          <div class="form-group">
+            <label>Empresa</label>
+            <input type="text" value="${client.company_name || "-"}" readonly />
+          </div>
+
+          <div class="form-group">
+            <label for="uploadCategory-${client.user_id}">Categoria</label>
+            <select id="uploadCategory-${client.user_id}" required>
+              <option value="">Selecione a categoria</option>
+              <option value="PGR">PGR</option>
+              <option value="LTCAT">LTCAT</option>
+              <option value="PPP">PPP</option>
+              <option value="PCMSO">PCMSO</option>
+              <option value="Laudo de Insalubridade">Laudo de Insalubridade</option>
+              <option value="Laudo Ergonômico NR-17">Laudo Ergonômico NR-17</option>
+              <option value="Laudo de Periculosidade">Laudo de Periculosidade</option>
+              <option value="AET - Análise Ergonômica do Trabalho">AET - Análise Ergonômica do Trabalho</option>
+              <option value="PCA - Programa de Conservação Auditiva">PCA - Programa de Conservação Auditiva</option>
+              <option value="PPR - Programa de Proteção Respiratória">PPR - Programa de Proteção Respiratória</option>
+              <option value="APR - Análise Preliminar de Risco/HO">APR - Análise Preliminar de Risco/HO</option>
+              <option value="Manual de EPIs">Manual de EPIs</option>
+              <option value="Ordem de Serviço (NR 01)">Ordem de Serviço (NR 01)</option>
+              <option value="Certificados">Certificados</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="uploadSubcategory-${client.user_id}">Subcategoria</label>
+            <input
+              type="text"
+              id="uploadSubcategory-${client.user_id}"
+              placeholder="Digite a subcategoria"
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="uploadYear-${client.user_id}">Ano</label>
+            <input
+              type="number"
+              id="uploadYear-${client.user_id}"
+              placeholder="Digite o ano"
+              min="2000"
+              max="2100"
+              required
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="uploadFile-${client.user_id}">Arquivo</label>
+            <input
+              type="file"
+              id="uploadFile-${client.user_id}"
+              required
+            />
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" class="upload-submit-btn">
+            Enviar Documento
+          </button>
+        </div>
+
+        <div
+          class="upload-form-message"
+          id="uploadFormMessage-${client.user_id}"
+        ></div>
+      </form>
     `;
   }
 
@@ -299,6 +448,24 @@ document.addEventListener("DOMContentLoaded", async () => {
         </div>
 
         <div
+          id="upload-panel-${client.user_id}"
+          class="upload-panel hidden"
+        >
+          <div class="upload-panel-header">
+            <div>
+              <div class="upload-panel-title">Enviar documento</div>
+              <div class="upload-panel-subtitle">
+                Cliente: ${client.full_name || "-"}${client.company_name ? ` - ${client.company_name}` : ""}
+              </div>
+            </div>
+          </div>
+
+          <div id="upload-content-${client.user_id}">
+            ${createUploadPanelHtml(client)}
+          </div>
+        </div>
+
+        <div
           id="documents-panel-${client.user_id}"
           class="documents-panel hidden"
         >
@@ -319,32 +486,320 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
 
     bindClientActionButtons();
+    bindUploadForms();
+  }
+
+  async function loadClientDocuments(clientId) {
+    const response = await fetch(`http://localhost:3000/clients/${clientId}/documents`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
+      }
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || "Erro ao buscar documentos do cliente.");
+    }
+
+    return data;
+  }
+
+  async function renderClientDocumentsPanel(clientId) {
+    const content = document.getElementById(`documents-content-${clientId}`);
+
+    if (!content) {
+      return;
+    }
+
+    content.innerHTML = `
+      <div class="empty-documents-message">
+        Carregando documentos...
+      </div>
+    `;
+
+    try {
+      const documents = await loadClientDocuments(clientId);
+      content.innerHTML = createDocumentsHtml(documents);
+      bindClientActionButtons();
+    } catch (error) {
+      console.error("Erro ao carregar documentos do cliente:", error);
+      content.innerHTML = `
+        <div class="empty-documents-message">
+          ${error.message || "Erro ao carregar documentos."}
+        </div>
+      `;
+    }
+  }
+
+  async function downloadDocumentAsAdmin(documentId, buttonElement) {
+    const originalText = buttonElement.textContent;
+    buttonElement.textContent = "Baixando...";
+    buttonElement.disabled = true;
+    showAdminFeedback("Preparando download do documento...", "info");
+
+    try {
+      const response = await fetch("http://localhost:3000/admin/documents/download", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          document_id: documentId
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Erro ao baixar documento.");
+      }
+
+      if (!data.url) {
+        throw new Error("Link de download não foi gerado.");
+      }
+
+      window.open(data.url, "_blank");
+      showAdminFeedback("Download iniciado com sucesso.", "success");
+    } catch (error) {
+      console.error("Erro ao baixar documento no admin:", error);
+      showAdminFeedback(error.message || "Erro ao baixar documento.", "error");
+    } finally {
+      buttonElement.textContent = originalText;
+      buttonElement.disabled = false;
+    }
+  }
+
+  async function deleteDocumentAsAdmin(documentId, clientId, fileName, buttonElement) {
+    const confirmed = window.confirm(`Tem certeza que deseja excluir o documento "${fileName}"?`);
+
+    if (!confirmed) {
+      return;
+    }
+
+    const originalText = buttonElement.textContent;
+    buttonElement.textContent = "Excluindo...";
+    buttonElement.disabled = true;
+    showAdminFeedback("Excluindo documento...", "warning");
+
+    try {
+      const response = await fetch(`http://localhost:3000/admin/documents/${documentId}`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        }
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Erro ao excluir documento.");
+      }
+
+      await renderClientDocumentsPanel(clientId);
+      showAdminFeedback("Documento excluído com sucesso.", "success");
+    } catch (error) {
+      console.error("Erro ao excluir documento no admin:", error);
+      showAdminFeedback(error.message || "Erro ao excluir documento.", "error");
+    } finally {
+      buttonElement.textContent = originalText;
+      buttonElement.disabled = false;
+    }
+  }
+
+  async function replaceDocumentAsAdmin(documentId, clientId, file, buttonElement) {
+    const originalText = buttonElement.textContent;
+    buttonElement.textContent = "Substituindo...";
+    buttonElement.disabled = true;
+    showAdminFeedback("Substituindo documento...", "info");
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const response = await fetch(`http://localhost:3000/admin/documents/${documentId}/replace`, {
+        method: "PUT",
+        headers: {
+          "Authorization": `Bearer ${token}`
+        },
+        body: formData
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Erro ao substituir documento.");
+      }
+
+      await renderClientDocumentsPanel(clientId);
+      showAdminFeedback("Documento substituído com sucesso.", "success");
+    } catch (error) {
+      console.error("Erro ao substituir documento no admin:", error);
+      showAdminFeedback(error.message || "Erro ao substituir documento.", "error");
+    } finally {
+      buttonElement.textContent = originalText;
+      buttonElement.disabled = false;
+    }
+  }
+
+  async function uploadDocumentAsAdmin(clientId, category, subcategory, year, file, messageElement, submitButton) {
+    const originalButtonText = submitButton.textContent;
+
+    submitButton.disabled = true;
+    submitButton.textContent = "Enviando...";
+    setInlineMessage(messageElement, "Enviando documento...", "info");
+    showAdminFeedback("Enviando documento...", "info");
+
+    try {
+      const formData = new FormData();
+      formData.append("client_id", clientId);
+      formData.append("category", category);
+      formData.append("subcategory", subcategory || "");
+      formData.append("year", year);
+      formData.append("file", file);
+
+      const response = await fetch("http://localhost:3000/admin/documents/upload", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token}`
+        },
+        body: formData
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Erro ao enviar documento.");
+      }
+
+      setInlineMessage(messageElement, "Documento enviado com sucesso.", "success");
+      showAdminFeedback("Documento enviado com sucesso.", "success");
+
+      const documentsPanel = document.getElementById(`documents-panel-${clientId}`);
+      const viewDocumentsButton = document.querySelector(`.view-documents-btn[data-client-id="${clientId}"]`);
+
+      if (documentsPanel) {
+        documentsPanel.classList.remove("hidden");
+      }
+
+      if (viewDocumentsButton) {
+        viewDocumentsButton.textContent = "Ocultar Documentos";
+      }
+
+      await renderClientDocumentsPanel(clientId);
+
+      return true;
+    } catch (error) {
+      console.error("Erro ao enviar documento no admin:", error);
+      setInlineMessage(messageElement, error.message || "Erro ao enviar documento.", "error");
+      showAdminFeedback(error.message || "Erro ao enviar documento.", "error");
+      return false;
+    } finally {
+      submitButton.disabled = false;
+      submitButton.textContent = originalButtonText;
+    }
+  }
+
+  function bindUploadForms() {
+    const uploadForms = document.querySelectorAll(".upload-form");
+
+    uploadForms.forEach((form) => {
+      if (form.dataset.bound === "true") {
+        return;
+      }
+
+      form.dataset.bound = "true";
+
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+
+        const clientId = form.dataset.clientId;
+        const category = document.getElementById(`uploadCategory-${clientId}`).value;
+        const subcategory = document.getElementById(`uploadSubcategory-${clientId}`).value.trim();
+        const year = document.getElementById(`uploadYear-${clientId}`).value.trim();
+        const fileInput = document.getElementById(`uploadFile-${clientId}`);
+        const message = document.getElementById(`uploadFormMessage-${clientId}`);
+        const submitButton = form.querySelector(".upload-submit-btn");
+
+        if (!category || !year || !fileInput.files.length) {
+          setInlineMessage(message, "Preencha os campos obrigatórios e selecione um arquivo.", "error");
+          showAdminFeedback("Preencha os campos obrigatórios do upload.", "error");
+          return;
+        }
+
+        const file = fileInput.files[0];
+
+        const success = await uploadDocumentAsAdmin(
+          clientId,
+          category,
+          subcategory,
+          year,
+          file,
+          message,
+          submitButton
+        );
+
+        if (success) {
+          form.reset();
+        }
+      });
+    });
   }
 
   function bindClientActionButtons() {
     const uploadButtons = document.querySelectorAll(".upload-documents-btn");
     const viewButtons = document.querySelectorAll(".view-documents-btn");
     const noticeButtons = document.querySelectorAll(".client-notices-btn");
+    const downloadButtons = document.querySelectorAll(".download-document-btn");
+    const deleteButtons = document.querySelectorAll(".delete-document-btn");
+    const replaceButtons = document.querySelectorAll(".replace-document-btn");
+    const replaceInputs = document.querySelectorAll(".replace-document-file-input");
+    const menuToggles = document.querySelectorAll(".document-menu-toggle");
 
     uploadButtons.forEach((button) => {
+      if (button.dataset.bound === "true") {
+        return;
+      }
+
+      button.dataset.bound = "true";
+
       button.addEventListener("click", () => {
         const clientId = button.dataset.clientId;
-        const clientName = button.dataset.clientName;
-        const companyName = button.dataset.companyName;
+        const uploadPanel = document.getElementById(`upload-panel-${clientId}`);
 
-        alert(`Upload de documentos do cliente: ${clientName} (${companyName})\nID: ${clientId}`);
+        if (!uploadPanel) {
+          return;
+        }
+
+        const isHidden = uploadPanel.classList.contains("hidden");
+
+        if (!isHidden) {
+          uploadPanel.classList.add("hidden");
+          button.textContent = "Upload Documentos";
+          return;
+        }
+
+        uploadPanel.classList.remove("hidden");
+        button.textContent = "Ocultar Upload";
       });
     });
 
     viewButtons.forEach((button) => {
-      button.addEventListener("click", () => {
+      if (button.dataset.bound === "true") {
+        return;
+      }
+
+      button.dataset.bound = "true";
+
+      button.addEventListener("click", async () => {
         const clientId = button.dataset.clientId;
-        const clientName = button.dataset.clientName;
-
         const panel = document.getElementById(`documents-panel-${clientId}`);
-        const content = document.getElementById(`documents-content-${clientId}`);
 
-        if (!panel || !content) {
+        if (!panel) {
           return;
         }
 
@@ -356,23 +811,145 @@ document.addEventListener("DOMContentLoaded", async () => {
           return;
         }
 
-        const documents = getMockDocumentsByClient(clientId, clientName);
-        content.innerHTML = createDocumentsHtml(documents);
         panel.classList.remove("hidden");
         button.textContent = "Ocultar Documentos";
+
+        await renderClientDocumentsPanel(clientId);
       });
     });
 
     noticeButtons.forEach((button) => {
+      if (button.dataset.bound === "true") {
+        return;
+      }
+
+      button.dataset.bound = "true";
+
       button.addEventListener("click", () => {
-        const clientId = button.dataset.clientId;
         const clientName = button.dataset.clientName;
         const companyName = button.dataset.companyName;
+        showAdminFeedback(`Área de avisos do cliente ${clientName} (${companyName}) será o próximo módulo a evoluir.`, "info");
+      });
+    });
 
-        alert(`Gerenciar avisos do cliente: ${clientName} (${companyName})\nID: ${clientId}`);
+    menuToggles.forEach((button) => {
+      if (button.dataset.bound === "true") {
+        return;
+      }
+
+      button.dataset.bound = "true";
+
+      button.addEventListener("click", (event) => {
+        event.stopPropagation();
+
+        const documentId = button.dataset.documentId;
+        const dropdown = document.getElementById(`documentActions-${documentId}`);
+
+        if (!dropdown) {
+          return;
+        }
+
+        const isHidden = dropdown.classList.contains("hidden");
+
+        closeAllDocumentMenus();
+
+        if (isHidden) {
+          dropdown.classList.remove("hidden");
+          button.textContent = "▴";
+        } else {
+          dropdown.classList.add("hidden");
+          button.textContent = "▾";
+        }
+      });
+    });
+
+    downloadButtons.forEach((button) => {
+      if (button.dataset.bound === "true") {
+        return;
+      }
+
+      button.dataset.bound = "true";
+
+      button.addEventListener("click", async () => {
+        const documentId = button.dataset.documentId;
+
+        if (!documentId) {
+          showAdminFeedback("Documento inválido para download.", "error");
+          return;
+        }
+
+        await downloadDocumentAsAdmin(documentId, button);
+      });
+    });
+
+    deleteButtons.forEach((button) => {
+      if (button.dataset.bound === "true") {
+        return;
+      }
+
+      button.dataset.bound = "true";
+
+      button.addEventListener("click", async () => {
+        const documentId = button.dataset.documentId;
+        const clientId = button.dataset.clientId;
+        const fileName = button.dataset.fileName || "Documento";
+
+        if (!documentId || !clientId) {
+          showAdminFeedback("Documento inválido para exclusão.", "error");
+          return;
+        }
+
+        await deleteDocumentAsAdmin(documentId, clientId, fileName, button);
+      });
+    });
+
+    replaceButtons.forEach((button) => {
+      if (button.dataset.bound === "true") {
+        return;
+      }
+
+      button.dataset.bound = "true";
+
+      button.addEventListener("click", () => {
+        const documentId = button.dataset.documentId;
+        const fileInput = document.getElementById(`replaceFileInput-${documentId}`);
+
+        if (!fileInput) {
+          showAdminFeedback("Campo de substituição não encontrado.", "error");
+          return;
+        }
+
+        fileInput.click();
+      });
+    });
+
+    replaceInputs.forEach((input) => {
+      if (input.dataset.bound === "true") {
+        return;
+      }
+
+      input.dataset.bound = "true";
+
+      input.addEventListener("change", async () => {
+        const documentId = input.dataset.documentId;
+        const clientId = input.dataset.clientId;
+        const file = input.files[0];
+        const button = document.querySelector(`.replace-document-btn[data-document-id="${documentId}"]`);
+
+        if (!documentId || !clientId || !file || !button) {
+          input.value = "";
+          return;
+        }
+
+        await replaceDocumentAsAdmin(documentId, clientId, file, button);
+        input.value = "";
       });
     });
   }
+
+  document.addEventListener("click", () => {
+    closeAllDocumentMenus();
+  });
 
   async function loadClients() {
     clientsListMessage.textContent = "Carregando clientes...";
@@ -391,6 +968,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       if (!response.ok) {
         clientsListMessage.textContent = data.error || "Erro ao carregar clientes.";
+        showAdminFeedback(data.error || "Erro ao carregar clientes.", "error");
         return;
       }
 
@@ -398,6 +976,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     } catch (error) {
       console.error("Erro ao carregar clientes:", error);
       clientsListMessage.textContent = "Erro ao conectar com o servidor.";
+      showAdminFeedback("Erro ao conectar com o servidor.", "error");
     }
   }
 
@@ -411,7 +990,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     toggleCreateClientForm();
   });
 
-  toggleClientsListBtn.addEventListener("click", async () => {
+  toggleClientsListBtn.addEventListener("click", () => {
     const isHidden = clientsSectionWrapper.classList.contains("hidden");
 
     if (isHidden) {
@@ -443,9 +1022,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     try {
       await navigator.clipboard.writeText(password);
       copyTemporaryPasswordBtn.textContent = "Senha copiada!";
+      showAdminFeedback("Senha temporária copiada com sucesso.", "success");
     } catch (error) {
       console.error("Erro ao copiar senha:", error);
       copyTemporaryPasswordBtn.textContent = "Erro ao copiar";
+      showAdminFeedback("Erro ao copiar senha temporária.", "error");
     }
 
     setTimeout(() => {
@@ -458,6 +1039,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     createClientMessage.textContent = "Enviando...";
     hidePasswordBox();
+    hideAdminFeedback();
 
     const formData = {
       full_name: document.getElementById("fullName").value.trim(),
@@ -478,6 +1060,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     if (!formData.full_name || !formData.company_name || !formData.cpf_cnpj || !formData.email) {
       createClientMessage.textContent = "Preencha os campos obrigatórios.";
+      showAdminFeedback("Preencha os campos obrigatórios do cadastro.", "error");
       return;
     }
 
@@ -495,10 +1078,12 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       if (!response.ok) {
         createClientMessage.textContent = data.error || "Erro ao cadastrar cliente.";
+        showAdminFeedback(data.error || "Erro ao cadastrar cliente.", "error");
         return;
       }
 
       createClientMessage.textContent = "Cliente cadastrado com sucesso.";
+      showAdminFeedback("Cliente cadastrado com sucesso.", "success");
 
       if (data.temporary_password) {
         showPassword(data.temporary_password);
@@ -511,6 +1096,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     } catch (error) {
       console.error("Erro ao cadastrar cliente:", error);
       createClientMessage.textContent = "Erro ao conectar.";
+      showAdminFeedback("Erro ao conectar para cadastrar cliente.", "error");
     }
   });
 

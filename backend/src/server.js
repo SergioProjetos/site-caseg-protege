@@ -4,15 +4,13 @@ console.log("ESTOU NO SERVER CERTO 🚀");
 console.log("ARQUIVO EM EXECUÇÃO:", __filename);
 
 const express = require("express");
+const multer = require("multer");
 const { createClient } = require("@supabase/supabase-js");
 
 console.log("URL:", process.env.SUPABASE_URL ? "OK" : "NÃO CARREGOU");
 console.log("SERVICE ROLE KEY:", process.env.SUPABASE_SERVICE_ROLE_KEY ? "OK" : "NÃO CARREGOU");
 console.log("ANON KEY:", process.env.SUPABASE_ANON_KEY ? "OK" : "NÃO CARREGOU");
 
-/* ===============================
-   CLIENTES SUPABASE
-================================ */
 const adminSupabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -26,9 +24,6 @@ const publicSupabase = createClient(
 const app = express();
 app.use(express.json());
 
-/* ===============================
-   CORS (PERMITIR FRONTEND)
-================================ */
 app.use((req, res, next) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
@@ -43,12 +38,18 @@ app.use((req, res, next) => {
 
 const PORT = 3000;
 
-/* ===============================
-   FUNÇÃO AUXILIAR - VALIDAR USUÁRIO PELO TOKEN
-================================ */
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 15 * 1024 * 1024
+  }
+});
+
 async function getAuthenticatedUser(req) {
   try {
     const authHeader = req.headers.authorization;
+
+    console.log("AUTH HEADER RECEBIDO:", authHeader ? "SIM" : "NÃO");
 
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return {
@@ -58,6 +59,13 @@ async function getAuthenticatedUser(req) {
     }
 
     const token = authHeader.split(" ")[1];
+
+    if (!token) {
+      return {
+        error: "Token inválido.",
+        status: 401
+      };
+    }
 
     console.log("TOKEN RECEBIDO NO BACKEND:", token ? "SIM" : "NÃO");
 
@@ -86,9 +94,6 @@ async function getAuthenticatedUser(req) {
   }
 }
 
-/* ===============================
-   FUNÇÃO AUXILIAR - BUSCAR PERFIL
-================================ */
 async function getUserProfile(userId) {
   try {
     const { data, error } = await adminSupabase
@@ -115,24 +120,51 @@ async function getUserProfile(userId) {
   }
 }
 
-/* ===============================
-   FUNÇÃO AUXILIAR - GERAR SENHA TEMPORÁRIA
-================================ */
 function generateTemporaryPassword() {
   const random = Math.random().toString(36).slice(-6);
   return `Caseg@${random}1`;
 }
 
-/* ===============================
-   TESTE
-================================ */
+function sanitizeFileName(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^\w.\-]+/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
+function normalizeText(value) {
+  return value ? String(value).trim() : "";
+}
+
+function normalizeOptionalText(value) {
+  const normalized = normalizeText(value);
+  return normalized || null;
+}
+
+async function findDuplicateDocument({ clientId, category, subcategory, year, fileName }) {
+  let query = adminSupabase
+    .from("documents")
+    .select("id")
+    .eq("client_id", clientId)
+    .eq("category", category)
+    .eq("year", year)
+    .eq("file_name", fileName);
+
+  if (subcategory) {
+    query = query.eq("subcategory", subcategory);
+  } else {
+    query = query.is("subcategory", null);
+  }
+
+  return query.maybeSingle();
+}
+
 app.get("/", (req, res) => {
   res.send("Servidor Caseg Protege rodando 🚀");
 });
 
-/* ===============================
-   PRIMEIRO ACESSO
-================================ */
 app.post("/primeiro-acesso", async (req, res) => {
   try {
     const {
@@ -176,9 +208,6 @@ app.post("/primeiro-acesso", async (req, res) => {
   }
 });
 
-/* ===============================
-   LOGIN
-================================ */
 app.post("/login", async (req, res) => {
   try {
     const { cpf_cnpj, password } = req.body;
@@ -231,9 +260,6 @@ app.post("/login", async (req, res) => {
   }
 });
 
-/* ===============================
-   CADASTRAR CLIENTE REAL
-================================ */
 app.post("/clients", async (req, res) => {
   try {
     const authResult = await getAuthenticatedUser(req);
@@ -377,9 +403,6 @@ app.post("/clients", async (req, res) => {
   }
 });
 
-/* ===============================
-   LISTAR CLIENTES
-================================ */
 app.get("/clients", async (req, res) => {
   try {
     const authResult = await getAuthenticatedUser(req);
@@ -437,9 +460,349 @@ app.get("/clients", async (req, res) => {
   }
 });
 
-/* ===============================
-   BUSCAR DOCUMENTOS (SEGURO)
-================================ */
+app.get("/clients/:clientId/documents", async (req, res) => {
+  try {
+    const authResult = await getAuthenticatedUser(req);
+
+    if (authResult.error) {
+      return res.status(authResult.status).json({
+        error: authResult.error
+      });
+    }
+
+    const adminUserId = authResult.user.id;
+
+    const profileResult = await getUserProfile(adminUserId);
+
+    if (profileResult.error) {
+      return res.status(profileResult.status).json({
+        error: profileResult.error
+      });
+    }
+
+    const adminProfile = profileResult.profile;
+
+    if (adminProfile.role !== "admin") {
+      return res.status(403).json({
+        error: "Acesso restrito a administradores."
+      });
+    }
+
+    const { clientId } = req.params;
+
+    if (!clientId) {
+      return res.status(400).json({
+        error: "clientId é obrigatório."
+      });
+    }
+
+    const { data, error } = await adminSupabase
+      .from("documents")
+      .select(`
+        id,
+        client_id,
+        file_name,
+        category,
+        subcategory,
+        year,
+        created_at
+      `)
+      .eq("client_id", clientId)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      return res.status(500).json({
+        error: error.message || "Erro ao buscar documentos do cliente."
+      });
+    }
+
+    return res.status(200).json(data || []);
+  } catch (error) {
+    console.error("ERRO EM GET /clients/:clientId/documents:", error);
+    res.status(500).json({ error: "Erro interno do servidor" });
+  }
+});
+
+app.post("/admin/documents/upload", (req, res, next) => {
+  upload.single("file")(req, res, function (err) {
+    if (err) {
+      console.error("ERRO NO MULTER:", err);
+
+      if (err instanceof multer.MulterError) {
+        return res.status(400).json({
+          error: `Erro no upload: ${err.message}`
+        });
+      }
+
+      return res.status(500).json({
+        error: "Erro ao processar o arquivo enviado."
+      });
+    }
+
+    next();
+  });
+}, async (req, res) => {
+  try {
+    const authResult = await getAuthenticatedUser(req);
+
+    if (authResult.error) {
+      return res.status(authResult.status).json({
+        error: authResult.error
+      });
+    }
+
+    const adminUserId = authResult.user.id;
+    const profileResult = await getUserProfile(adminUserId);
+
+    if (profileResult.error) {
+      return res.status(profileResult.status).json({
+        error: profileResult.error
+      });
+    }
+
+    const adminProfile = profileResult.profile;
+
+    if (adminProfile.role !== "admin") {
+      return res.status(403).json({
+        error: "Acesso restrito a administradores."
+      });
+    }
+
+    const clientId = normalizeText(req.body.client_id);
+    const category = normalizeText(req.body.category);
+    const subcategory = normalizeOptionalText(req.body.subcategory);
+    const year = normalizeText(req.body.year);
+    const file = req.file;
+
+    console.log("UPLOAD RECEBIDO:");
+    console.log("client_id:", clientId);
+    console.log("category:", category);
+    console.log("subcategory:", subcategory);
+    console.log("year:", year);
+    console.log("file:", file ? file.originalname : "NÃO");
+
+    if (!clientId || !category || !year || !file) {
+      return res.status(400).json({
+        error: "Campos obrigatórios: client_id, category, year e file."
+      });
+    }
+
+    const { data: clientProfile, error: clientProfileError } = await adminSupabase
+      .from("profiles")
+      .select("user_id, full_name, company_name, role")
+      .eq("user_id", clientId)
+      .eq("role", "client")
+      .single();
+
+    if (clientProfileError || !clientProfile) {
+      return res.status(404).json({
+        error: "Cliente não encontrado."
+      });
+    }
+
+    const { data: duplicateDocument, error: duplicateError } = await findDuplicateDocument({
+      clientId,
+      category,
+      subcategory,
+      year,
+      fileName: file.originalname
+    });
+
+    if (duplicateError) {
+      return res.status(500).json({
+        error: "Erro ao verificar duplicidade do documento."
+      });
+    }
+
+    if (duplicateDocument) {
+      return res.status(400).json({
+        error: "Já existe um documento com o mesmo nome do arquivo, categoria, subcategoria e ano para este cliente."
+      });
+    }
+
+    const sanitizedFileName = sanitizeFileName(file.originalname);
+    const timestamp = Date.now();
+    const storagePath = `${clientId}/${year}/${timestamp}_${sanitizedFileName}`;
+
+    const { error: uploadError } = await adminSupabase.storage
+      .from("documents")
+      .upload(storagePath, file.buffer, {
+        contentType: file.mimetype,
+        upsert: false
+      });
+
+    if (uploadError) {
+      return res.status(500).json({
+        error: uploadError.message || "Erro ao enviar arquivo para o storage."
+      });
+    }
+
+    const { data: insertedDocument, error: insertError } = await adminSupabase
+      .from("documents")
+      .insert({
+        client_id: clientId,
+        file_name: file.originalname,
+        file_path: storagePath,
+        category,
+        subcategory,
+        year
+      })
+      .select("id, client_id, file_name, category, subcategory, year, created_at")
+      .single();
+
+    if (insertError) {
+      await adminSupabase.storage.from("documents").remove([storagePath]);
+
+      return res.status(500).json({
+        error: insertError.message || "Erro ao salvar documento no banco."
+      });
+    }
+
+    return res.status(201).json({
+      message: "Documento enviado com sucesso.",
+      document: insertedDocument
+    });
+  } catch (error) {
+    console.error("ERRO EM POST /admin/documents/upload:", error);
+    res.status(500).json({ error: "Erro interno do servidor" });
+  }
+});
+
+app.put("/admin/documents/:documentId/replace", (req, res, next) => {
+  upload.single("file")(req, res, function (err) {
+    if (err) {
+      console.error("ERRO NO MULTER (SUBSTITUIR):", err);
+
+      if (err instanceof multer.MulterError) {
+        return res.status(400).json({
+          error: `Erro no upload: ${err.message}`
+        });
+      }
+
+      return res.status(500).json({
+        error: "Erro ao processar o arquivo enviado."
+      });
+    }
+
+    next();
+  });
+}, async (req, res) => {
+  try {
+    const authResult = await getAuthenticatedUser(req);
+
+    if (authResult.error) {
+      return res.status(authResult.status).json({
+        error: authResult.error
+      });
+    }
+
+    const adminUserId = authResult.user.id;
+    const profileResult = await getUserProfile(adminUserId);
+
+    if (profileResult.error) {
+      return res.status(profileResult.status).json({
+        error: profileResult.error
+      });
+    }
+
+    const adminProfile = profileResult.profile;
+
+    if (adminProfile.role !== "admin") {
+      return res.status(403).json({
+        error: "Acesso restrito a administradores."
+      });
+    }
+
+    const { documentId } = req.params;
+    const file = req.file;
+
+    if (!documentId) {
+      return res.status(400).json({
+        error: "documentId é obrigatório."
+      });
+    }
+
+    if (!file) {
+      return res.status(400).json({
+        error: "É obrigatório selecionar um novo arquivo."
+      });
+    }
+
+    const { data: currentDocument, error: currentDocumentError } = await adminSupabase
+      .from("documents")
+      .select(`
+        id,
+        client_id,
+        file_name,
+        file_path,
+        category,
+        subcategory,
+        year
+      `)
+      .eq("id", documentId)
+      .single();
+
+    if (currentDocumentError || !currentDocument) {
+      return res.status(404).json({
+        error: "Documento não encontrado."
+      });
+    }
+
+    const sanitizedFileName = sanitizeFileName(file.originalname);
+    const timestamp = Date.now();
+    const storagePath = `${currentDocument.client_id}/${currentDocument.year}/${timestamp}_${sanitizedFileName}`;
+
+    const { error: uploadError } = await adminSupabase.storage
+      .from("documents")
+      .upload(storagePath, file.buffer, {
+        contentType: file.mimetype,
+        upsert: false
+      });
+
+    if (uploadError) {
+      return res.status(500).json({
+        error: uploadError.message || "Erro ao enviar o novo arquivo para o storage."
+      });
+    }
+
+    const { data: updatedDocument, error: updateError } = await adminSupabase
+      .from("documents")
+      .update({
+        file_name: file.originalname,
+        file_path: storagePath
+      })
+      .eq("id", documentId)
+      .select("id, client_id, file_name, category, subcategory, year, created_at")
+      .single();
+
+    if (updateError || !updatedDocument) {
+      await adminSupabase.storage.from("documents").remove([storagePath]);
+
+      return res.status(500).json({
+        error: updateError?.message || "Erro ao atualizar documento no banco."
+      });
+    }
+
+    if (currentDocument.file_path) {
+      const { error: removeOldFileError } = await adminSupabase.storage
+        .from("documents")
+        .remove([currentDocument.file_path.trim()]);
+
+      if (removeOldFileError) {
+        console.error("ERRO AO REMOVER ARQUIVO ANTIGO:", removeOldFileError);
+      }
+    }
+
+    return res.status(200).json({
+      message: "Documento substituído com sucesso.",
+      document: updatedDocument
+    });
+  } catch (error) {
+    console.error("ERRO EM PUT /admin/documents/:documentId/replace:", error);
+    res.status(500).json({ error: "Erro interno do servidor" });
+  }
+});
+
 app.get("/documents", async (req, res) => {
   try {
     const authResult = await getAuthenticatedUser(req);
@@ -479,9 +842,6 @@ app.get("/documents", async (req, res) => {
   }
 });
 
-/* ===============================
-   DOWNLOAD DOCUMENTO (SEGURO)
-================================ */
 app.post("/documents/download", async (req, res) => {
   try {
     const authResult = await getAuthenticatedUser(req);
@@ -552,9 +912,157 @@ app.post("/documents/download", async (req, res) => {
   }
 });
 
-/* ===============================
-   BUSCAR AVISOS
-================================ */
+app.post("/admin/documents/download", async (req, res) => {
+  try {
+    const authResult = await getAuthenticatedUser(req);
+
+    if (authResult.error) {
+      return res.status(authResult.status).json({
+        error: authResult.error
+      });
+    }
+
+    const adminUserId = authResult.user.id;
+    const profileResult = await getUserProfile(adminUserId);
+
+    if (profileResult.error) {
+      return res.status(profileResult.status).json({
+        error: profileResult.error
+      });
+    }
+
+    const adminProfile = profileResult.profile;
+
+    if (adminProfile.role !== "admin") {
+      return res.status(403).json({
+        error: "Acesso restrito a administradores."
+      });
+    }
+
+    const { document_id } = req.body;
+
+    if (!document_id) {
+      return res.status(400).json({
+        error: "document_id é obrigatório."
+      });
+    }
+
+    const { data: documentData, error: documentError } = await adminSupabase
+      .from("documents")
+      .select("id, client_id, file_path, file_name")
+      .eq("id", document_id)
+      .single();
+
+    if (documentError || !documentData) {
+      return res.status(404).json({
+        error: "Documento não encontrado."
+      });
+    }
+
+    if (!documentData.file_path) {
+      return res.status(400).json({
+        error: "Este documento não possui caminho de arquivo válido."
+      });
+    }
+
+    const { data, error } = await adminSupabase.storage
+      .from("documents")
+      .createSignedUrl(documentData.file_path.trim(), 60);
+
+    if (error) {
+      return res.status(500).json({
+        error: error.message || "Erro ao gerar link temporário do documento."
+      });
+    }
+
+    return res.status(200).json({
+      url: data.signedUrl
+    });
+  } catch (error) {
+    console.error("ERRO EM POST /admin/documents/download:", error);
+    res.status(500).json({ error: "Erro interno do servidor" });
+  }
+});
+
+app.delete("/admin/documents/:documentId", async (req, res) => {
+  try {
+    const authResult = await getAuthenticatedUser(req);
+
+    if (authResult.error) {
+      return res.status(authResult.status).json({
+        error: authResult.error
+      });
+    }
+
+    const adminUserId = authResult.user.id;
+    const profileResult = await getUserProfile(adminUserId);
+
+    if (profileResult.error) {
+      return res.status(profileResult.status).json({
+        error: profileResult.error
+      });
+    }
+
+    const adminProfile = profileResult.profile;
+
+    if (adminProfile.role !== "admin") {
+      return res.status(403).json({
+        error: "Acesso restrito a administradores."
+      });
+    }
+
+    const { documentId } = req.params;
+
+    if (!documentId) {
+      return res.status(400).json({
+        error: "documentId é obrigatório."
+      });
+    }
+
+    const { data: documentData, error: documentError } = await adminSupabase
+      .from("documents")
+      .select("id, file_path, file_name")
+      .eq("id", documentId)
+      .single();
+
+    if (documentError || !documentData) {
+      return res.status(404).json({
+        error: "Documento não encontrado."
+      });
+    }
+
+    if (documentData.file_path) {
+      const { error: storageError } = await adminSupabase.storage
+        .from("documents")
+        .remove([documentData.file_path.trim()]);
+
+      if (storageError) {
+        return res.status(500).json({
+          error: storageError.message || "Erro ao excluir arquivo do storage."
+        });
+      }
+    }
+
+    const { error: deleteDbError } = await adminSupabase
+      .from("documents")
+      .delete()
+      .eq("id", documentId);
+
+    if (deleteDbError) {
+      return res.status(500).json({
+        error: deleteDbError.message || "Erro ao excluir documento do banco."
+      });
+    }
+
+    return res.status(200).json({
+      message: "Documento excluído com sucesso."
+    });
+  } catch (error) {
+    console.error("ERRO EM DELETE /admin/documents/:documentId:", error);
+    res.status(500).json({ error: "Erro interno do servidor" });
+  }
+});
+
 app.get("/notices", async (req, res) => {
   try {
     const { data, error } = await adminSupabase
@@ -571,7 +1079,7 @@ app.get("/notices", async (req, res) => {
       });
     }
 
-    const activeNotices = data.filter(notice => notice.is_active == true);
+    const activeNotices = data.filter((notice) => notice.is_active == true);
 
     res.json(activeNotices);
   } catch (err) {
@@ -583,17 +1091,19 @@ app.get("/notices", async (req, res) => {
   }
 });
 
-/* ===============================
-   START SERVER
-================================ */
 console.log("Rotas configuradas:");
 console.log("GET /");
 console.log("POST /primeiro-acesso");
 console.log("POST /login");
 console.log("POST /clients");
 console.log("GET /clients");
+console.log("GET /clients/:clientId/documents");
+console.log("POST /admin/documents/upload");
+console.log("PUT /admin/documents/:documentId/replace");
 console.log("GET /documents");
 console.log("POST /documents/download");
+console.log("POST /admin/documents/download");
+console.log("DELETE /admin/documents/:documentId");
 console.log("GET /notices");
 
 app.listen(PORT, () => {
