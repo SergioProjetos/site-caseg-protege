@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Primeiro Acesso - CASEG Protege</title>
+
+    <link rel="stylesheet" href="../assets/css/style.css">
+
+    <style>
+        #firstAccessMessage {
+            margin-top: 16px;
+            font-weight: 600;
+        }
+
+        .first-access-wrapper {
+            max-width: 500px;
+            margin: 0 auto;
+        }
+
+        .first-access-info {
+            margin-bottom: 24px;
+            line-height: 1.6;
+        }
+    </style>
+
+    <script>
+        const token = localStorage.getItem("access_token");
+        const profile = JSON.parse(localStorage.getItem("profile"));
+
+        if (!token || !profile) {
+            alert("Sessão inválida. Faça login novamente.");
+            window.location.href = "login.html";
+        }
+
+        if (profile.role !== "client") {
+            alert("Acesso não permitido.");
+            window.location.href = "login.html";
+        }
+
+        if (profile.must_change_password !== true) {
+            window.location.href = "servicos.html";
+        }
+    </script>
+</head>
+<body>
+
+<header>
+    <h1>CASEG Protege</h1>
+
+    <nav>
+        <a href="../index.html">Home</a>
+        <a href="servicos.html">Serviços</a>
+        <a href="avisos.html">Avisos</a>
+        <a href="contato.html">Contato</a>
+        <a href="login.html">Área do Cliente</a>
+    </nav>
+</header>
+
+<main>
+    <div class="first-access-wrapper">
+        <h2>Primeiro Acesso</h2>
+
+        <div class="first-access-info">
+            <p>Olá, <strong id="clientName">cliente</strong>.</p>
+            <p>Por segurança, no seu primeiro acesso é necessário cadastrar uma nova senha para continuar utilizando a área do cliente.</p>
+        </div>
+
+        <form id="firstAccessForm">
+            <label for="newPassword">Nova senha</label><br>
+            <input
+                type="password"
+                id="newPassword"
+                name="newPassword"
+                required
+            ><br><br>
+
+            <label for="confirmPassword">Confirmar nova senha</label><br>
+            <input
+                type="password"
+                id="confirmPassword"
+                name="confirmPassword"
+                required
+            ><br><br>
+
+            <button type="submit">Salvar nova senha</button>
+
+            <div id="firstAccessMessage"></div>
+        </form>
+    </div>
+</main>
+
+<footer>
+    <p>© CASEG Protege</p>
+    <p>
+        <a href="termos-de-uso.html">Termos de Uso</a> —
+        <a href="politica-privacidade.html">Política de Privacidade</a>
+    </p>
+</footer>
+
+<script>
+    const savedProfile = JSON.parse(localStorage.getItem("profile"));
+    const clientNameElement = document.querySelector("#clientName");
+
+    if (savedProfile && clientNameElement) {
+        clientNameElement.textContent = savedProfile.full_name || "cliente";
+    }
+</script>
+
+<script src="../assets/js/primeiro-acesso.js"></script>
+
+</body>
+</html>

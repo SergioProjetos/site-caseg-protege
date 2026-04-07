@@ -120,6 +120,41 @@ async function getUserProfile(userId) {
   }
 }
 
+async function validateAdminAccess(req, res) {
+  const authResult = await getAuthenticatedUser(req);
+
+  if (authResult.error) {
+    res.status(authResult.status).json({
+      error: authResult.error
+    });
+    return null;
+  }
+
+  const adminUserId = authResult.user.id;
+  const profileResult = await getUserProfile(adminUserId);
+
+  if (profileResult.error) {
+    res.status(profileResult.status).json({
+      error: profileResult.error
+    });
+    return null;
+  }
+
+  const adminProfile = profileResult.profile;
+
+  if (adminProfile.role !== "admin") {
+    res.status(403).json({
+      error: "Acesso restrito a administradores."
+    });
+    return null;
+  }
+
+  return {
+    adminUser: authResult.user,
+    adminProfile
+  };
+}
+
 function generateTemporaryPassword() {
   const random = Math.random().toString(36).slice(-6);
   return `Caseg@${random}1`;
@@ -220,7 +255,7 @@ app.post("/login", async (req, res) => {
 
     const { data: profile, error: profileError } = await adminSupabase
       .from("profiles")
-      .select("user_id, email, role, full_name, company_name")
+      .select("user_id, email, role, full_name, company_name, must_change_password")
       .eq("cpf_cnpj", cpf_cnpj)
       .single();
 
@@ -250,7 +285,8 @@ app.post("/login", async (req, res) => {
         role: profile.role,
         full_name: profile.full_name,
         company_name: profile.company_name,
-        email: profile.email
+        email: profile.email,
+        must_change_password: profile.must_change_password
       },
       session: authData.session
     });
@@ -262,30 +298,9 @@ app.post("/login", async (req, res) => {
 
 app.post("/clients", async (req, res) => {
   try {
-    const authResult = await getAuthenticatedUser(req);
-
-    if (authResult.error) {
-      return res.status(authResult.status).json({
-        error: authResult.error
-      });
-    }
-
-    const adminUserId = authResult.user.id;
-
-    const profileResult = await getUserProfile(adminUserId);
-
-    if (profileResult.error) {
-      return res.status(profileResult.status).json({
-        error: profileResult.error
-      });
-    }
-
-    const adminProfile = profileResult.profile;
-
-    if (adminProfile.role !== "admin") {
-      return res.status(403).json({
-        error: "Acesso restrito a administradores."
-      });
+    const adminAccess = await validateAdminAccess(req, res);
+    if (!adminAccess) {
+      return;
     }
 
     const {
@@ -366,6 +381,7 @@ app.post("/clients", async (req, res) => {
         cpf_cnpj: normalizedCpfCnpj,
         email: normalizedEmail,
         role: "client",
+        must_change_password: true,
         address_zip: normalizedZip,
         address_street: address_street || null,
         address_number: address_number || null,
@@ -405,30 +421,9 @@ app.post("/clients", async (req, res) => {
 
 app.get("/clients", async (req, res) => {
   try {
-    const authResult = await getAuthenticatedUser(req);
-
-    if (authResult.error) {
-      return res.status(authResult.status).json({
-        error: authResult.error
-      });
-    }
-
-    const adminUserId = authResult.user.id;
-
-    const profileResult = await getUserProfile(adminUserId);
-
-    if (profileResult.error) {
-      return res.status(profileResult.status).json({
-        error: profileResult.error
-      });
-    }
-
-    const adminProfile = profileResult.profile;
-
-    if (adminProfile.role !== "admin") {
-      return res.status(403).json({
-        error: "Acesso restrito a administradores."
-      });
+    const adminAccess = await validateAdminAccess(req, res);
+    if (!adminAccess) {
+      return;
     }
 
     const { data, error } = await adminSupabase
@@ -462,30 +457,9 @@ app.get("/clients", async (req, res) => {
 
 app.get("/clients/:clientId/documents", async (req, res) => {
   try {
-    const authResult = await getAuthenticatedUser(req);
-
-    if (authResult.error) {
-      return res.status(authResult.status).json({
-        error: authResult.error
-      });
-    }
-
-    const adminUserId = authResult.user.id;
-
-    const profileResult = await getUserProfile(adminUserId);
-
-    if (profileResult.error) {
-      return res.status(profileResult.status).json({
-        error: profileResult.error
-      });
-    }
-
-    const adminProfile = profileResult.profile;
-
-    if (adminProfile.role !== "admin") {
-      return res.status(403).json({
-        error: "Acesso restrito a administradores."
-      });
+    const adminAccess = await validateAdminAccess(req, res);
+    if (!adminAccess) {
+      return;
     }
 
     const { clientId } = req.params;
@@ -543,29 +517,9 @@ app.post("/admin/documents/upload", (req, res, next) => {
   });
 }, async (req, res) => {
   try {
-    const authResult = await getAuthenticatedUser(req);
-
-    if (authResult.error) {
-      return res.status(authResult.status).json({
-        error: authResult.error
-      });
-    }
-
-    const adminUserId = authResult.user.id;
-    const profileResult = await getUserProfile(adminUserId);
-
-    if (profileResult.error) {
-      return res.status(profileResult.status).json({
-        error: profileResult.error
-      });
-    }
-
-    const adminProfile = profileResult.profile;
-
-    if (adminProfile.role !== "admin") {
-      return res.status(403).json({
-        error: "Acesso restrito a administradores."
-      });
+    const adminAccess = await validateAdminAccess(req, res);
+    if (!adminAccess) {
+      return;
     }
 
     const clientId = normalizeText(req.body.client_id);
@@ -688,29 +642,9 @@ app.put("/admin/documents/:documentId/replace", (req, res, next) => {
   });
 }, async (req, res) => {
   try {
-    const authResult = await getAuthenticatedUser(req);
-
-    if (authResult.error) {
-      return res.status(authResult.status).json({
-        error: authResult.error
-      });
-    }
-
-    const adminUserId = authResult.user.id;
-    const profileResult = await getUserProfile(adminUserId);
-
-    if (profileResult.error) {
-      return res.status(profileResult.status).json({
-        error: profileResult.error
-      });
-    }
-
-    const adminProfile = profileResult.profile;
-
-    if (adminProfile.role !== "admin") {
-      return res.status(403).json({
-        error: "Acesso restrito a administradores."
-      });
+    const adminAccess = await validateAdminAccess(req, res);
+    if (!adminAccess) {
+      return;
     }
 
     const { documentId } = req.params;
@@ -914,29 +848,9 @@ app.post("/documents/download", async (req, res) => {
 
 app.post("/admin/documents/download", async (req, res) => {
   try {
-    const authResult = await getAuthenticatedUser(req);
-
-    if (authResult.error) {
-      return res.status(authResult.status).json({
-        error: authResult.error
-      });
-    }
-
-    const adminUserId = authResult.user.id;
-    const profileResult = await getUserProfile(adminUserId);
-
-    if (profileResult.error) {
-      return res.status(profileResult.status).json({
-        error: profileResult.error
-      });
-    }
-
-    const adminProfile = profileResult.profile;
-
-    if (adminProfile.role !== "admin") {
-      return res.status(403).json({
-        error: "Acesso restrito a administradores."
-      });
+    const adminAccess = await validateAdminAccess(req, res);
+    if (!adminAccess) {
+      return;
     }
 
     const { document_id } = req.body;
@@ -986,29 +900,9 @@ app.post("/admin/documents/download", async (req, res) => {
 
 app.delete("/admin/documents/:documentId", async (req, res) => {
   try {
-    const authResult = await getAuthenticatedUser(req);
-
-    if (authResult.error) {
-      return res.status(authResult.status).json({
-        error: authResult.error
-      });
-    }
-
-    const adminUserId = authResult.user.id;
-    const profileResult = await getUserProfile(adminUserId);
-
-    if (profileResult.error) {
-      return res.status(profileResult.status).json({
-        error: profileResult.error
-      });
-    }
-
-    const adminProfile = profileResult.profile;
-
-    if (adminProfile.role !== "admin") {
-      return res.status(403).json({
-        error: "Acesso restrito a administradores."
-      });
+    const adminAccess = await validateAdminAccess(req, res);
+    if (!adminAccess) {
+      return;
     }
 
     const { documentId } = req.params;
@@ -1063,11 +957,238 @@ app.delete("/admin/documents/:documentId", async (req, res) => {
   }
 });
 
+/* =========================
+   MÓDULO ADMIN DE AVISOS
+========================= */
+
+app.get("/admin/clients/:clientId/notices", async (req, res) => {
+  try {
+    const adminAccess = await validateAdminAccess(req, res);
+    if (!adminAccess) {
+      return;
+    }
+
+    const { clientId } = req.params;
+
+    if (!clientId) {
+      return res.status(400).json({
+        error: "clientId é obrigatório."
+      });
+    }
+
+    const { data: clientProfile, error: clientError } = await adminSupabase
+      .from("profiles")
+      .select("user_id, role")
+      .eq("user_id", clientId)
+      .eq("role", "client")
+      .single();
+
+    if (clientError || !clientProfile) {
+      return res.status(404).json({
+        error: "Cliente não encontrado."
+      });
+    }
+
+    const { data, error } = await adminSupabase
+      .from("notices")
+      .select("id, client_id, title, message, is_active, created_at")
+      .eq("client_id", clientId)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      return res.status(500).json({
+        error: error.message || "Erro ao buscar avisos do cliente."
+      });
+    }
+
+    return res.status(200).json(data || []);
+  } catch (error) {
+    console.error("ERRO EM GET /admin/clients/:clientId/notices:", error);
+    res.status(500).json({ error: "Erro interno do servidor" });
+  }
+});
+
+app.post("/admin/notices", async (req, res) => {
+  try {
+    const adminAccess = await validateAdminAccess(req, res);
+    if (!adminAccess) {
+      return;
+    }
+
+    const clientId = normalizeText(req.body.client_id);
+    const title = normalizeText(req.body.title);
+    const message = normalizeText(req.body.message);
+    const isActive = typeof req.body.is_active === "boolean" ? req.body.is_active : true;
+
+    if (!clientId || !title || !message) {
+      return res.status(400).json({
+        error: "Campos obrigatórios: client_id, title e message."
+      });
+    }
+
+    const { data: clientProfile, error: clientError } = await adminSupabase
+      .from("profiles")
+      .select("user_id, role")
+      .eq("user_id", clientId)
+      .eq("role", "client")
+      .single();
+
+    if (clientError || !clientProfile) {
+      return res.status(404).json({
+        error: "Cliente não encontrado."
+      });
+    }
+
+    const { data: insertedNotice, error: insertError } = await adminSupabase
+      .from("notices")
+      .insert({
+        client_id: clientId,
+        title,
+        message,
+        is_active: isActive
+      })
+      .select("id, client_id, title, message, is_active, created_at")
+      .single();
+
+    if (insertError) {
+      return res.status(500).json({
+        error: insertError.message || "Erro ao salvar aviso."
+      });
+    }
+
+    return res.status(201).json({
+      message: "Aviso criado com sucesso.",
+      notice: insertedNotice
+    });
+  } catch (error) {
+    console.error("ERRO EM POST /admin/notices:", error);
+    res.status(500).json({ error: "Erro interno do servidor" });
+  }
+});
+
+app.put("/admin/notices/:noticeId/toggle", async (req, res) => {
+  try {
+    const adminAccess = await validateAdminAccess(req, res);
+    if (!adminAccess) {
+      return;
+    }
+
+    const { noticeId } = req.params;
+    const isActive = req.body.is_active;
+
+    if (!noticeId) {
+      return res.status(400).json({
+        error: "noticeId é obrigatório."
+      });
+    }
+
+    if (typeof isActive !== "boolean") {
+      return res.status(400).json({
+        error: "is_active deve ser boolean."
+      });
+    }
+
+    const { data: currentNotice, error: currentError } = await adminSupabase
+      .from("notices")
+      .select("id, client_id, title, is_active")
+      .eq("id", noticeId)
+      .single();
+
+    if (currentError || !currentNotice) {
+      return res.status(404).json({
+        error: "Aviso não encontrado."
+      });
+    }
+
+    const { data: updatedNotice, error: updateError } = await adminSupabase
+      .from("notices")
+      .update({
+        is_active: isActive
+      })
+      .eq("id", noticeId)
+      .select("id, client_id, title, message, is_active, created_at")
+      .single();
+
+    if (updateError || !updatedNotice) {
+      return res.status(500).json({
+        error: updateError?.message || "Erro ao atualizar status do aviso."
+      });
+    }
+
+    return res.status(200).json({
+      message: "Status do aviso atualizado com sucesso.",
+      notice: updatedNotice
+    });
+  } catch (error) {
+    console.error("ERRO EM PUT /admin/notices/:noticeId/toggle:", error);
+    res.status(500).json({ error: "Erro interno do servidor" });
+  }
+});
+
+app.delete("/admin/notices/:noticeId", async (req, res) => {
+  try {
+    const adminAccess = await validateAdminAccess(req, res);
+    if (!adminAccess) {
+      return;
+    }
+
+    const { noticeId } = req.params;
+
+    if (!noticeId) {
+      return res.status(400).json({
+        error: "noticeId é obrigatório."
+      });
+    }
+
+    const { data: currentNotice, error: currentError } = await adminSupabase
+      .from("notices")
+      .select("id, client_id, title")
+      .eq("id", noticeId)
+      .single();
+
+    if (currentError || !currentNotice) {
+      return res.status(404).json({
+        error: "Aviso não encontrado."
+      });
+    }
+
+    const { error: deleteError } = await adminSupabase
+      .from("notices")
+      .delete()
+      .eq("id", noticeId);
+
+    if (deleteError) {
+      return res.status(500).json({
+        error: deleteError.message || "Erro ao excluir aviso."
+      });
+    }
+
+    return res.status(200).json({
+      message: "Aviso excluído com sucesso."
+    });
+  } catch (error) {
+    console.error("ERRO EM DELETE /admin/notices/:noticeId:", error);
+    res.status(500).json({ error: "Erro interno do servidor" });
+  }
+});
+
 app.get("/notices", async (req, res) => {
   try {
+    const authResult = await getAuthenticatedUser(req);
+
+    if (authResult.error) {
+      return res.status(authResult.status).json({
+        error: authResult.error
+      });
+    }
+
+    const userId = authResult.user.id;
+
     const { data, error } = await adminSupabase
       .from("notices")
       .select("*")
+      .eq("client_id", userId)
+      .eq("is_active", true)
       .order("created_at", { ascending: false });
 
     console.log("AVISOS RETORNADOS:", data);
@@ -1079,9 +1200,7 @@ app.get("/notices", async (req, res) => {
       });
     }
 
-    const activeNotices = data.filter((notice) => notice.is_active == true);
-
-    res.json(activeNotices);
+    res.json(data || []);
   } catch (err) {
     console.log("ERRO NA ROTA /notices:", err);
 
@@ -1104,6 +1223,10 @@ console.log("GET /documents");
 console.log("POST /documents/download");
 console.log("POST /admin/documents/download");
 console.log("DELETE /admin/documents/:documentId");
+console.log("GET /admin/clients/:clientId/notices");
+console.log("POST /admin/notices");
+console.log("PUT /admin/notices/:noticeId/toggle");
+console.log("DELETE /admin/notices/:noticeId");
 console.log("GET /notices");
 
 app.listen(PORT, () => {

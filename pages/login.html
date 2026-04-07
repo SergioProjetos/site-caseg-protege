@@ -127,7 +127,42 @@
 
 <script>
     function onlyDigits(value) {
-        return value.replace(/\D/g, "");
+        return (value || "").replace(/\D/g, "");
+    }
+
+    function clearSession() {
+        localStorage.removeItem("access_token");
+        localStorage.removeItem("profile");
+    }
+
+    function setLoginMessage(message, color) {
+        loginMessage.innerHTML = `<span style="color:${color};">${message}</span>`;
+    }
+
+    function redirectUser(profile) {
+        if (!profile || !profile.role) {
+            clearSession();
+            setLoginMessage("Perfil inválido retornado pelo servidor.", "red");
+            return;
+        }
+
+        if (profile.role === "admin") {
+            window.location.href = "admin.html";
+            return;
+        }
+
+        if (profile.role === "client" && profile.must_change_password === true) {
+            window.location.href = "primeiro-acesso.html";
+            return;
+        }
+
+        if (profile.role === "client") {
+            window.location.href = "servicos.html";
+            return;
+        }
+
+        clearSession();
+        setLoginMessage("Tipo de usuário não reconhecido.", "red");
     }
 
     const cpfInput = document.querySelector("#cpf_cnpj");
@@ -173,7 +208,12 @@
         const cpf_cnpj = onlyDigits(document.querySelector("#cpf_cnpj").value.trim());
         const password = document.querySelector("#password").value.trim();
 
-        loginMessage.innerHTML = "<span style='color:#0b6b79;'>Entrando...</span>";
+        if (!cpf_cnpj || !password) {
+            setLoginMessage("Preencha CPF/CNPJ e senha.", "red");
+            return;
+        }
+
+        setLoginMessage("Entrando...", "#0b6b79");
 
         try {
             const response = await fetch("http://localhost:3000/login", {
@@ -187,29 +227,30 @@
             const data = await response.json();
 
             if (!response.ok) {
-                loginMessage.innerHTML =
-                    `<span style="color:red;">${data.error || "Erro ao fazer login."}</span>`;
+                clearSession();
+                setLoginMessage(data.error || "Erro ao fazer login.", "red");
+                return;
+            }
+
+            if (!data.session || !data.session.access_token || !data.profile) {
+                clearSession();
+                setLoginMessage("Resposta inválida do servidor.", "red");
                 return;
             }
 
             localStorage.setItem("access_token", data.session.access_token);
             localStorage.setItem("profile", JSON.stringify(data.profile));
 
-            loginMessage.innerHTML =
-                `<span style="color:green;">Login realizado com sucesso!</span>`;
+            setLoginMessage("Login realizado com sucesso!", "green");
 
             setTimeout(() => {
-                if (data.profile.role === "admin") {
-                    window.location.href = "admin.html";
-                } else {
-                    window.location.href = "servicos.html";
-                }
+                redirectUser(data.profile);
             }, 800);
 
         } catch (error) {
             console.error("Erro no login:", error);
-            loginMessage.innerHTML =
-                `<span style="color:red;">Erro ao conectar com o servidor.</span>`;
+            clearSession();
+            setLoginMessage("Erro ao conectar com o servidor.", "red");
         }
     });
 </script>

@@ -39,6 +39,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   const clientsList = document.getElementById("clientsList");
 
   let feedbackTimeout = null;
+  const clientDocumentsCache = {};
+  const clientNoticesCache = {};
 
   function showAdminFeedback(message, type = "info", autoHide = true) {
     adminFeedback.textContent = message;
@@ -80,6 +82,15 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   function onlyDigits(value) {
     return (value || "").replace(/\D/g, "");
+  }
+
+  function escapeHtml(value) {
+    return String(value || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
   }
 
   function formatCpfCnpj(value) {
@@ -192,11 +203,95 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
-  function createDocumentsHtml(documents) {
+  function getUniqueCategories(documents) {
+    return [...new Set(documents.map((doc) => doc.category).filter(Boolean))].sort((a, b) =>
+      a.localeCompare(b, "pt-BR")
+    );
+  }
+
+  function getUniqueYears(documents) {
+    return [...new Set(documents.map((doc) => String(doc.year || "")).filter(Boolean))].sort((a, b) =>
+      b.localeCompare(a, "pt-BR")
+    );
+  }
+
+  function filterDocuments(documents, filters) {
+    return documents.filter((document) => {
+      const fileName = String(document.file_name || "").toLowerCase();
+      const category = String(document.category || "");
+      const year = String(document.year || "");
+
+      const matchesName = !filters.name || fileName.includes(filters.name.toLowerCase());
+      const matchesCategory = !filters.category || category === filters.category;
+      const matchesYear = !filters.year || year === filters.year;
+
+      return matchesName && matchesCategory && matchesYear;
+    });
+  }
+
+  function createDocumentsFiltersHtml(clientId, documents, filteredDocuments) {
+    const categories = getUniqueCategories(documents);
+    const years = getUniqueYears(documents);
+
+    return `
+      <div class="documents-filters">
+        <div class="documents-filter-group">
+          <label for="filterName-${clientId}">Nome do arquivo</label>
+          <input
+            type="text"
+            id="filterName-${clientId}"
+            class="document-filter-name"
+            data-client-id="${clientId}"
+            placeholder="Buscar por nome do arquivo"
+          />
+        </div>
+
+        <div class="documents-filter-group">
+          <label for="filterCategory-${clientId}">Categoria</label>
+          <select
+            id="filterCategory-${clientId}"
+            class="document-filter-category"
+            data-client-id="${clientId}"
+          >
+            <option value="">Todas</option>
+            ${categories.map((category) => `<option value="${escapeHtml(category)}">${escapeHtml(category)}</option>`).join("")}
+          </select>
+        </div>
+
+        <div class="documents-filter-group">
+          <label for="filterYear-${clientId}">Ano</label>
+          <select
+            id="filterYear-${clientId}"
+            class="document-filter-year"
+            data-client-id="${clientId}"
+          >
+            <option value="">Todos</option>
+            ${years.map((year) => `<option value="${escapeHtml(year)}">${escapeHtml(year)}</option>`).join("")}
+          </select>
+        </div>
+
+        <div class="documents-filter-actions">
+          <button
+            type="button"
+            class="clear-filters-btn"
+            data-client-id="${clientId}"
+          >
+            Limpar filtros
+          </button>
+        </div>
+      </div>
+
+      <div class="documents-results-info">
+        Exibindo ${filteredDocuments.length} de ${documents.length} documento(s).
+      </div>
+    `;
+  }
+
+  function createDocumentsListHtml(documents) {
     if (!documents || documents.length === 0) {
       return `
         <div class="empty-documents-message">
-          Nenhum documento encontrado para este cliente.
+          Nenhum documento encontrado para este cliente com os filtros selecionados.
         </div>
       `;
     }
@@ -209,22 +304,22 @@ document.addEventListener("DOMContentLoaded", async () => {
               <div class="document-item-grid">
                 <div class="document-item-field">
                   <strong>Nome do arquivo</strong>
-                  ${document.file_name || "-"}
+                  ${escapeHtml(document.file_name || "-")}
                 </div>
 
                 <div class="document-item-field">
                   <strong>Categoria</strong>
-                  ${document.category || "-"}
+                  ${escapeHtml(document.category || "-")}
                 </div>
 
                 <div class="document-item-field">
                   <strong>Subcategoria</strong>
-                  ${document.subcategory || "-"}
+                  ${escapeHtml(document.subcategory || "-")}
                 </div>
 
                 <div class="document-item-field">
                   <strong>Ano</strong>
-                  ${document.year || "-"}
+                  ${escapeHtml(document.year || "-")}
                 </div>
 
                 <div class="document-item-field">
@@ -259,7 +354,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                     class="document-action-btn replace-document-btn"
                     data-document-id="${document.id}"
                     data-client-id="${document.client_id}"
-                    data-file-name="${document.file_name || "Documento"}"
+                    data-file-name="${escapeHtml(document.file_name || "Documento")}"
                   >
                     Substituir
                   </button>
@@ -277,7 +372,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                     class="document-action-btn delete-document-btn"
                     data-document-id="${document.id}"
                     data-client-id="${document.client_id}"
-                    data-file-name="${document.file_name || "Documento"}"
+                    data-file-name="${escapeHtml(document.file_name || "Documento")}"
                   >
                     Excluir
                   </button>
@@ -287,6 +382,15 @@ document.addEventListener("DOMContentLoaded", async () => {
           </div>
         `).join("")}
       </div>
+    `;
+  }
+
+  function createDocumentsHtml(clientId, documents, filters = { name: "", category: "", year: "" }) {
+    const filteredDocuments = filterDocuments(documents, filters);
+
+    return `
+      ${createDocumentsFiltersHtml(clientId, documents, filteredDocuments)}
+      ${createDocumentsListHtml(filteredDocuments)}
     `;
   }
 
@@ -300,12 +404,12 @@ document.addEventListener("DOMContentLoaded", async () => {
         <div class="upload-form-grid">
           <div class="form-group">
             <label>Cliente</label>
-            <input type="text" value="${client.full_name || "-"}" readonly />
+            <input type="text" value="${escapeHtml(client.full_name || "-")}" readonly />
           </div>
 
           <div class="form-group">
             <label>Empresa</label>
-            <input type="text" value="${client.company_name || "-"}" readonly />
+            <input type="text" value="${escapeHtml(client.company_name || "-")}" readonly />
           </div>
 
           <div class="form-group">
@@ -374,6 +478,122 @@ document.addEventListener("DOMContentLoaded", async () => {
     `;
   }
 
+  function createNoticePanelHtml(client) {
+    return `
+      <form
+        class="notice-form"
+        data-client-id="${client.user_id}"
+        id="noticeForm-${client.user_id}"
+      >
+        <div class="notice-form-grid">
+          <div class="form-group">
+            <label>Cliente</label>
+            <input type="text" value="${escapeHtml(client.full_name || "-")}" readonly />
+          </div>
+
+          <div class="form-group">
+            <label>Empresa</label>
+            <input type="text" value="${escapeHtml(client.company_name || "-")}" readonly />
+          </div>
+
+          <div class="form-group notice-form-full">
+            <label for="noticeTitle-${client.user_id}">Título do aviso</label>
+            <input
+              type="text"
+              id="noticeTitle-${client.user_id}"
+              placeholder="Digite o título do aviso"
+              required
+            />
+          </div>
+
+          <div class="form-group notice-form-full">
+            <label for="noticeMessage-${client.user_id}">Mensagem</label>
+            <textarea
+              id="noticeMessage-${client.user_id}"
+              placeholder="Digite a mensagem do aviso"
+              required
+            ></textarea>
+          </div>
+
+          <div class="notice-checkbox-row">
+            <label class="notice-checkbox-label">
+              <input type="checkbox" id="noticeIsActive-${client.user_id}" checked />
+              Criar aviso como ativo
+            </label>
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" class="notice-submit-btn">
+            Salvar Aviso
+          </button>
+        </div>
+
+        <div
+          class="upload-form-message"
+          id="noticeFormMessage-${client.user_id}"
+        ></div>
+      </form>
+    `;
+  }
+
+  function createNoticesListHtml(notices) {
+    if (!notices || notices.length === 0) {
+      return `
+        <div class="empty-documents-message">
+          Nenhum aviso cadastrado para este cliente.
+        </div>
+      `;
+    }
+
+    return `
+      <div class="notices-list">
+        ${notices.map((notice) => `
+          <div class="notice-item">
+            <div class="notice-item-header">
+              <div>
+                <div class="notice-item-title">${escapeHtml(notice.title || "Sem título")}</div>
+                <div class="notice-item-meta">
+                  Criado em ${formatDate(notice.created_at)} •
+                  Status:
+                  <span class="notice-status ${notice.is_active ? "active" : "inactive"}">
+                    ${notice.is_active ? "Ativo" : "Inativo"}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div class="notice-item-message">
+              ${escapeHtml(notice.message || "-").replace(/\n/g, "<br>")}
+            </div>
+
+            <div class="notice-item-actions">
+              <button
+                type="button"
+                class="notice-action-btn toggle-notice-btn"
+                data-notice-id="${notice.id}"
+                data-client-id="${notice.client_id}"
+                data-is-active="${notice.is_active ? "true" : "false"}"
+              >
+                ${notice.is_active ? "Desativar" : "Ativar"}
+              </button>
+
+              <button
+                type="button"
+                class="notice-action-btn delete-notice-btn"
+                data-notice-id="${notice.id}"
+                data-client-id="${notice.client_id}"
+                data-title="${escapeHtml(notice.title || "Aviso")}"
+              >
+                Excluir
+              </button>
+            </div>
+          </div>
+        `).join("")}
+      </div>
+    `;
+  }
+
   function renderClients(clients) {
     clientsList.innerHTML = "";
 
@@ -392,12 +612,12 @@ document.addEventListener("DOMContentLoaded", async () => {
         <div class="client-card-content">
           <div class="client-card-info">
             <div class="client-card-header">
-              <div class="client-card-title">${client.full_name || "-"}</div>
+              <div class="client-card-title">${escapeHtml(client.full_name || "-")}</div>
             </div>
 
             <div class="client-card-grid">
               <div class="client-card-item">
-                <strong>Empresa:</strong> ${client.company_name || "-"}
+                <strong>Empresa:</strong> ${escapeHtml(client.company_name || "-")}
               </div>
 
               <div class="client-card-item">
@@ -419,8 +639,8 @@ document.addEventListener("DOMContentLoaded", async () => {
               type="button"
               class="client-action-btn upload-documents-btn"
               data-client-id="${client.user_id}"
-              data-client-name="${client.full_name || ""}"
-              data-company-name="${client.company_name || ""}"
+              data-client-name="${escapeHtml(client.full_name || "")}"
+              data-company-name="${escapeHtml(client.company_name || "")}"
             >
               Upload Documentos
             </button>
@@ -429,8 +649,8 @@ document.addEventListener("DOMContentLoaded", async () => {
               type="button"
               class="client-action-btn view-documents-btn"
               data-client-id="${client.user_id}"
-              data-client-name="${client.full_name || ""}"
-              data-company-name="${client.company_name || ""}"
+              data-client-name="${escapeHtml(client.full_name || "")}"
+              data-company-name="${escapeHtml(client.company_name || "")}"
             >
               Visualizar Documentos
             </button>
@@ -439,8 +659,8 @@ document.addEventListener("DOMContentLoaded", async () => {
               type="button"
               class="client-action-btn client-notices-btn"
               data-client-id="${client.user_id}"
-              data-client-name="${client.full_name || ""}"
-              data-company-name="${client.company_name || ""}"
+              data-client-name="${escapeHtml(client.full_name || "")}"
+              data-company-name="${escapeHtml(client.company_name || "")}"
             >
               Avisos
             </button>
@@ -455,7 +675,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             <div>
               <div class="upload-panel-title">Enviar documento</div>
               <div class="upload-panel-subtitle">
-                Cliente: ${client.full_name || "-"}${client.company_name ? ` - ${client.company_name}` : ""}
+                Cliente: ${escapeHtml(client.full_name || "-")}${client.company_name ? ` - ${escapeHtml(client.company_name)}` : ""}
               </div>
             </div>
           </div>
@@ -473,12 +693,31 @@ document.addEventListener("DOMContentLoaded", async () => {
             <div>
               <div class="documents-panel-title">Documentos enviados</div>
               <div class="documents-panel-subtitle">
-                Cliente: ${client.full_name || "-"}${client.company_name ? ` - ${client.company_name}` : ""}
+                Cliente: ${escapeHtml(client.full_name || "-")}${client.company_name ? ` - ${escapeHtml(client.company_name)}` : ""}
               </div>
             </div>
           </div>
 
           <div id="documents-content-${client.user_id}"></div>
+        </div>
+
+        <div
+          id="notices-panel-${client.user_id}"
+          class="notices-panel hidden"
+        >
+          <div class="notices-panel-header">
+            <div>
+              <div class="notices-panel-title">Avisos do cliente</div>
+              <div class="notices-panel-subtitle">
+                Cliente: ${escapeHtml(client.full_name || "-")}${client.company_name ? ` - ${escapeHtml(client.company_name)}` : ""}
+              </div>
+            </div>
+          </div>
+
+          <div class="notices-panel-body">
+            ${createNoticePanelHtml(client)}
+            <div id="notices-content-${client.user_id}" class="notices-content"></div>
+          </div>
         </div>
       `;
 
@@ -487,6 +726,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     bindClientActionButtons();
     bindUploadForms();
+    bindNoticeForms();
   }
 
   async function loadClientDocuments(clientId) {
@@ -507,6 +747,90 @@ document.addEventListener("DOMContentLoaded", async () => {
     return data;
   }
 
+  async function loadClientNotices(clientId) {
+    const response = await fetch(`http://localhost:3000/admin/clients/${clientId}/notices`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
+      }
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || "Erro ao buscar avisos do cliente.");
+    }
+
+    return data;
+  }
+
+  function bindDocumentFilters(clientId) {
+    const nameInput = document.getElementById(`filterName-${clientId}`);
+    const categorySelect = document.getElementById(`filterCategory-${clientId}`);
+    const yearSelect = document.getElementById(`filterYear-${clientId}`);
+    const clearButton = document.querySelector(`.clear-filters-btn[data-client-id="${clientId}"]`);
+
+    if (nameInput && nameInput.dataset.bound !== "true") {
+      nameInput.dataset.bound = "true";
+      nameInput.addEventListener("input", () => {
+        renderFilteredDocuments(clientId);
+      });
+    }
+
+    if (categorySelect && categorySelect.dataset.bound !== "true") {
+      categorySelect.dataset.bound = "true";
+      categorySelect.addEventListener("change", () => {
+        renderFilteredDocuments(clientId);
+      });
+    }
+
+    if (yearSelect && yearSelect.dataset.bound !== "true") {
+      yearSelect.dataset.bound = "true";
+      yearSelect.addEventListener("change", () => {
+        renderFilteredDocuments(clientId);
+      });
+    }
+
+    if (clearButton && clearButton.dataset.bound !== "true") {
+      clearButton.dataset.bound = "true";
+      clearButton.addEventListener("click", () => {
+        if (nameInput) {
+          nameInput.value = "";
+        }
+
+        if (categorySelect) {
+          categorySelect.value = "";
+        }
+
+        if (yearSelect) {
+          yearSelect.value = "";
+        }
+
+        renderFilteredDocuments(clientId);
+      });
+    }
+  }
+
+  function renderFilteredDocuments(clientId) {
+    const content = document.getElementById(`documents-content-${clientId}`);
+    const documents = clientDocumentsCache[clientId] || [];
+
+    if (!content) {
+      return;
+    }
+
+    const filters = {
+      name: document.getElementById(`filterName-${clientId}`)?.value || "",
+      category: document.getElementById(`filterCategory-${clientId}`)?.value || "",
+      year: document.getElementById(`filterYear-${clientId}`)?.value || ""
+    };
+
+    content.innerHTML = createDocumentsHtml(clientId, documents, filters);
+    bindClientActionButtons();
+    bindDocumentFilters(clientId);
+  }
+
   async function renderClientDocumentsPanel(clientId) {
     const content = document.getElementById(`documents-content-${clientId}`);
 
@@ -522,13 +846,43 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     try {
       const documents = await loadClientDocuments(clientId);
-      content.innerHTML = createDocumentsHtml(documents);
+      clientDocumentsCache[clientId] = documents;
+      content.innerHTML = createDocumentsHtml(clientId, documents);
       bindClientActionButtons();
+      bindDocumentFilters(clientId);
     } catch (error) {
       console.error("Erro ao carregar documentos do cliente:", error);
       content.innerHTML = `
         <div class="empty-documents-message">
-          ${error.message || "Erro ao carregar documentos."}
+          ${escapeHtml(error.message || "Erro ao carregar documentos.")}
+        </div>
+      `;
+    }
+  }
+
+  async function renderClientNoticesPanel(clientId) {
+    const content = document.getElementById(`notices-content-${clientId}`);
+
+    if (!content) {
+      return;
+    }
+
+    content.innerHTML = `
+      <div class="empty-documents-message">
+        Carregando avisos...
+      </div>
+    `;
+
+    try {
+      const notices = await loadClientNotices(clientId);
+      clientNoticesCache[clientId] = notices;
+      content.innerHTML = createNoticesListHtml(notices);
+      bindClientActionButtons();
+    } catch (error) {
+      console.error("Erro ao carregar avisos do cliente:", error);
+      content.innerHTML = `
+        <div class="empty-documents-message">
+          ${escapeHtml(error.message || "Erro ao carregar avisos.")}
         </div>
       `;
     }
@@ -704,6 +1058,124 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
+  async function createNoticeAsAdmin(clientId, title, message, isActive, messageElement, submitButton) {
+    const originalButtonText = submitButton.textContent;
+
+    submitButton.disabled = true;
+    submitButton.textContent = "Salvando...";
+    setInlineMessage(messageElement, "Salvando aviso...", "info");
+    showAdminFeedback("Salvando aviso...", "info");
+
+    try {
+      const response = await fetch("http://localhost:3000/admin/notices", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          client_id: clientId,
+          title,
+          message,
+          is_active: isActive
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Erro ao salvar aviso.");
+      }
+
+      setInlineMessage(messageElement, "Aviso salvo com sucesso.", "success");
+      showAdminFeedback("Aviso salvo com sucesso.", "success");
+
+      await renderClientNoticesPanel(clientId);
+      return true;
+    } catch (error) {
+      console.error("Erro ao salvar aviso no admin:", error);
+      setInlineMessage(messageElement, error.message || "Erro ao salvar aviso.", "error");
+      showAdminFeedback(error.message || "Erro ao salvar aviso.", "error");
+      return false;
+    } finally {
+      submitButton.disabled = false;
+      submitButton.textContent = originalButtonText;
+    }
+  }
+
+  async function toggleNoticeAsAdmin(noticeId, clientId, currentIsActive, buttonElement) {
+    const originalText = buttonElement.textContent;
+    buttonElement.disabled = true;
+    buttonElement.textContent = currentIsActive ? "Desativando..." : "Ativando...";
+    showAdminFeedback("Atualizando status do aviso...", "info");
+
+    try {
+      const response = await fetch(`http://localhost:3000/admin/notices/${noticeId}/toggle`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          is_active: !currentIsActive
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Erro ao atualizar status do aviso.");
+      }
+
+      await renderClientNoticesPanel(clientId);
+      showAdminFeedback("Status do aviso atualizado com sucesso.", "success");
+    } catch (error) {
+      console.error("Erro ao alternar status do aviso:", error);
+      showAdminFeedback(error.message || "Erro ao atualizar status do aviso.", "error");
+    } finally {
+      buttonElement.disabled = false;
+      buttonElement.textContent = originalText;
+    }
+  }
+
+  async function deleteNoticeAsAdmin(noticeId, clientId, title, buttonElement) {
+    const confirmed = window.confirm(`Tem certeza que deseja excluir o aviso "${title}"?`);
+
+    if (!confirmed) {
+      return;
+    }
+
+    const originalText = buttonElement.textContent;
+    buttonElement.disabled = true;
+    buttonElement.textContent = "Excluindo...";
+    showAdminFeedback("Excluindo aviso...", "warning");
+
+    try {
+      const response = await fetch(`http://localhost:3000/admin/notices/${noticeId}`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        }
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Erro ao excluir aviso.");
+      }
+
+      await renderClientNoticesPanel(clientId);
+      showAdminFeedback("Aviso excluído com sucesso.", "success");
+    } catch (error) {
+      console.error("Erro ao excluir aviso:", error);
+      showAdminFeedback(error.message || "Erro ao excluir aviso.", "error");
+    } finally {
+      buttonElement.disabled = false;
+      buttonElement.textContent = originalText;
+    }
+  }
+
   function bindUploadForms() {
     const uploadForms = document.querySelectorAll(".upload-form");
 
@@ -750,6 +1222,52 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
+  function bindNoticeForms() {
+    const noticeForms = document.querySelectorAll(".notice-form");
+
+    noticeForms.forEach((form) => {
+      if (form.dataset.bound === "true") {
+        return;
+      }
+
+      form.dataset.bound = "true";
+
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+
+        const clientId = form.dataset.clientId;
+        const title = document.getElementById(`noticeTitle-${clientId}`).value.trim();
+        const messageText = document.getElementById(`noticeMessage-${clientId}`).value.trim();
+        const isActive = document.getElementById(`noticeIsActive-${clientId}`).checked;
+        const messageElement = document.getElementById(`noticeFormMessage-${clientId}`);
+        const submitButton = form.querySelector(".notice-submit-btn");
+
+        if (!title || !messageText) {
+          setInlineMessage(messageElement, "Preencha título e mensagem do aviso.", "error");
+          showAdminFeedback("Preencha os campos obrigatórios do aviso.", "error");
+          return;
+        }
+
+        const success = await createNoticeAsAdmin(
+          clientId,
+          title,
+          messageText,
+          isActive,
+          messageElement,
+          submitButton
+        );
+
+        if (success) {
+          form.reset();
+          const activeCheckbox = document.getElementById(`noticeIsActive-${clientId}`);
+          if (activeCheckbox) {
+            activeCheckbox.checked = true;
+          }
+        }
+      });
+    });
+  }
+
   function bindClientActionButtons() {
     const uploadButtons = document.querySelectorAll(".upload-documents-btn");
     const viewButtons = document.querySelectorAll(".view-documents-btn");
@@ -759,6 +1277,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     const replaceButtons = document.querySelectorAll(".replace-document-btn");
     const replaceInputs = document.querySelectorAll(".replace-document-file-input");
     const menuToggles = document.querySelectorAll(".document-menu-toggle");
+    const toggleNoticeButtons = document.querySelectorAll(".toggle-notice-btn");
+    const deleteNoticeButtons = document.querySelectorAll(".delete-notice-btn");
 
     uploadButtons.forEach((button) => {
       if (button.dataset.bound === "true") {
@@ -825,10 +1345,26 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       button.dataset.bound = "true";
 
-      button.addEventListener("click", () => {
-        const clientName = button.dataset.clientName;
-        const companyName = button.dataset.companyName;
-        showAdminFeedback(`Área de avisos do cliente ${clientName} (${companyName}) será o próximo módulo a evoluir.`, "info");
+      button.addEventListener("click", async () => {
+        const clientId = button.dataset.clientId;
+        const panel = document.getElementById(`notices-panel-${clientId}`);
+
+        if (!panel) {
+          return;
+        }
+
+        const isHidden = panel.classList.contains("hidden");
+
+        if (!isHidden) {
+          panel.classList.add("hidden");
+          button.textContent = "Avisos";
+          return;
+        }
+
+        panel.classList.remove("hidden");
+        button.textContent = "Ocultar Avisos";
+
+        await renderClientNoticesPanel(clientId);
       });
     });
 
@@ -943,6 +1479,48 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         await replaceDocumentAsAdmin(documentId, clientId, file, button);
         input.value = "";
+      });
+    });
+
+    toggleNoticeButtons.forEach((button) => {
+      if (button.dataset.bound === "true") {
+        return;
+      }
+
+      button.dataset.bound = "true";
+
+      button.addEventListener("click", async () => {
+        const noticeId = button.dataset.noticeId;
+        const clientId = button.dataset.clientId;
+        const currentIsActive = button.dataset.isActive === "true";
+
+        if (!noticeId || !clientId) {
+          showAdminFeedback("Aviso inválido para alteração de status.", "error");
+          return;
+        }
+
+        await toggleNoticeAsAdmin(noticeId, clientId, currentIsActive, button);
+      });
+    });
+
+    deleteNoticeButtons.forEach((button) => {
+      if (button.dataset.bound === "true") {
+        return;
+      }
+
+      button.dataset.bound = "true";
+
+      button.addEventListener("click", async () => {
+        const noticeId = button.dataset.noticeId;
+        const clientId = button.dataset.clientId;
+        const title = button.dataset.title || "Aviso";
+
+        if (!noticeId || !clientId) {
+          showAdminFeedback("Aviso inválido para exclusão.", "error");
+          return;
+        }
+
+        await deleteNoticeAsAdmin(noticeId, clientId, title, button);
       });
     });
   }

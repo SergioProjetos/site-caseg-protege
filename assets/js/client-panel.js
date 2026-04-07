@@ -8,7 +8,6 @@ if (!profile) {
 const welcomeMessage = document.querySelector("#welcomeMessage");
 const companyName = document.querySelector("#companyName");
 const documentsList = document.querySelector("#documentsList");
-const noticesList = document.querySelector("#noticesList");
 const logoutBtn = document.querySelector("#logoutBtn");
 
 /* ===============================
@@ -102,7 +101,7 @@ async function loadDocuments() {
 
     const groupedByCategory = {};
 
-    documents.forEach(doc => {
+    documents.forEach((doc) => {
       if (!groupedByCategory[doc.category]) {
         groupedByCategory[doc.category] = [];
       }
@@ -111,10 +110,10 @@ async function loadDocuments() {
 
     const groupedBySubcategory = {};
 
-    Object.keys(groupedByCategory).forEach(category => {
+    Object.keys(groupedByCategory).forEach((category) => {
       groupedBySubcategory[category] = {};
 
-      groupedByCategory[category].forEach(doc => {
+      groupedByCategory[category].forEach((doc) => {
         const subcategory = doc.subcategory ? doc.subcategory : null;
 
         if (!groupedBySubcategory[category][subcategory]) {
@@ -127,13 +126,13 @@ async function loadDocuments() {
 
     const groupedByYear = {};
 
-    Object.keys(groupedBySubcategory).forEach(category => {
+    Object.keys(groupedBySubcategory).forEach((category) => {
       groupedByYear[category] = {};
 
-      Object.keys(groupedBySubcategory[category]).forEach(subcategory => {
+      Object.keys(groupedBySubcategory[category]).forEach((subcategory) => {
         groupedByYear[category][subcategory] = {};
 
-        groupedBySubcategory[category][subcategory].forEach(doc => {
+        groupedBySubcategory[category][subcategory].forEach((doc) => {
           const year = doc.year;
 
           if (!groupedByYear[category][subcategory][year]) {
@@ -147,7 +146,7 @@ async function loadDocuments() {
 
     documentsContainer.innerHTML = "";
 
-    Object.keys(groupedByYear).forEach(category => {
+    Object.keys(groupedByYear).forEach((category) => {
       const categoryElement = document.createElement("div");
       categoryElement.className = "doc-category";
 
@@ -162,7 +161,7 @@ async function loadDocuments() {
       categoryElement.appendChild(subcategoriesContainer);
       documentsContainer.appendChild(categoryElement);
 
-      Object.keys(groupedByYear[category]).forEach(subcategory => {
+      Object.keys(groupedByYear[category]).forEach((subcategory) => {
         let yearsContainer;
 
         if (subcategory === "null") {
@@ -186,7 +185,7 @@ async function loadDocuments() {
           subcategoriesContainer.appendChild(subcategoryElement);
         }
 
-        Object.keys(groupedByYear[category][subcategory]).forEach(year => {
+        Object.keys(groupedByYear[category][subcategory]).forEach((year) => {
           const yearElement = document.createElement("div");
           yearElement.className = "doc-year";
 
@@ -201,7 +200,7 @@ async function loadDocuments() {
           yearElement.appendChild(filesContainer);
           yearsContainer.appendChild(yearElement);
 
-          groupedByYear[category][subcategory][year].forEach(doc => {
+          groupedByYear[category][subcategory][year].forEach((doc) => {
             const ul = document.createElement("ul");
             const li = document.createElement("li");
             const link = document.createElement("a");
@@ -238,7 +237,7 @@ async function loadDocuments() {
 function setupDocumentToggles() {
   const categoryButtons = document.querySelectorAll(".doc-category-toggle");
 
-  categoryButtons.forEach(button => {
+  categoryButtons.forEach((button) => {
     button.addEventListener("click", () => {
       const subcategories = button.nextElementSibling;
 
@@ -249,7 +248,7 @@ function setupDocumentToggles() {
 
   const subcategoryButtons = document.querySelectorAll(".doc-subcategory-toggle");
 
-  subcategoryButtons.forEach(button => {
+  subcategoryButtons.forEach((button) => {
     button.addEventListener("click", () => {
       const years = button.nextElementSibling;
 
@@ -260,7 +259,7 @@ function setupDocumentToggles() {
 
   const yearButtons = document.querySelectorAll(".doc-year-toggle");
 
-  yearButtons.forEach(button => {
+  yearButtons.forEach((button) => {
     button.addEventListener("click", () => {
       const files = button.nextElementSibling;
 
@@ -277,7 +276,7 @@ function setupDocumentLinks() {
   const fileLinks = document.querySelectorAll(".doc-file-link");
   const token = localStorage.getItem("access_token");
 
-  fileLinks.forEach(link => {
+  fileLinks.forEach((link) => {
     link.addEventListener("click", async (event) => {
       event.preventDefault();
 
@@ -327,104 +326,10 @@ function setupDocumentLinks() {
 }
 
 /* ===============================
-   AVISOS (CARROSSEL)
-================================ */
-async function loadNotices() {
-  if (!noticesList) return;
-
-  noticesList.innerHTML =
-    "<p class='loading-message'>Carregando avisos...</p>";
-
-  try {
-    const response = await fetch("http://localhost:3000/notices");
-
-    console.log("STATUS /notices:", response.status);
-
-    if (!response.ok) {
-      throw new Error("Erro na requisição de avisos");
-    }
-
-    const notices = await response.json();
-
-    console.log("AVISOS:", notices);
-
-    if (!Array.isArray(notices) || notices.length === 0) {
-      noticesList.innerHTML =
-        "<p class='empty-message'>Nenhum aviso disponível no momento.</p>";
-      return;
-    }
-
-    noticesList.innerHTML = `
-      <div class="notice-carousel">
-        <button id="prevNoticeBtn">‹</button>
-        <div id="noticeSlide"></div>
-        <button id="nextNoticeBtn">›</button>
-      </div>
-    `;
-
-    let currentNoticeIndex = 0;
-
-    function renderNotice() {
-      const notice = notices[currentNoticeIndex];
-      const noticeSlide = document.querySelector("#noticeSlide");
-
-      console.log("NOTICE ATUAL:", notice);
-
-      noticeSlide.innerHTML = `
-        <img src="${notice.image_url}" 
-             alt="${notice.title}" 
-             style="width:100%; border-radius:8px; cursor:pointer;" />
-      `;
-
-      const img = noticeSlide.querySelector("img");
-
-      if (img) {
-        img.addEventListener("error", () => {
-          console.error("Erro ao carregar imagem do aviso:", notice.image_url);
-        });
-      }
-
-      if (img && notice.link) {
-        img.addEventListener("click", () => {
-          window.open(notice.link, "_blank");
-        });
-      }
-    }
-
-    renderNotice();
-
-    document.querySelector("#prevNoticeBtn").addEventListener("click", () => {
-      currentNoticeIndex =
-        currentNoticeIndex === 0
-          ? notices.length - 1
-          : currentNoticeIndex - 1;
-
-      renderNotice();
-    });
-
-    document.querySelector("#nextNoticeBtn").addEventListener("click", () => {
-      currentNoticeIndex =
-        currentNoticeIndex === notices.length - 1
-          ? 0
-          : currentNoticeIndex + 1;
-
-      renderNotice();
-    });
-
-  } catch (error) {
-    console.error("Erro ao carregar avisos:", error);
-
-    noticesList.innerHTML =
-      "<p class='empty-message'>Erro ao carregar avisos.</p>";
-  }
-}
-
-/* ===============================
    INIT
 ================================ */
 function initClientPanel() {
   loadClientInfo();
-  loadNotices();
   loadDocuments();
 }
 
