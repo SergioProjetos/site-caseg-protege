@@ -162,7 +162,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   function showPassword(password) {
     temporaryPasswordBox.classList.remove("hidden");
-    temporaryPasswordField.value = password;
+    temporaryPasswordField.value = password || "";
   }
 
   function hideCreateClientForm() {
@@ -1663,11 +1663,14 @@ document.addEventListener("DOMContentLoaded", async () => {
       createClientMessage.textContent = "Cliente cadastrado com sucesso.";
       showAdminFeedback("Cliente cadastrado com sucesso.", "success");
 
+      createClientForm.reset();
+
       if (data.temporary_password) {
         showPassword(data.temporary_password);
+      } else {
+        hidePasswordBox();
       }
 
-      createClientForm.reset();
       showCreateClientForm();
 
       await loadClients();

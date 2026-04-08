@@ -9,13 +9,22 @@
 
     <script>
         const token = localStorage.getItem("access_token");
+        const profile = JSON.parse(localStorage.getItem("profile"));
 
-        if (!token) {
+        if (!token || !profile) {
             alert("Você precisa fazer login.");
             window.location.href = "login.html";
         }
-    </script>
 
+        if (profile.role !== "client") {
+            alert("Acesso restrito.");
+            window.location.href = "login.html";
+        }
+
+        if (profile.must_change_password === true) {
+            window.location.href = "primeiro-acesso.html";
+        }
+    </script>
 </head>
 <body>
 

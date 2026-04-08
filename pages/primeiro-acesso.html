@@ -7,6 +7,10 @@
 
     <link rel="stylesheet" href="../assets/css/style.css">
 
+    <!-- Font Awesome -->
+    <link rel="stylesheet"
+          href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
     <style>
         #firstAccessMessage {
             margin-top: 16px;
@@ -22,23 +26,78 @@
             margin-bottom: 24px;
             line-height: 1.6;
         }
+
+        .password-wrapper {
+            position: relative;
+            display: inline-block;
+            width: 100%;
+            margin-bottom: 12px;
+        }
+
+        .password-wrapper input {
+            width: 100%;
+            padding-right: 40px;
+            box-sizing: border-box;
+        }
+
+        .toggle-password-btn {
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            cursor: pointer;
+            background: none;
+            border: none;
+            padding: 0;
+        }
+
+        #passwordMismatchMessage {
+            margin-top: 8px;
+            margin-bottom: 16px;
+            font-size: 14px;
+            font-weight: 600;
+            color: red;
+            display: none;
+            line-height: 1.4;
+        }
+
+        .password-rules {
+            margin-top: 0;
+            margin-bottom: 16px;
+            padding-left: 18px;
+        }
+
+        .password-rules li {
+            margin-bottom: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            color: #666;
+        }
+
+        .password-rules li.valid {
+            color: green;
+        }
+
+        .password-rules li.invalid {
+            color: red;
+        }
     </style>
 
     <script>
-        const token = localStorage.getItem("access_token");
-        const profile = JSON.parse(localStorage.getItem("profile"));
+        const accessTokenCheck = localStorage.getItem("access_token");
+        const profileCheck = JSON.parse(localStorage.getItem("profile"));
 
-        if (!token || !profile) {
+        if (!accessTokenCheck || !profileCheck) {
             alert("Sessão inválida. Faça login novamente.");
             window.location.href = "login.html";
         }
 
-        if (profile.role !== "client") {
+        if (profileCheck.role !== "client") {
             alert("Acesso não permitido.");
             window.location.href = "login.html";
         }
 
-        if (profile.must_change_password !== true) {
+        if (profileCheck.must_change_password !== true) {
             window.location.href = "servicos.html";
         }
     </script>
@@ -68,20 +127,46 @@
 
         <form id="firstAccessForm">
             <label for="newPassword">Nova senha</label><br>
-            <input
-                type="password"
-                id="newPassword"
-                name="newPassword"
-                required
-            ><br><br>
+            <div class="password-wrapper">
+                <input
+                    type="password"
+                    id="newPassword"
+                    name="newPassword"
+                    required
+                >
+                <button
+                    type="button"
+                    id="toggleNewPassword"
+                    class="toggle-password-btn"
+                >
+                    <i id="eyeIconNewPassword" class="fa-solid fa-eye"></i>
+                </button>
+            </div>
+
+            <ul class="password-rules">
+                <li id="ruleMinLength" class="invalid">Pelo menos 8 caracteres</li>
+                <li id="ruleUppercase" class="invalid">Pelo menos 1 letra maiúscula</li>
+                <li id="ruleNumber" class="invalid">Pelo menos 1 número</li>
+            </ul>
 
             <label for="confirmPassword">Confirmar nova senha</label><br>
-            <input
-                type="password"
-                id="confirmPassword"
-                name="confirmPassword"
-                required
-            ><br><br>
+            <div class="password-wrapper">
+                <input
+                    type="password"
+                    id="confirmPassword"
+                    name="confirmPassword"
+                    required
+                >
+                <button
+                    type="button"
+                    id="toggleConfirmPassword"
+                    class="toggle-password-btn"
+                >
+                    <i id="eyeIconConfirmPassword" class="fa-solid fa-eye"></i>
+                </button>
+            </div>
+
+            <div id="passwordMismatchMessage">As senhas não coincidem.</div>
 
             <button type="submit">Salvar nova senha</button>
 
@@ -99,11 +184,11 @@
 </footer>
 
 <script>
-    const savedProfile = JSON.parse(localStorage.getItem("profile"));
+    const savedProfileName = JSON.parse(localStorage.getItem("profile"));
     const clientNameElement = document.querySelector("#clientName");
 
-    if (savedProfile && clientNameElement) {
-        clientNameElement.textContent = savedProfile.full_name || "cliente";
+    if (savedProfileName && clientNameElement) {
+        clientNameElement.textContent = savedProfileName.full_name || "cliente";
     }
 </script>
 

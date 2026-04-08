@@ -178,6 +178,21 @@ function normalizeOptionalText(value) {
   return normalized || null;
 }
 
+function validateStrongPassword(password) {
+  const normalizedPassword = String(password || "").trim();
+
+  return {
+    minLength: normalizedPassword.length >= 8,
+    hasUppercase: /[A-Z]/.test(normalizedPassword),
+    hasNumber: /\d/.test(normalizedPassword)
+  };
+}
+
+function isStrongPassword(password) {
+  const validation = validateStrongPassword(password);
+  return validation.minLength && validation.hasUppercase && validation.hasNumber;
+}
+
 async function findDuplicateDocument({ clientId, category, subcategory, year, fileName }) {
   let query = adminSupabase
     .from("documents")
@@ -198,49 +213,6 @@ async function findDuplicateDocument({ clientId, category, subcategory, year, fi
 
 app.get("/", (req, res) => {
   res.send("Servidor Caseg Protege rodando 🚀");
-});
-
-app.post("/primeiro-acesso", async (req, res) => {
-  try {
-    const {
-      company_name,
-      full_name,
-      cpf_cnpj,
-      email,
-      password
-    } = req.body;
-
-    const { data: userData, error: userError } =
-      await adminSupabase.auth.admin.createUser({
-        email,
-        password,
-        email_confirm: true
-      });
-
-    if (userError) {
-      return res.status(400).json({ error: userError.message });
-    }
-
-    const { error: profileError } = await adminSupabase
-      .from("profiles")
-      .insert({
-        user_id: userData.user.id,
-        company_name,
-        full_name,
-        cpf_cnpj,
-        email,
-        role: "client"
-      });
-
-    if (profileError) {
-      return res.status(400).json({ error: profileError.message });
-    }
-
-    res.json({ message: "Cadastro realizado com sucesso!" });
-  } catch (error) {
-    console.error("ERRO EM /primeiro-acesso:", error);
-    res.status(500).json({ error: "Erro interno do servidor" });
-  }
 });
 
 app.post("/login", async (req, res) => {
@@ -292,6 +264,83 @@ app.post("/login", async (req, res) => {
     });
   } catch (error) {
     console.error("ERRO EM /login:", error);
+    res.status(500).json({ error: "Erro interno do servidor" });
+  }
+});
+
+app.put("/update-password", async (req, res) => {
+  try {
+    const authResult = await getAuthenticatedUser(req);
+
+    if (authResult.error) {
+      return res.status(authResult.status).json({
+        error: authResult.error
+      });
+    }
+
+    const userId = authResult.user.id;
+    const { new_password } = req.body;
+    const normalizedPassword = String(new_password || "").trim();
+
+    if (!normalizedPassword) {
+      return res.status(400).json({
+        error: "new_password é obrigatório."
+      });
+    }
+
+    if (!isStrongPassword(normalizedPassword)) {
+      return res.status(400).json({
+        error: "A nova senha deve ter no mínimo 8 caracteres, 1 letra maiúscula e 1 número."
+      });
+    }
+
+    const profileResult = await getUserProfile(userId);
+
+    if (profileResult.error) {
+      return res.status(profileResult.status).json({
+        error: profileResult.error
+      });
+    }
+
+    const profile = profileResult.profile;
+
+    if (profile.role !== "client") {
+      return res.status(403).json({
+        error: "Apenas clientes podem atualizar a senha por esta rota."
+      });
+    }
+
+    const { error: updateAuthError } = await adminSupabase.auth.admin.updateUserById(
+      userId,
+      {
+        password: normalizedPassword
+      }
+    );
+
+    if (updateAuthError) {
+      return res.status(500).json({
+        error: updateAuthError.message || "Erro ao atualizar senha no Auth."
+      });
+    }
+
+    const { error: updateProfileError } = await adminSupabase
+      .from("profiles")
+      .update({
+        must_change_password: false
+      })
+      .eq("user_id", userId);
+
+    if (updateProfileError) {
+      return res.status(500).json({
+        error: updateProfileError.message || "Erro ao atualizar perfil do usuário."
+      });
+    }
+
+    return res.status(200).json({
+      message: "Senha atualizada com sucesso."
+    });
+  } catch (error) {
+    console.error("ERRO EM PUT /update-password:", error);
     res.status(500).json({ error: "Erro interno do servidor" });
   }
 });
@@ -1212,8 +1261,8 @@ app.get("/notices", async (req, res) => {
 
 console.log("Rotas configuradas:");
 console.log("GET /");
-console.log("POST /primeiro-acesso");
 console.log("POST /login");
+console.log("PUT /update-password");
 console.log("POST /clients");
 console.log("GET /clients");
 console.log("GET /clients/:clientId/documents");
