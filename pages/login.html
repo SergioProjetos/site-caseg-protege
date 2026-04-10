@@ -202,6 +202,13 @@
     const loginForm = document.querySelector("#loginForm");
     const loginMessage = document.querySelector("#loginMessage");
 
+    const passwordUpdated = localStorage.getItem("password_updated");
+
+    if (passwordUpdated === "true") {
+        setLoginMessage("Senha alterada com sucesso. Faça login novamente.", "green");
+        localStorage.removeItem("password_updated");
+    }
+
     loginForm.addEventListener("submit", async function (event) {
         event.preventDefault();
 

@@ -24,8 +24,16 @@ document.addEventListener("DOMContentLoaded", async () => {
   const toggleClientsListBtn = document.getElementById("toggleClientsListBtn");
   const clientsSectionWrapper = document.getElementById("clientsSectionWrapper");
 
+  const toggleHomeBannersBtn = document.getElementById("toggleHomeBannersBtn");
+  const homeBannersWrapper = document.getElementById("homeBannersWrapper");
+
   const createClientForm = document.getElementById("createClientForm");
   const createClientMessage = document.getElementById("createClientMessage");
+
+  const homeBannerForm = document.getElementById("homeBannerForm");
+  const homeBannerMessage = document.getElementById("homeBannerMessage");
+  const homeBannersListMessage = document.getElementById("homeBannersListMessage");
+  const homeBannersList = document.getElementById("homeBannersList");
 
   const cpfCnpjInput = document.getElementById("cpfCnpj");
   const phoneInput = document.getElementById("phone");
@@ -40,7 +48,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   let feedbackTimeout = null;
   const clientDocumentsCache = {};
-  const clientNoticesCache = {};
 
   function showAdminFeedback(message, type = "info", autoHide = true) {
     adminFeedback.textContent = message;
@@ -191,6 +198,16 @@ document.addEventListener("DOMContentLoaded", async () => {
   function showClientsList() {
     clientsSectionWrapper.classList.remove("hidden");
     toggleClientsListBtn.textContent = "Ocultar Clientes";
+  }
+
+  function hideHomeBanners() {
+    homeBannersWrapper.classList.add("hidden");
+    toggleHomeBannersBtn.textContent = "Exibir Banners";
+  }
+
+  function showHomeBanners() {
+    homeBannersWrapper.classList.remove("hidden");
+    toggleHomeBannersBtn.textContent = "Ocultar Banners";
   }
 
   function closeAllDocumentMenus() {
@@ -478,120 +495,69 @@ document.addEventListener("DOMContentLoaded", async () => {
     `;
   }
 
-  function createNoticePanelHtml(client) {
+  function createHomeBannerCardHtml(banner) {
+    const linkHtml = banner.link
+      ? `<a href="${escapeHtml(banner.link)}" target="_blank" rel="noopener noreferrer">${escapeHtml(banner.link)}</a>`
+      : "-";
+
     return `
-      <form
-        class="notice-form"
-        data-client-id="${client.user_id}"
-        id="noticeForm-${client.user_id}"
-      >
-        <div class="notice-form-grid">
-          <div class="form-group">
-            <label>Cliente</label>
-            <input type="text" value="${escapeHtml(client.full_name || "-")}" readonly />
+      <div class="home-banner-card">
+        <div class="home-banner-top">
+          <div class="home-banner-preview">
+            <img src="${escapeHtml(banner.image_url || "")}" alt="${escapeHtml(banner.title || "Banner da Home")}" />
           </div>
 
-          <div class="form-group">
-            <label>Empresa</label>
-            <input type="text" value="${escapeHtml(client.company_name || "-")}" readonly />
-          </div>
+          <div class="home-banner-info">
+            <div class="home-banner-title">${escapeHtml(banner.title || "Sem título")}</div>
 
-          <div class="form-group notice-form-full">
-            <label for="noticeTitle-${client.user_id}">Título do aviso</label>
-            <input
-              type="text"
-              id="noticeTitle-${client.user_id}"
-              placeholder="Digite o título do aviso"
-              required
-            />
-          </div>
+            <div class="home-banner-meta">
+              <strong>Link:</strong> ${linkHtml}
+            </div>
 
-          <div class="form-group notice-form-full">
-            <label for="noticeMessage-${client.user_id}">Mensagem</label>
-            <textarea
-              id="noticeMessage-${client.user_id}"
-              placeholder="Digite a mensagem do aviso"
-              required
-            ></textarea>
-          </div>
+            <div class="home-banner-meta">
+              <strong>Criado em:</strong> ${formatDate(banner.created_at)}
+            </div>
 
-          <div class="notice-checkbox-row">
-            <label class="notice-checkbox-label">
-              <input type="checkbox" id="noticeIsActive-${client.user_id}" checked />
-              Criar aviso como ativo
-            </label>
+            <span class="home-banner-status ${banner.is_active ? "active" : "inactive"}">
+              ${banner.is_active ? "Ativo" : "Inativo"}
+            </span>
           </div>
         </div>
 
-        <div class="form-actions">
-          <button type="submit" class="notice-submit-btn">
-            Salvar Aviso
+        <div class="home-banner-actions">
+          <button
+            type="button"
+            class="home-banner-action-btn toggle-home-banner-btn"
+            data-banner-id="${banner.id}"
+            data-is-active="${banner.is_active ? "true" : "false"}"
+          >
+            ${banner.is_active ? "Desativar" : "Ativar"}
+          </button>
+
+          <button
+            type="button"
+            class="home-banner-action-btn delete-home-banner-btn"
+            data-banner-id="${banner.id}"
+            data-banner-title="${escapeHtml(banner.title || "Banner")}"
+          >
+            Excluir
           </button>
         </div>
-
-        <div
-          class="upload-form-message"
-          id="noticeFormMessage-${client.user_id}"
-        ></div>
-      </form>
+      </div>
     `;
   }
 
-  function createNoticesListHtml(notices) {
-    if (!notices || notices.length === 0) {
-      return `
-        <div class="empty-documents-message">
-          Nenhum aviso cadastrado para este cliente.
-        </div>
-      `;
+  function renderHomeBanners(banners) {
+    homeBannersList.innerHTML = "";
+
+    if (!Array.isArray(banners) || banners.length === 0) {
+      homeBannersListMessage.textContent = "Nenhum banner cadastrado no momento.";
+      return;
     }
 
-    return `
-      <div class="notices-list">
-        ${notices.map((notice) => `
-          <div class="notice-item">
-            <div class="notice-item-header">
-              <div>
-                <div class="notice-item-title">${escapeHtml(notice.title || "Sem título")}</div>
-                <div class="notice-item-meta">
-                  Criado em ${formatDate(notice.created_at)} •
-                  Status:
-                  <span class="notice-status ${notice.is_active ? "active" : "inactive"}">
-                    ${notice.is_active ? "Ativo" : "Inativo"}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div class="notice-item-message">
-              ${escapeHtml(notice.message || "-").replace(/\n/g, "<br>")}
-            </div>
-
-            <div class="notice-item-actions">
-              <button
-                type="button"
-                class="notice-action-btn toggle-notice-btn"
-                data-notice-id="${notice.id}"
-                data-client-id="${notice.client_id}"
-                data-is-active="${notice.is_active ? "true" : "false"}"
-              >
-                ${notice.is_active ? "Desativar" : "Ativar"}
-              </button>
-
-              <button
-                type="button"
-                class="notice-action-btn delete-notice-btn"
-                data-notice-id="${notice.id}"
-                data-client-id="${notice.client_id}"
-                data-title="${escapeHtml(notice.title || "Aviso")}"
-              >
-                Excluir
-              </button>
-            </div>
-          </div>
-        `).join("")}
-      </div>
-    `;
+    homeBannersListMessage.textContent = `${banners.length} banner(s) encontrado(s).`;
+    homeBannersList.innerHTML = banners.map(createHomeBannerCardHtml).join("");
+    bindHomeBannerActionButtons();
   }
 
   function renderClients(clients) {
@@ -617,19 +583,43 @@ document.addEventListener("DOMContentLoaded", async () => {
 
             <div class="client-card-grid">
               <div class="client-card-item">
-                <strong>Empresa:</strong> ${escapeHtml(client.company_name || "-")}
+                <i class="fa-solid fa-building client-info-icon"></i>
+                <div class="client-card-text">
+                  <strong>Empresa</strong>
+                  <span>${escapeHtml(client.company_name || "-")}</span>
+                </div>
               </div>
 
               <div class="client-card-item">
-                <strong>CPF/CNPJ:</strong> ${formatCpfCnpj(client.cpf_cnpj) || "-"}
+                <i class="fa-regular fa-id-card client-info-icon"></i>
+                <div class="client-card-text">
+                  <strong>CPF/CNPJ</strong>
+                  <span>${formatCpfCnpj(client.cpf_cnpj) || "-"}</span>
+                </div>
               </div>
 
               <div class="client-card-item">
-                <strong>Telefone:</strong> ${formatPhone(client.phone) || "-"}
+                <i class="fa-regular fa-envelope client-info-icon"></i>
+                <div class="client-card-text">
+                  <strong>E-mail</strong>
+                  <span>${escapeHtml(client.email || "-")}</span>
+                </div>
               </div>
 
               <div class="client-card-item">
-                <strong>WhatsApp:</strong> ${formatPhone(client.whatsapp) || "-"}
+                <i class="fa-solid fa-phone client-info-icon"></i>
+                <div class="client-card-text">
+                  <strong>Telefone</strong>
+                  <span>${formatPhone(client.phone) || "-"}</span>
+                </div>
+              </div>
+
+              <div class="client-card-item">
+                <i class="fa-brands fa-whatsapp client-info-icon"></i>
+                <div class="client-card-text">
+                  <strong>WhatsApp</strong>
+                  <span>${formatPhone(client.whatsapp) || "-"}</span>
+                </div>
               </div>
             </div>
           </div>
@@ -657,12 +647,11 @@ document.addEventListener("DOMContentLoaded", async () => {
 
             <button
               type="button"
-              class="client-action-btn client-notices-btn"
+              class="client-action-btn delete-client-btn"
               data-client-id="${client.user_id}"
-              data-client-name="${escapeHtml(client.full_name || "")}"
-              data-company-name="${escapeHtml(client.company_name || "")}"
+              data-client-name="${escapeHtml(client.full_name || "Cliente")}"
             >
-              Avisos
+              Excluir Cliente
             </button>
           </div>
         </div>
@@ -700,25 +689,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 
           <div id="documents-content-${client.user_id}"></div>
         </div>
-
-        <div
-          id="notices-panel-${client.user_id}"
-          class="notices-panel hidden"
-        >
-          <div class="notices-panel-header">
-            <div>
-              <div class="notices-panel-title">Avisos do cliente</div>
-              <div class="notices-panel-subtitle">
-                Cliente: ${escapeHtml(client.full_name || "-")}${client.company_name ? ` - ${escapeHtml(client.company_name)}` : ""}
-              </div>
-            </div>
-          </div>
-
-          <div class="notices-panel-body">
-            ${createNoticePanelHtml(client)}
-            <div id="notices-content-${client.user_id}" class="notices-content"></div>
-          </div>
-        </div>
       `;
 
       clientsList.appendChild(card);
@@ -726,7 +696,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     bindClientActionButtons();
     bindUploadForms();
-    bindNoticeForms();
   }
 
   async function loadClientDocuments(clientId) {
@@ -747,8 +716,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     return data;
   }
 
-  async function loadClientNotices(clientId) {
-    const response = await fetch(`http://localhost:3000/admin/clients/${clientId}/notices`, {
+  async function loadHomeBanners() {
+    const response = await fetch("http://localhost:3000/admin/notices", {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
@@ -759,7 +728,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const data = await response.json();
 
     if (!response.ok) {
-      throw new Error(data.error || "Erro ao buscar avisos do cliente.");
+      throw new Error(data.error || "Erro ao buscar banners da Home.");
     }
 
     return data;
@@ -860,31 +829,16 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
-  async function renderClientNoticesPanel(clientId) {
-    const content = document.getElementById(`notices-content-${clientId}`);
-
-    if (!content) {
-      return;
-    }
-
-    content.innerHTML = `
-      <div class="empty-documents-message">
-        Carregando avisos...
-      </div>
-    `;
+  async function renderHomeBannersPanel() {
+    homeBannersListMessage.textContent = "Carregando banners...";
+    homeBannersList.innerHTML = "";
 
     try {
-      const notices = await loadClientNotices(clientId);
-      clientNoticesCache[clientId] = notices;
-      content.innerHTML = createNoticesListHtml(notices);
-      bindClientActionButtons();
+      const banners = await loadHomeBanners();
+      renderHomeBanners(banners);
     } catch (error) {
-      console.error("Erro ao carregar avisos do cliente:", error);
-      content.innerHTML = `
-        <div class="empty-documents-message">
-          ${escapeHtml(error.message || "Erro ao carregar avisos.")}
-        </div>
-      `;
+      console.error("Erro ao carregar banners da Home:", error);
+      homeBannersListMessage.textContent = error.message || "Erro ao carregar banners.";
     }
   }
 
@@ -1000,6 +954,47 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
+  async function deleteClientAsAdmin(clientId, clientName, buttonElement) {
+    const confirmed = window.confirm(
+      `Tem certeza que deseja excluir o cliente "${clientName}"?\n\nTodos os documentos e acessos serão removidos permanentemente.`
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    const originalText = buttonElement.textContent;
+    buttonElement.textContent = "Excluindo...";
+    buttonElement.disabled = true;
+    showAdminFeedback("Excluindo cliente e dados vinculados...", "warning");
+
+    try {
+      const response = await fetch(`http://localhost:3000/admin/clients/${clientId}`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        }
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Erro ao excluir cliente.");
+      }
+
+      delete clientDocumentsCache[clientId];
+      await loadClients();
+      showAdminFeedback("Cliente excluído com sucesso.", "success");
+    } catch (error) {
+      console.error("Erro ao excluir cliente:", error);
+      showAdminFeedback(error.message || "Erro ao excluir cliente.", "error");
+    } finally {
+      buttonElement.textContent = originalText;
+      buttonElement.disabled = false;
+    }
+  }
+
   async function uploadDocumentAsAdmin(clientId, category, subcategory, year, file, messageElement, submitButton) {
     const originalButtonText = submitButton.textContent;
 
@@ -1045,7 +1040,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
 
       await renderClientDocumentsPanel(clientId);
-
       return true;
     } catch (error) {
       console.error("Erro ao enviar documento no admin:", error);
@@ -1058,44 +1052,44 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
-  async function createNoticeAsAdmin(clientId, title, message, isActive, messageElement, submitButton) {
+  async function createHomeBannerAsAdmin(title, link, isActive, imageFile, messageElement, submitButton) {
     const originalButtonText = submitButton.textContent;
 
     submitButton.disabled = true;
     submitButton.textContent = "Salvando...";
-    setInlineMessage(messageElement, "Salvando aviso...", "info");
-    showAdminFeedback("Salvando aviso...", "info");
+    setInlineMessage(messageElement, "Salvando banner...", "info");
+    showAdminFeedback("Salvando banner da Home...", "info");
 
     try {
-      const response = await fetch("http://localhost:3000/admin/notices", {
+      const formData = new FormData();
+      formData.append("title", title);
+      formData.append("link", link || "");
+      formData.append("is_active", String(isActive));
+      formData.append("image", imageFile);
+
+      const response = await fetch("http://localhost:3000/admin/notices/upload", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
           "Authorization": `Bearer ${token}`
         },
-        body: JSON.stringify({
-          client_id: clientId,
-          title,
-          message,
-          is_active: isActive
-        })
+        body: formData
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || "Erro ao salvar aviso.");
+        throw new Error(data.error || "Erro ao salvar banner.");
       }
 
-      setInlineMessage(messageElement, "Aviso salvo com sucesso.", "success");
-      showAdminFeedback("Aviso salvo com sucesso.", "success");
+      setInlineMessage(messageElement, "Banner salvo com sucesso.", "success");
+      showAdminFeedback("Banner da Home salvo com sucesso.", "success");
 
-      await renderClientNoticesPanel(clientId);
+      await renderHomeBannersPanel();
       return true;
     } catch (error) {
-      console.error("Erro ao salvar aviso no admin:", error);
-      setInlineMessage(messageElement, error.message || "Erro ao salvar aviso.", "error");
-      showAdminFeedback(error.message || "Erro ao salvar aviso.", "error");
+      console.error("Erro ao salvar banner da Home:", error);
+      setInlineMessage(messageElement, error.message || "Erro ao salvar banner.", "error");
+      showAdminFeedback(error.message || "Erro ao salvar banner.", "error");
       return false;
     } finally {
       submitButton.disabled = false;
@@ -1103,14 +1097,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
-  async function toggleNoticeAsAdmin(noticeId, clientId, currentIsActive, buttonElement) {
+  async function toggleHomeBannerAsAdmin(bannerId, currentIsActive, buttonElement) {
     const originalText = buttonElement.textContent;
     buttonElement.disabled = true;
     buttonElement.textContent = currentIsActive ? "Desativando..." : "Ativando...";
-    showAdminFeedback("Atualizando status do aviso...", "info");
+    showAdminFeedback("Atualizando status do banner...", "info");
 
     try {
-      const response = await fetch(`http://localhost:3000/admin/notices/${noticeId}/toggle`, {
+      const response = await fetch(`http://localhost:3000/admin/notices/${bannerId}/toggle`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -1124,22 +1118,22 @@ document.addEventListener("DOMContentLoaded", async () => {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || "Erro ao atualizar status do aviso.");
+        throw new Error(data.error || "Erro ao atualizar status do banner.");
       }
 
-      await renderClientNoticesPanel(clientId);
-      showAdminFeedback("Status do aviso atualizado com sucesso.", "success");
+      await renderHomeBannersPanel();
+      showAdminFeedback("Status do banner atualizado com sucesso.", "success");
     } catch (error) {
-      console.error("Erro ao alternar status do aviso:", error);
-      showAdminFeedback(error.message || "Erro ao atualizar status do aviso.", "error");
+      console.error("Erro ao alternar status do banner:", error);
+      showAdminFeedback(error.message || "Erro ao atualizar status do banner.", "error");
     } finally {
       buttonElement.disabled = false;
       buttonElement.textContent = originalText;
     }
   }
 
-  async function deleteNoticeAsAdmin(noticeId, clientId, title, buttonElement) {
-    const confirmed = window.confirm(`Tem certeza que deseja excluir o aviso "${title}"?`);
+  async function deleteHomeBannerAsAdmin(bannerId, bannerTitle, buttonElement) {
+    const confirmed = window.confirm(`Tem certeza que deseja excluir o banner "${bannerTitle}"?`);
 
     if (!confirmed) {
       return;
@@ -1148,10 +1142,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     const originalText = buttonElement.textContent;
     buttonElement.disabled = true;
     buttonElement.textContent = "Excluindo...";
-    showAdminFeedback("Excluindo aviso...", "warning");
+    showAdminFeedback("Excluindo banner...", "warning");
 
     try {
-      const response = await fetch(`http://localhost:3000/admin/notices/${noticeId}`, {
+      const response = await fetch(`http://localhost:3000/admin/notices/${bannerId}`, {
         method: "DELETE",
         headers: {
           "Content-Type": "application/json",
@@ -1162,14 +1156,14 @@ document.addEventListener("DOMContentLoaded", async () => {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || "Erro ao excluir aviso.");
+        throw new Error(data.error || "Erro ao excluir banner.");
       }
 
-      await renderClientNoticesPanel(clientId);
-      showAdminFeedback("Aviso excluído com sucesso.", "success");
+      await renderHomeBannersPanel();
+      showAdminFeedback("Banner excluído com sucesso.", "success");
     } catch (error) {
-      console.error("Erro ao excluir aviso:", error);
-      showAdminFeedback(error.message || "Erro ao excluir aviso.", "error");
+      console.error("Erro ao excluir banner:", error);
+      showAdminFeedback(error.message || "Erro ao excluir banner.", "error");
     } finally {
       buttonElement.disabled = false;
       buttonElement.textContent = originalText;
@@ -1222,48 +1216,87 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
-  function bindNoticeForms() {
-    const noticeForms = document.querySelectorAll(".notice-form");
+  function bindHomeBannerForm() {
+    if (!homeBannerForm || homeBannerForm.dataset.bound === "true") {
+      return;
+    }
 
-    noticeForms.forEach((form) => {
-      if (form.dataset.bound === "true") {
+    homeBannerForm.dataset.bound = "true";
+
+    homeBannerForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+
+      const title = document.getElementById("bannerTitle").value.trim();
+      const link = document.getElementById("bannerLink").value.trim();
+      const isActive = document.getElementById("bannerIsActive").checked;
+      const imageInput = document.getElementById("bannerImage");
+      const submitButton = document.getElementById("saveBannerBtn");
+
+      if (!title || !imageInput.files.length) {
+        setInlineMessage(homeBannerMessage, "Preencha o título e selecione uma imagem.", "error");
+        showAdminFeedback("Preencha os campos obrigatórios do banner.", "error");
         return;
       }
 
-      form.dataset.bound = "true";
+      const imageFile = imageInput.files[0];
 
-      form.addEventListener("submit", async (event) => {
-        event.preventDefault();
+      const success = await createHomeBannerAsAdmin(
+        title,
+        link,
+        isActive,
+        imageFile,
+        homeBannerMessage,
+        submitButton
+      );
 
-        const clientId = form.dataset.clientId;
-        const title = document.getElementById(`noticeTitle-${clientId}`).value.trim();
-        const messageText = document.getElementById(`noticeMessage-${clientId}`).value.trim();
-        const isActive = document.getElementById(`noticeIsActive-${clientId}`).checked;
-        const messageElement = document.getElementById(`noticeFormMessage-${clientId}`);
-        const submitButton = form.querySelector(".notice-submit-btn");
+      if (success) {
+        homeBannerForm.reset();
+        document.getElementById("bannerIsActive").checked = true;
+      }
+    });
+  }
 
-        if (!title || !messageText) {
-          setInlineMessage(messageElement, "Preencha título e mensagem do aviso.", "error");
-          showAdminFeedback("Preencha os campos obrigatórios do aviso.", "error");
+  function bindHomeBannerActionButtons() {
+    const toggleButtons = document.querySelectorAll(".toggle-home-banner-btn");
+    const deleteButtons = document.querySelectorAll(".delete-home-banner-btn");
+
+    toggleButtons.forEach((button) => {
+      if (button.dataset.bound === "true") {
+        return;
+      }
+
+      button.dataset.bound = "true";
+
+      button.addEventListener("click", async () => {
+        const bannerId = button.dataset.bannerId;
+        const currentIsActive = button.dataset.isActive === "true";
+
+        if (!bannerId) {
+          showAdminFeedback("Banner inválido para alteração de status.", "error");
           return;
         }
 
-        const success = await createNoticeAsAdmin(
-          clientId,
-          title,
-          messageText,
-          isActive,
-          messageElement,
-          submitButton
-        );
+        await toggleHomeBannerAsAdmin(bannerId, currentIsActive, button);
+      });
+    });
 
-        if (success) {
-          form.reset();
-          const activeCheckbox = document.getElementById(`noticeIsActive-${clientId}`);
-          if (activeCheckbox) {
-            activeCheckbox.checked = true;
-          }
+    deleteButtons.forEach((button) => {
+      if (button.dataset.bound === "true") {
+        return;
+      }
+
+      button.dataset.bound = "true";
+
+      button.addEventListener("click", async () => {
+        const bannerId = button.dataset.bannerId;
+        const bannerTitle = button.dataset.bannerTitle || "Banner";
+
+        if (!bannerId) {
+          showAdminFeedback("Banner inválido para exclusão.", "error");
+          return;
         }
+
+        await deleteHomeBannerAsAdmin(bannerId, bannerTitle, button);
       });
     });
   }
@@ -1271,14 +1304,12 @@ document.addEventListener("DOMContentLoaded", async () => {
   function bindClientActionButtons() {
     const uploadButtons = document.querySelectorAll(".upload-documents-btn");
     const viewButtons = document.querySelectorAll(".view-documents-btn");
-    const noticeButtons = document.querySelectorAll(".client-notices-btn");
+    const deleteClientButtons = document.querySelectorAll(".delete-client-btn");
     const downloadButtons = document.querySelectorAll(".download-document-btn");
     const deleteButtons = document.querySelectorAll(".delete-document-btn");
     const replaceButtons = document.querySelectorAll(".replace-document-btn");
     const replaceInputs = document.querySelectorAll(".replace-document-file-input");
     const menuToggles = document.querySelectorAll(".document-menu-toggle");
-    const toggleNoticeButtons = document.querySelectorAll(".toggle-notice-btn");
-    const deleteNoticeButtons = document.querySelectorAll(".delete-notice-btn");
 
     uploadButtons.forEach((button) => {
       if (button.dataset.bound === "true") {
@@ -1338,7 +1369,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       });
     });
 
-    noticeButtons.forEach((button) => {
+    deleteClientButtons.forEach((button) => {
       if (button.dataset.bound === "true") {
         return;
       }
@@ -1347,24 +1378,14 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       button.addEventListener("click", async () => {
         const clientId = button.dataset.clientId;
-        const panel = document.getElementById(`notices-panel-${clientId}`);
+        const clientName = button.dataset.clientName || "Cliente";
 
-        if (!panel) {
+        if (!clientId) {
+          showAdminFeedback("Cliente inválido para exclusão.", "error");
           return;
         }
 
-        const isHidden = panel.classList.contains("hidden");
-
-        if (!isHidden) {
-          panel.classList.add("hidden");
-          button.textContent = "Avisos";
-          return;
-        }
-
-        panel.classList.remove("hidden");
-        button.textContent = "Ocultar Avisos";
-
-        await renderClientNoticesPanel(clientId);
+        await deleteClientAsAdmin(clientId, clientName, button);
       });
     });
 
@@ -1481,48 +1502,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         input.value = "";
       });
     });
-
-    toggleNoticeButtons.forEach((button) => {
-      if (button.dataset.bound === "true") {
-        return;
-      }
-
-      button.dataset.bound = "true";
-
-      button.addEventListener("click", async () => {
-        const noticeId = button.dataset.noticeId;
-        const clientId = button.dataset.clientId;
-        const currentIsActive = button.dataset.isActive === "true";
-
-        if (!noticeId || !clientId) {
-          showAdminFeedback("Aviso inválido para alteração de status.", "error");
-          return;
-        }
-
-        await toggleNoticeAsAdmin(noticeId, clientId, currentIsActive, button);
-      });
-    });
-
-    deleteNoticeButtons.forEach((button) => {
-      if (button.dataset.bound === "true") {
-        return;
-      }
-
-      button.dataset.bound = "true";
-
-      button.addEventListener("click", async () => {
-        const noticeId = button.dataset.noticeId;
-        const clientId = button.dataset.clientId;
-        const title = button.dataset.title || "Aviso";
-
-        if (!noticeId || !clientId) {
-          showAdminFeedback("Aviso inválido para exclusão.", "error");
-          return;
-        }
-
-        await deleteNoticeAsAdmin(noticeId, clientId, title, button);
-      });
-    });
   }
 
   document.addEventListener("click", () => {
@@ -1575,6 +1554,17 @@ document.addEventListener("DOMContentLoaded", async () => {
       showClientsList();
     } else {
       hideClientsList();
+    }
+  });
+
+  toggleHomeBannersBtn.addEventListener("click", async () => {
+    const isHidden = homeBannersWrapper.classList.contains("hidden");
+
+    if (isHidden) {
+      showHomeBanners();
+      await renderHomeBannersPanel();
+    } else {
+      hideHomeBanners();
     }
   });
 
@@ -1672,7 +1662,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
 
       showCreateClientForm();
-
       await loadClients();
     } catch (error) {
       console.error("Erro ao cadastrar cliente:", error);
@@ -1681,9 +1670,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   });
 
+  bindHomeBannerForm();
+
   loadAdminInfo();
   hidePasswordBox();
   hideCreateClientForm();
   showClientsList();
+  hideHomeBanners();
   await loadClients();
 });

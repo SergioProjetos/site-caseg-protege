@@ -211,6 +211,22 @@ async function findDuplicateDocument({ clientId, category, subcategory, year, fi
   return query.maybeSingle();
 }
 
+async function removeStorageFiles(bucketName, filePaths) {
+  const cleanedPaths = (filePaths || [])
+    .map((path) => String(path || "").trim())
+    .filter(Boolean);
+
+  if (!cleanedPaths.length) {
+    return null;
+  }
+
+  const { error } = await adminSupabase.storage
+    .from(bucketName)
+    .remove(cleanedPaths);
+
+  return error || null;
+}
+
 app.get("/", (req, res) => {
   res.send("Servidor Caseg Protege rodando 🚀");
 });
@@ -504,6 +520,93 @@ app.get("/clients", async (req, res) => {
   }
 });
 
+app.delete("/admin/clients/:clientId", async (req, res) => {
+  try {
+    const adminAccess = await validateAdminAccess(req, res);
+    if (!adminAccess) {
+      return;
+    }
+
+    const { clientId } = req.params;
+
+    if (!clientId) {
+      return res.status(400).json({
+        error: "clientId é obrigatório."
+      });
+    }
+
+    const { data: clientProfile, error: clientProfileError } = await adminSupabase
+      .from("profiles")
+      .select("user_id, full_name, role")
+      .eq("user_id", clientId)
+      .eq("role", "client")
+      .single();
+
+    if (clientProfileError || !clientProfile) {
+      return res.status(404).json({
+        error: "Cliente não encontrado."
+      });
+    }
+
+    const { data: clientDocuments, error: documentsError } = await adminSupabase
+      .from("documents")
+      .select("id, file_path")
+      .eq("client_id", clientId);
+
+    if (documentsError) {
+      return res.status(500).json({
+        error: documentsError.message || "Erro ao buscar documentos do cliente."
+      });
+    }
+
+    const documentFilePaths = (clientDocuments || []).map((doc) => doc.file_path).filter(Boolean);
+    const storageRemoveError = await removeStorageFiles("documents", documentFilePaths);
+
+    if (storageRemoveError) {
+      return res.status(500).json({
+        error: storageRemoveError.message || "Erro ao excluir arquivos do cliente no storage."
+      });
+    }
+
+    const { error: deleteDocumentsError } = await adminSupabase
+      .from("documents")
+      .delete()
+      .eq("client_id", clientId);
+
+    if (deleteDocumentsError) {
+      return res.status(500).json({
+        error: deleteDocumentsError.message || "Erro ao excluir documentos do cliente."
+      });
+    }
+
+    const { error: deleteProfileError } = await adminSupabase
+      .from("profiles")
+      .delete()
+      .eq("user_id", clientId);
+
+    if (deleteProfileError) {
+      return res.status(500).json({
+        error: deleteProfileError.message || "Erro ao excluir perfil do cliente."
+      });
+    }
+
+    const { error: deleteAuthError } = await adminSupabase.auth.admin.deleteUser(clientId);
+
+    if (deleteAuthError) {
+      return res.status(500).json({
+        error: deleteAuthError.message || "Erro ao excluir usuário do Auth."
+      });
+    }
+
+    return res.status(200).json({
+      message: "Cliente excluído com sucesso."
+    });
+  } catch (error) {
+    console.error("ERRO EM DELETE /admin/clients/:clientId:", error);
+    res.status(500).json({ error: "Erro interno do servidor" });
+  }
+});
+
 app.get("/clients/:clientId/documents", async (req, res) => {
   try {
     const adminAccess = await validateAdminAccess(req, res);
@@ -576,13 +679,6 @@ app.post("/admin/documents/upload", (req, res, next) => {
     const subcategory = normalizeOptionalText(req.body.subcategory);
     const year = normalizeText(req.body.year);
     const file = req.file;
-
-    console.log("UPLOAD RECEBIDO:");
-    console.log("client_id:", clientId);
-    console.log("category:", category);
-    console.log("subcategory:", subcategory);
-    console.log("year:", year);
-    console.log("file:", file ? file.originalname : "NÃO");
 
     if (!clientId || !category || !year || !file) {
       return res.status(400).json({
@@ -798,16 +894,11 @@ app.get("/documents", async (req, res) => {
 
     const userId = authResult.user.id;
 
-    console.log("USER ID AUTENTICADO /documents:", userId);
-
     const { data, error } = await adminSupabase
       .from("documents")
       .select("*")
       .eq("client_id", userId)
       .order("year", { ascending: false });
-
-    console.log("DOCUMENTOS RETORNADOS:", data);
-    console.log("ERRO DOCUMENTOS:", error);
 
     if (error) {
       return res.status(500).json({
@@ -838,9 +929,6 @@ app.post("/documents/download", async (req, res) => {
     const userId = authResult.user.id;
     const { document_id } = req.body;
 
-    console.log("DOCUMENT_ID RECEBIDO:", document_id);
-    console.log("USER ID LOGADO:", userId);
-
     if (!document_id) {
       return res.status(400).json({
         error: "document_id é obrigatório."
@@ -852,9 +940,6 @@ app.post("/documents/download", async (req, res) => {
       .select("id, client_id, file_path, file_name")
       .eq("id", document_id)
       .single();
-
-    console.log("DOCUMENTO ENCONTRADO:", documentData);
-    console.log("ERRO AO BUSCAR DOCUMENTO:", documentError);
 
     if (documentError || !documentData) {
       return res.status(404).json({
@@ -868,14 +953,9 @@ app.post("/documents/download", async (req, res) => {
       });
     }
 
-    console.log("CAMINHO USADO NO DOWNLOAD:", documentData.file_path);
-
     const { data, error } = await adminSupabase.storage
       .from("documents")
       .createSignedUrl(documentData.file_path.trim(), 60);
-
-    console.log("RESPOSTA createSignedUrl:", data);
-    console.log("ERRO createSignedUrl:", error);
 
     if (error) {
       return res.status(500).json({
@@ -1007,110 +1087,132 @@ app.delete("/admin/documents/:documentId", async (req, res) => {
 });
 
 /* =========================
-   MÓDULO ADMIN DE AVISOS
+   BANNERS GLOBAIS DA HOME
 ========================= */
 
-app.get("/admin/clients/:clientId/notices", async (req, res) => {
+app.get("/admin/notices", async (req, res) => {
   try {
     const adminAccess = await validateAdminAccess(req, res);
     if (!adminAccess) {
       return;
     }
 
-    const { clientId } = req.params;
-
-    if (!clientId) {
-      return res.status(400).json({
-        error: "clientId é obrigatório."
-      });
-    }
-
-    const { data: clientProfile, error: clientError } = await adminSupabase
-      .from("profiles")
-      .select("user_id, role")
-      .eq("user_id", clientId)
-      .eq("role", "client")
-      .single();
-
-    if (clientError || !clientProfile) {
-      return res.status(404).json({
-        error: "Cliente não encontrado."
-      });
-    }
-
     const { data, error } = await adminSupabase
       .from("notices")
-      .select("id, client_id, title, message, is_active, created_at")
-      .eq("client_id", clientId)
+      .select("id, title, image_url, link, is_active, created_at")
       .order("created_at", { ascending: false });
 
     if (error) {
       return res.status(500).json({
-        error: error.message || "Erro ao buscar avisos do cliente."
+        error: error.message || "Erro ao buscar banners da Home."
       });
     }
 
     return res.status(200).json(data || []);
   } catch (error) {
-    console.error("ERRO EM GET /admin/clients/:clientId/notices:", error);
+    console.error("ERRO EM GET /admin/notices:", error);
     res.status(500).json({ error: "Erro interno do servidor" });
   }
 });
 
-app.post("/admin/notices", async (req, res) => {
+app.post("/admin/notices/upload", (req, res, next) => {
+  upload.single("image")(req, res, function (err) {
+    if (err) {
+      console.error("ERRO NO MULTER (BANNER):", err);
+
+      if (err instanceof multer.MulterError) {
+        return res.status(400).json({
+          error: `Erro no upload: ${err.message}`
+        });
+      }
+
+      return res.status(500).json({
+        error: "Erro ao processar a imagem enviada."
+      });
+    }
+
+    next();
+  });
+}, async (req, res) => {
   try {
     const adminAccess = await validateAdminAccess(req, res);
     if (!adminAccess) {
       return;
     }
 
-    const clientId = normalizeText(req.body.client_id);
     const title = normalizeText(req.body.title);
-    const message = normalizeText(req.body.message);
-    const isActive = typeof req.body.is_active === "boolean" ? req.body.is_active : true;
+    const link = normalizeOptionalText(req.body.link);
+    const isActive = String(req.body.is_active).toLowerCase() === "true";
+    const image = req.file;
 
-    if (!clientId || !title || !message) {
+    if (!title || !image) {
       return res.status(400).json({
-        error: "Campos obrigatórios: client_id, title e message."
+        error: "Campos obrigatórios: title e image."
       });
     }
 
-    const { data: clientProfile, error: clientError } = await adminSupabase
-      .from("profiles")
-      .select("user_id, role")
-      .eq("user_id", clientId)
-      .eq("role", "client")
-      .single();
+    if (!image.mimetype.startsWith("image/")) {
+      return res.status(400).json({
+        error: "O arquivo enviado deve ser uma imagem válida."
+      });
+    }
 
-    if (clientError || !clientProfile) {
-      return res.status(404).json({
-        error: "Cliente não encontrado."
+    const sanitizedFileName = sanitizeFileName(image.originalname);
+    const timestamp = Date.now();
+    const storagePath = `home-banners/${timestamp}_${sanitizedFileName}`;
+
+    const { error: uploadError } = await adminSupabase.storage
+      .from("notices")
+      .upload(storagePath, image.buffer, {
+        contentType: image.mimetype,
+        upsert: false
+      });
+
+    if (uploadError) {
+      return res.status(500).json({
+        error: uploadError.message || "Erro ao enviar imagem do banner para o storage."
+      });
+    }
+
+    const { data: publicUrlData } = adminSupabase.storage
+      .from("notices")
+      .getPublicUrl(storagePath);
+
+    const imageUrl = publicUrlData?.publicUrl || null;
+
+    if (!imageUrl) {
+      await adminSupabase.storage.from("notices").remove([storagePath]);
+
+      return res.status(500).json({
+        error: "Não foi possível gerar a URL pública da imagem do banner."
       });
     }
 
     const { data: insertedNotice, error: insertError } = await adminSupabase
       .from("notices")
       .insert({
-        client_id: clientId,
         title,
-        message,
+        image_url: imageUrl,
+        link,
         is_active: isActive
       })
-      .select("id, client_id, title, message, is_active, created_at")
+      .select("id, title, image_url, link, is_active, created_at")
       .single();
 
     if (insertError) {
+      await adminSupabase.storage.from("notices").remove([storagePath]);
+
       return res.status(500).json({
-        error: insertError.message || "Erro ao salvar aviso."
+        error: insertError.message || "Erro ao salvar banner no banco."
       });
     }
 
     return res.status(201).json({
-      message: "Aviso criado com sucesso.",
+      message: "Banner da Home criado com sucesso.",
       notice: insertedNotice
     });
   } catch (error) {
-    console.error("ERRO EM POST /admin/notices:", error);
+    console.error("ERRO EM POST /admin/notices/upload:", error);
     res.status(500).json({ error: "Erro interno do servidor" });
   }
 });
@@ -1139,13 +1241,13 @@ app.put("/admin/notices/:noticeId/toggle", async (req, res) => {
 
     const { data: currentNotice, error: currentError } = await adminSupabase
       .from("notices")
-      .select("id, client_id, title, is_active")
+      .select("id, title, is_active")
       .eq("id", noticeId)
       .single();
 
     if (currentError || !currentNotice) {
       return res.status(404).json({
-        error: "Aviso não encontrado."
+        error: "Banner não encontrado."
       });
     }
 
@@ -1155,17 +1257,17 @@ app.put("/admin/notices/:noticeId/toggle", async (req, res) => {
         is_active: isActive
       })
       .eq("id", noticeId)
-      .select("id, client_id, title, message, is_active, created_at")
+      .select("id, title, image_url, link, is_active, created_at")
       .single();
 
     if (updateError || !updatedNotice) {
       return res.status(500).json({
-        error: updateError?.message || "Erro ao atualizar status do aviso."
+        error: updateError?.message || "Erro ao atualizar status do banner."
       });
     }
 
     return res.status(200).json({
-      message: "Status do aviso atualizado com sucesso.",
+      message: "Status do banner atualizado com sucesso.",
       notice: updatedNotice
     });
   } catch (error) {
@@ -1191,14 +1293,30 @@ app.delete("/admin/notices/:noticeId", async (req, res) => {
 
     const { data: currentNotice, error: currentError } = await adminSupabase
       .from("notices")
-      .select("id, client_id, title")
+      .select("id, title, image_url")
       .eq("id", noticeId)
       .single();
 
     if (currentError || !currentNotice) {
       return res.status(404).json({
-        error: "Aviso não encontrado."
+        error: "Banner não encontrado."
       });
+    }
+
+    if (currentNotice.image_url) {
+      const marker = "/storage/v1/object/public/notices/";
+      const splitPath = currentNotice.image_url.split(marker);
+      const filePath = splitPath.length > 1 ? splitPath[1] : null;
+
+      if (filePath) {
+        const { error: removeImageError } = await adminSupabase.storage
+          .from("notices")
+          .remove([filePath]);
+
+        if (removeImageError) {
+          console.error("ERRO AO REMOVER IMAGEM DO BANNER:", removeImageError);
+        }
+      }
     }
 
     const { error: deleteError } = await adminSupabase
@@ -1208,12 +1326,12 @@ app.delete("/admin/notices/:noticeId", async (req, res) => {
 
     if (deleteError) {
       return res.status(500).json({
-        error: deleteError.message || "Erro ao excluir aviso."
+        error: deleteError.message || "Erro ao excluir banner."
       });
     }
 
     return res.status(200).json({
-      message: "Aviso excluído com sucesso."
+      message: "Banner excluído com sucesso."
     });
   } catch (error) {
     console.error("ERRO EM DELETE /admin/notices/:noticeId:", error);
@@ -1223,25 +1341,11 @@ app.delete("/admin/notices/:noticeId", async (req, res) => {
 
 app.get("/notices", async (req, res) => {
   try {
-    const authResult = await getAuthenticatedUser(req);
-
-    if (authResult.error) {
-      return res.status(authResult.status).json({
-        error: authResult.error
-      });
-    }
-
-    const userId = authResult.user.id;
-
     const { data, error } = await adminSupabase
       .from("notices")
-      .select("*")
-      .eq("client_id", userId)
+      .select("id, title, image_url, link, is_active, created_at")
       .eq("is_active", true)
       .order("created_at", { ascending: false });
-
-    console.log("AVISOS RETORNADOS:", data);
-    console.log("ERRO AVISOS:", error);
 
     if (error) {
       return res.status(500).json({
@@ -1265,6 +1369,7 @@ console.log("POST /login");
 console.log("PUT /update-password");
 console.log("POST /clients");
 console.log("GET /clients");
+console.log("DELETE /admin/clients/:clientId");
 console.log("GET /clients/:clientId/documents");
 console.log("POST /admin/documents/upload");
 console.log("PUT /admin/documents/:documentId/replace");
@@ -1272,8 +1377,8 @@ console.log("GET /documents");
 console.log("POST /documents/download");
 console.log("POST /admin/documents/download");
 console.log("DELETE /admin/documents/:documentId");
-console.log("GET /admin/clients/:clientId/notices");
-console.log("POST /admin/notices");
+console.log("GET /admin/notices");
+console.log("POST /admin/notices/upload");
 console.log("PUT /admin/notices/:noticeId/toggle");
 console.log("DELETE /admin/notices/:noticeId");
 console.log("GET /notices");

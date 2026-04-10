@@ -232,6 +232,7 @@ if (firstAccessForm) {
       setMessage("Senha atualizada com sucesso! Redirecionando para o login...", "success");
 
       setTimeout(() => {
+        localStorage.setItem("password_updated", "true");
         localStorage.removeItem("access_token");
         localStorage.removeItem("profile");
         window.location.href = "login.html";

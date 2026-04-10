@@ -5,6 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Painel Administrativo - CASEG Protege</title>
   <link rel="stylesheet" href="../assets/css/admin.css" />
+
+  <!-- Font Awesome -->
+  <link
+    rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
+  />
 </head>
 <body>
   <div class="admin-container">
@@ -191,9 +197,7 @@
                   readonly
                   value=""
                 />
-                <button type="button" id="copyTemporaryPasswordBtn">
-                  Copiar senha
-                </button>
+                <button type="button" id="copyTemporaryPasswordBtn">Copiar senha</button>
               </div>
             </div>
           </form>
@@ -217,6 +221,75 @@
         <div id="clientsSectionWrapper" class="hidden">
           <div id="clientsListMessage" class="list-message">Carregando clientes...</div>
           <div id="clientsList" class="clients-list"></div>
+        </div>
+      </section>
+
+      <section class="admin-section">
+        <div class="section-header">
+          <div>
+            <h2>Banners da Home</h2>
+            <p class="section-description">
+              Cadastre e gerencie os banners globais que serão exibidos futuramente na Home.
+            </p>
+          </div>
+
+          <button type="button" id="toggleHomeBannersBtn" class="section-action-btn">
+            Exibir Banners
+          </button>
+        </div>
+
+        <div id="homeBannersWrapper" class="hidden">
+          <form id="homeBannerForm" class="admin-form">
+            <div class="form-grid">
+              <div class="form-group">
+                <label for="bannerTitle">Título</label>
+                <input
+                  type="text"
+                  id="bannerTitle"
+                  name="bannerTitle"
+                  placeholder="Digite o título do banner"
+                  required
+                />
+              </div>
+
+              <div class="form-group">
+                <label for="bannerLink">Link</label>
+                <input
+                  type="url"
+                  id="bannerLink"
+                  name="bannerLink"
+                  placeholder="https://..."
+                />
+              </div>
+
+              <div class="form-group form-group-full">
+                <label for="bannerImage">Imagem do banner</label>
+                <input
+                  type="file"
+                  id="bannerImage"
+                  name="bannerImage"
+                  accept="image/*"
+                  required
+                />
+              </div>
+
+              <div class="form-group form-group-full">
+                <label class="checkbox-label">
+                  <input type="checkbox" id="bannerIsActive" checked />
+                  Cadastrar banner como ativo
+                </label>
+              </div>
+            </div>
+
+            <div class="form-actions">
+              <button type="submit" id="saveBannerBtn">Salvar Banner</button>
+            </div>
+
+            <p id="homeBannerMessage" class="form-message"></p>
+          </form>
+
+          <div id="homeBannersListMessage" class="list-message">Carregando banners...</div>
+          <div id="homeBannersList" class="home-banners-list"></div>
         </div>
       </section>
     </main>
