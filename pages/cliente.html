@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel do Cliente - CASEG Protege</title>
+
+    <link rel="stylesheet" href="../assets/css/style.css">
+
+    <script>
+        const token = localStorage.getItem("access_token");
+        const profile = JSON.parse(localStorage.getItem("profile"));
+
+        if (!token || !profile) {
+            alert("Você precisa fazer login.");
+            window.location.href = "login.html";
+        }
+
+        if (profile.role !== "client") {
+            alert("Acesso restrito.");
+            window.location.href = "login.html";
+        }
+
+        if (profile.must_change_password === true) {
+            window.location.href = "primeiro-acesso.html";
+        }
+    </script>
+</head>
+
+<body>
+
+<header class="site-header">
+    <div class="header-container">
+
+        <a href="home.html" class="logo-link reveal-on-load delay-1">
+            <img
+                src="/site-caseg-protege/logo_transparente.png"
+                alt="Logo CASEG Protege"
+                class="site-logo"
+            />
+        </a>
+
+        <nav class="main-nav reveal-on-load delay-2">
+            <a href="home.html">Home</a>
+            <a href="avisos.html">Sobre</a>
+            <a href="contato.html">Contato</a>
+        </nav>
+
+    </div>
+</header>
+
+<main class="login-page">
+    <div class="client-info reveal-on-load delay-3">
+        <h2 id="welcomeMessage"></h2>
+        <p id="companyName"></p>
+        <p>Bem-vindo ao painel do cliente da CASEG Protege.</p>
+    </div>
+
+    <div class="client-cards reveal-on-load delay-4">
+        <section class="client-card reveal-on-load delay-4">
+            <h3>Documentos</h3>
+
+            <div id="documentsList"></div>
+        </section>
+    </div>
+
+    <button id="logoutBtn" class="reveal-on-load delay-5">Sair da conta</button>
+</main>
+
+<footer class="site-footer">
+    <p>© CASEG Protege</p>
+    <p>
+        <a href="termos-de-uso.html">Termos de Uso</a> —
+        <a href="politica-privacidade.html">Política de Privacidade</a>
+    </p>
+</footer>
+
+<script src="../assets/js/client-panel.js"></script>
+<script src="../assets/js/site-animations.js"></script>
+
+</body>
+</html>

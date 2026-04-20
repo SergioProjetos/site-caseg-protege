@@ -6,33 +6,135 @@
     <title>Contato - CASEG Protege</title>
 
     <link rel="stylesheet" href="../assets/css/style.css">
+    <link
+        rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
+    />
+
+    <style>
+        .contact-page {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 40px 20px 60px;
+        }
+
+        .contact-card {
+            background: var(--caseg-white);
+            border-radius: 14px;
+            padding: 32px 28px;
+            box-shadow: var(--caseg-shadow);
+            border-top: 5px solid var(--caseg-green);
+        }
+
+        .contact-card h2 {
+            margin-top: 0;
+            margin-bottom: 12px;
+            color: var(--caseg-red);
+            font-size: 32px;
+        }
+
+        .contact-card p {
+            margin-bottom: 14px;
+            color: var(--caseg-gray-dark);
+        }
+
+        .contact-info {
+            margin-top: 24px;
+            display: grid;
+            gap: 16px;
+        }
+
+        .contact-info-item {
+            background: var(--caseg-soft);
+            border-radius: 10px;
+            padding: 18px;
+            border-left: 4px solid var(--caseg-green);
+        }
+
+        .contact-info-item strong {
+            display: block;
+            margin-bottom: 6px;
+            color: var(--caseg-green-dark);
+        }
+
+        @media (max-width: 768px) {
+            .contact-page {
+                padding: 24px 16px 40px;
+            }
+
+            .contact-card {
+                padding: 24px 18px;
+            }
+
+            .contact-card h2 {
+                font-size: 28px;
+            }
+        }
+    </style>
 </head>
 <body>
 
-<header>
-    <h1>CASEG Protege</h1>
+    <header class="site-header">
+        <div class="header-container">
+            <a href="home.html" class="logo-link reveal-on-load delay-1">
+                <img
+                    src="/site-caseg-protege/logo_transparente.png"
+                    alt="Logo CASEG Protege"
+                    class="site-logo"
+                />
+            </a>
 
-    <nav>
-        <a href="../index.html">Home</a>
-        <a href="servicos.html">Serviços</a>
-        <a href="avisos.html">Avisos</a>
-        <a href="contato.html">Contato</a>
-        <a href="login.html">Área do Cliente</a>
-    </nav>
-</header>
+            <nav class="main-nav reveal-on-load delay-2">
+                <a href="home.html">Home</a>
+                <a href="servicos.html">Serviços</a>
+                <a href="avisos.html">Sobre</a>
+                <a href="login.html" class="nav-login">
+                    <i class="fa-regular fa-user"></i>
+                    Entrar
+                </a>
+            </nav>
+        </div>
+    </header>
 
-<main>
-    <h2>Contato</h2>
-    <p>Entre em contato com a CASEG Protege.</p>
-</main>
+    <main class="contact-page">
+        <section class="contact-card reveal-on-load delay-3">
+            <h2>Contato</h2>
+            <p>
+                Entre em contato com a CASEG Protege e fale com nossa equipe para tirar dúvidas,
+                solicitar informações ou conhecer melhor nossos serviços.
+            </p>
 
-<footer>
-    <p>© CASEG Protege</p>
-    <p>
-        <a href="termos-de-uso.html">Termos de Uso</a> —
-        <a href="politica-privacidade.html">Política de Privacidade</a>
-    </p>
-</footer>
+            <div class="contact-info">
+                <div class="contact-info-item reveal-on-load delay-4">
+                    <strong>Atendimento</strong>
+                    Nossa equipe está preparada para orientar sua empresa com responsabilidade,
+                    organização e suporte profissional.
+                </div>
+
+                <div class="contact-info-item reveal-on-load delay-5">
+                    <strong>Solicitações</strong>
+                    Você pode utilizar esta página como ponto de contato para serviços,
+                    treinamentos, apoio técnico e informações gerais.
+                </div>
+
+                <div class="contact-info-item reveal-on-load delay-6">
+                    <strong>Próximo passo</strong>
+                    Se desejar, podemos evoluir esta página para incluir formulário, WhatsApp,
+                    telefone, e-mail e localização.
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <p>© CASEG Protege</p>
+        <p>
+            <a href="termos-de-uso.html">Termos de Uso</a> —
+            <a href="politica-privacidade.html">Política de Privacidade</a>
+        </p>
+    </footer>
+
+    <script src="../assets/js/site-animations.js"></script>
 
 </body>
 </html>

@@ -3,36 +3,95 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Avisos - CASEG Protege</title>
+    <title>Sobre - CASEG Protege</title>
 
     <link rel="stylesheet" href="../assets/css/style.css">
+    <link
+        rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
+    />
 </head>
 <body>
 
-<header>
-    <h1>CASEG Protege</h1>
+    <header class="site-header">
+        <div class="header-container">
+            <a href="home.html" class="logo-link reveal-on-load delay-1">
+                <img
+                    src="/site-caseg-protege/logo_transparente.png"
+                    alt="Logo CASEG Protege"
+                    class="site-logo"
+                />
+            </a>
 
-    <nav>
-        <a href="../index.html">Home</a>
-        <a href="servicos.html">Serviços</a>
-        <a href="avisos.html">Avisos</a>
-        <a href="contato.html">Contato</a>
-        <a href="login.html">Área do Cliente</a>
-    </nav>
-</header>
+            <nav class="main-nav reveal-on-load delay-2">
+                <a href="home.html">Home</a>
+                <a href="servicos.html">Serviços</a>
+                <a href="avisos.html">Sobre</a>
+                <a href="contato.html">Contato</a>
+                <a href="login.html" class="nav-login">
+                    <i class="fa-regular fa-user"></i>
+                    Entrar
+                </a>
+            </nav>
+        </div>
+    </header>
 
-<main>
-    <h2>Avisos</h2>
-    <p>Comunicados e informativos da CASEG Protege.</p>
-</main>
+    <main>
+        <section class="home-about reveal-on-load delay-3">
+            <div class="section-title">
+                <h2>Sobre a CASEG Protege</h2>
+                <p>
+                    Conheça nossa empresa, nossa missão e nosso compromisso com a segurança e organização dos nossos clientes.
+                </p>
+            </div>
 
-<footer>
-    <p>© CASEG Protege</p>
-    <p>
-        <a href="termos-de-uso.html">Termos de Uso</a> —
-        <a href="politica-privacidade.html">Política de Privacidade</a>
-    </p>
-</footer>
+            <div class="home-about-cards">
+                <div class="about-card reveal-on-load delay-3">
+                    <h3>Quem Somos</h3>
+                    <p>
+                        A CASEG Protege atua oferecendo soluções em segurança do trabalho,
+                        organização documental e gestão de informações, com foco em eficiência,
+                        controle e confiabilidade.
+                    </p>
+                </div>
+
+                <div class="about-card reveal-on-load delay-4">
+                    <h3>Missão</h3>
+                    <p>
+                        Proporcionar aos nossos clientes uma estrutura organizada, segura e prática,
+                        garantindo acesso fácil às informações e conformidade com as exigências legais.
+                    </p>
+                </div>
+
+                <div class="about-card reveal-on-load delay-5">
+                    <h3>Visão</h3>
+                    <p>
+                        Ser referência em gestão documental e suporte administrativo,
+                        trazendo inovação e simplicidade para empresas de todos os portes.
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <section class="home-cta reveal-on-load delay-4">
+            <h2>Quer saber mais ou contratar nossos serviços?</h2>
+            <p>Entre em contato com nossa equipe e descubra como podemos ajudar.</p>
+
+            <div class="home-cta-actions">
+                <a href="contato.html" class="btn-primary">Falar Conosco</a>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <p>© CASEG Protege</p>
+        <p>
+            <a href="termos-de-uso.html">Termos de Uso</a> —
+            <a href="politica-privacidade.html">Política de Privacidade</a>
+        </p>
+    </footer>
+
+    <script src="../assets/js/site-animations.js"></script>
 
 </body>
 </html>

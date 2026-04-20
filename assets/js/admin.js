@@ -23,6 +23,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   const toggleClientsListBtn = document.getElementById("toggleClientsListBtn");
   const clientsSectionWrapper = document.getElementById("clientsSectionWrapper");
+  const clientsSearchInput = document.getElementById("clientsSearchInput");
 
   const toggleHomeBannersBtn = document.getElementById("toggleHomeBannersBtn");
   const homeBannersWrapper = document.getElementById("homeBannersWrapper");
@@ -34,6 +35,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   const homeBannerMessage = document.getElementById("homeBannerMessage");
   const homeBannersListMessage = document.getElementById("homeBannersListMessage");
   const homeBannersList = document.getElementById("homeBannersList");
+
+  const bannerActionType = document.getElementById("bannerActionType");
+  const bannerLinkTarget = document.getElementById("bannerLinkTarget");
+  const bannerLink = document.getElementById("bannerLink");
+  const bannerDescription = document.getElementById("bannerDescription");
 
   const cpfCnpjInput = document.getElementById("cpfCnpj");
   const phoneInput = document.getElementById("phone");
@@ -48,8 +54,11 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   let feedbackTimeout = null;
   const clientDocumentsCache = {};
+  let allClientsCache = [];
 
   function showAdminFeedback(message, type = "info", autoHide = true) {
+    if (!adminFeedback) return;
+
     adminFeedback.textContent = message;
     adminFeedback.className = `admin-feedback ${type}`;
 
@@ -66,6 +75,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function hideAdminFeedback() {
+    if (!adminFeedback) return;
+
     if (feedbackTimeout) {
       clearTimeout(feedbackTimeout);
     }
@@ -75,20 +86,19 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function setInlineMessage(element, message, type = "info") {
-    if (!element) {
-      return;
-    }
-
+    if (!element) return;
     element.textContent = message;
     element.className = `upload-form-message ${type}`;
   }
 
   function loadAdminInfo() {
-    adminWelcome.textContent = `Bem-vindo, ${profile.full_name || "Administrador"}`;
+    if (adminWelcome) {
+      adminWelcome.textContent = `Bem-vindo, ${profile.full_name || "Administrador"}`;
+    }
   }
 
   function onlyDigits(value) {
-    return (value || "").replace(/\D/g, "");
+    return String(value || "").replace(/\D/g, "");
   }
 
   function escapeHtml(value) {
@@ -148,9 +158,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function formatDate(dateValue) {
-    if (!dateValue) {
-      return "-";
-    }
+    if (!dateValue) return "-";
 
     const date = new Date(dateValue);
 
@@ -161,28 +169,139 @@ document.addEventListener("DOMContentLoaded", async () => {
     return date.toLocaleDateString("pt-BR");
   }
 
+  function getLinkTargetLabel(linkTarget) {
+    switch (linkTarget) {
+      case "contato":
+        return "Página de Contato";
+      case "servicos":
+        return "Página de Serviços";
+      case "whatsapp":
+        return "WhatsApp";
+      case "custom":
+        return "Link Personalizado";
+      default:
+        return "-";
+    }
+  }
+
+  function getActionTypeLabel(actionType) {
+    switch (actionType) {
+      case "modal":
+        return "Abrir Informativo";
+      case "link":
+        return "Redirecionar";
+      default:
+        return "-";
+    }
+  }
+
+  function getClientStatusLabel(isActive) {
+    return isActive ? "Ativo" : "Inativo";
+  }
+
+  function prepareCollapsibleSection(element) {
+    if (!element || element.dataset.collapsibleReady === "true") return;
+
+    element.dataset.collapsibleReady = "true";
+    element.style.overflow = "hidden";
+    element.style.transition = "max-height 0.35s ease, opacity 0.3s ease";
+    element.style.willChange = "max-height, opacity";
+  }
+
+  function collapseSectionInstant(element) {
+    if (!element) return;
+
+    prepareCollapsibleSection(element);
+    element.classList.add("hidden");
+    element.style.maxHeight = "0px";
+    element.style.opacity = "0";
+  }
+
+  function expandSection(element) {
+    if (!element) return;
+
+    prepareCollapsibleSection(element);
+
+    element.classList.remove("hidden");
+    element.style.opacity = "0";
+    element.style.maxHeight = "0px";
+
+    requestAnimationFrame(() => {
+      element.style.opacity = "1";
+      element.style.maxHeight = `${element.scrollHeight}px`;
+    });
+
+    const handleTransitionEnd = (event) => {
+      if (event.propertyName !== "max-height") return;
+
+      if (!element.classList.contains("hidden")) {
+        element.style.maxHeight = `${element.scrollHeight}px`;
+      }
+
+      element.removeEventListener("transitionend", handleTransitionEnd);
+    };
+
+    element.addEventListener("transitionend", handleTransitionEnd);
+  }
+
+  function collapseSection(element) {
+    if (!element || element.classList.contains("hidden")) return;
+
+    prepareCollapsibleSection(element);
+
+    element.style.maxHeight = `${element.scrollHeight}px`;
+    element.style.opacity = "1";
+
+    requestAnimationFrame(() => {
+      element.style.maxHeight = "0px";
+      element.style.opacity = "0";
+    });
+
+    const handleTransitionEnd = (event) => {
+      if (event.propertyName !== "max-height") return;
+      element.classList.add("hidden");
+      element.removeEventListener("transitionend", handleTransitionEnd);
+    };
+
+    element.addEventListener("transitionend", handleTransitionEnd);
+  }
+
+  function refreshSectionHeight(element) {
+    if (!element || element.classList.contains("hidden")) return;
+
+    prepareCollapsibleSection(element);
+    element.style.maxHeight = `${element.scrollHeight}px`;
+    element.style.opacity = "1";
+  }
+
   function hidePasswordBox() {
+    if (!temporaryPasswordBox || !temporaryPasswordField || !copyTemporaryPasswordBtn) return;
+
     temporaryPasswordBox.classList.add("hidden");
     temporaryPasswordField.value = "";
     copyTemporaryPasswordBtn.textContent = "Copiar senha";
   }
 
   function showPassword(password) {
+    if (!temporaryPasswordBox || !temporaryPasswordField) return;
+
     temporaryPasswordBox.classList.remove("hidden");
     temporaryPasswordField.value = password || "";
   }
 
   function hideCreateClientForm() {
-    createClientWrapper.classList.add("hidden");
-    toggleCreateClientBtn.textContent = "Novo Cliente";
+    collapseSection(createClientWrapper);
+    if (toggleCreateClientBtn) toggleCreateClientBtn.textContent = "Novo Cliente";
   }
 
   function showCreateClientForm() {
-    createClientWrapper.classList.remove("hidden");
-    toggleCreateClientBtn.textContent = "Fechar Formulário";
+    expandSection(createClientWrapper);
+    if (toggleCreateClientBtn) toggleCreateClientBtn.textContent = "Fechar Formulário";
   }
 
   function toggleCreateClientForm() {
+    if (!createClientWrapper) return;
+
     if (createClientWrapper.classList.contains("hidden")) {
       showCreateClientForm();
     } else {
@@ -191,23 +310,23 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function hideClientsList() {
-    clientsSectionWrapper.classList.add("hidden");
-    toggleClientsListBtn.textContent = "Exibir Clientes";
+    collapseSection(clientsSectionWrapper);
+    if (toggleClientsListBtn) toggleClientsListBtn.textContent = "Exibir Clientes";
   }
 
   function showClientsList() {
-    clientsSectionWrapper.classList.remove("hidden");
-    toggleClientsListBtn.textContent = "Ocultar Clientes";
+    expandSection(clientsSectionWrapper);
+    if (toggleClientsListBtn) toggleClientsListBtn.textContent = "Ocultar Clientes";
   }
 
   function hideHomeBanners() {
-    homeBannersWrapper.classList.add("hidden");
-    toggleHomeBannersBtn.textContent = "Exibir Banners";
+    collapseSection(homeBannersWrapper);
+    if (toggleHomeBannersBtn) toggleHomeBannersBtn.textContent = "Exibir Banners";
   }
 
   function showHomeBanners() {
-    homeBannersWrapper.classList.remove("hidden");
-    toggleHomeBannersBtn.textContent = "Ocultar Banners";
+    expandSection(homeBannersWrapper);
+    if (toggleHomeBannersBtn) toggleHomeBannersBtn.textContent = "Ocultar Banners";
   }
 
   function closeAllDocumentMenus() {
@@ -218,6 +337,46 @@ document.addEventListener("DOMContentLoaded", async () => {
     document.querySelectorAll(".document-menu-toggle").forEach((button) => {
       button.textContent = "▾";
     });
+  }
+
+  function updateBannerFormVisibility() {
+    const actionType = bannerActionType?.value || "link";
+    const linkTargetGroup = bannerLinkTarget?.closest(".form-group");
+    const linkInputGroup = bannerLink?.closest(".form-group");
+    const descriptionGroup = bannerDescription?.closest(".form-group");
+
+    if (!linkTargetGroup || !linkInputGroup || !descriptionGroup) return;
+
+    if (actionType === "modal") {
+      linkTargetGroup.classList.add("hidden");
+      linkInputGroup.classList.remove("hidden");
+      descriptionGroup.classList.remove("hidden");
+
+      bannerLinkTarget.value = "";
+      bannerLink.required = false;
+      bannerDescription.required = true;
+      bannerLink.placeholder = "Não utilizado para banners informativos";
+    } else {
+      linkTargetGroup.classList.remove("hidden");
+      descriptionGroup.classList.add("hidden");
+
+      bannerDescription.required = false;
+      bannerDescription.value = "";
+
+      const target = bannerLinkTarget.value;
+
+      if (target === "custom") {
+        linkInputGroup.classList.remove("hidden");
+        bannerLink.required = true;
+        bannerLink.placeholder = "https://...";
+      } else {
+        linkInputGroup.classList.add("hidden");
+        bannerLink.required = false;
+        bannerLink.value = "";
+      }
+    }
+
+    refreshSectionHeight(homeBannersWrapper);
   }
 
   function getUniqueCategories(documents) {
@@ -243,6 +402,29 @@ document.addEventListener("DOMContentLoaded", async () => {
       const matchesYear = !filters.year || year === filters.year;
 
       return matchesName && matchesCategory && matchesYear;
+    });
+  }
+
+  function filterClients(clients, searchTerm) {
+    const normalizedSearch = String(searchTerm || "").trim().toLowerCase();
+    const digitsSearch = onlyDigits(searchTerm || "");
+
+    if (!normalizedSearch && !digitsSearch) {
+      return clients;
+    }
+
+    return clients.filter((client) => {
+      const fullName = String(client.full_name || "").toLowerCase();
+      const companyName = String(client.company_name || "").toLowerCase();
+      const cpfCnpj = String(client.cpf_cnpj || "");
+      const formattedCpfCnpj = formatCpfCnpj(cpfCnpj).toLowerCase();
+
+      const matchesName = fullName.includes(normalizedSearch);
+      const matchesCompany = companyName.includes(normalizedSearch);
+      const matchesCpfRaw = cpfCnpj.includes(digitsSearch);
+      const matchesCpfFormatted = formattedCpfCnpj.includes(normalizedSearch);
+
+      return matchesName || matchesCompany || matchesCpfRaw || matchesCpfFormatted;
     });
   }
 
@@ -433,6 +615,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             <label for="uploadCategory-${client.user_id}">Categoria</label>
             <select id="uploadCategory-${client.user_id}" required>
               <option value="">Selecione a categoria</option>
+              <option value="ASO">ASO</option>
               <option value="PGR">PGR</option>
               <option value="LTCAT">LTCAT</option>
               <option value="PPP">PPP</option>
@@ -496,9 +679,39 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function createHomeBannerCardHtml(banner) {
-    const linkHtml = banner.link
-      ? `<a href="${escapeHtml(banner.link)}" target="_blank" rel="noopener noreferrer">${escapeHtml(banner.link)}</a>`
-      : "-";
+    const actionTypeLabel = getActionTypeLabel(banner.action_type);
+    const linkTargetLabel = getLinkTargetLabel(banner.link_target);
+
+    let actionDetailsHtml = `
+      <div class="home-banner-meta">
+        <strong>Tipo de ação:</strong> ${escapeHtml(actionTypeLabel)}
+      </div>
+    `;
+
+    if (banner.action_type === "modal") {
+      actionDetailsHtml += `
+        <div class="home-banner-meta">
+          <strong>Descrição:</strong> ${escapeHtml(banner.description || "-")}
+        </div>
+      `;
+    } else {
+      actionDetailsHtml += `
+        <div class="home-banner-meta">
+          <strong>Destino:</strong> ${escapeHtml(linkTargetLabel)}
+        </div>
+      `;
+
+      if (banner.link_target === "custom" && banner.link) {
+        actionDetailsHtml += `
+          <div class="home-banner-meta">
+            <strong>Link:</strong>
+            <a href="${escapeHtml(banner.link)}" target="_blank" rel="noopener noreferrer">
+              ${escapeHtml(banner.link)}
+            </a>
+          </div>
+        `;
+      }
+    }
 
     return `
       <div class="home-banner-card">
@@ -510,9 +723,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           <div class="home-banner-info">
             <div class="home-banner-title">${escapeHtml(banner.title || "Sem título")}</div>
 
-            <div class="home-banner-meta">
-              <strong>Link:</strong> ${linkHtml}
-            </div>
+            ${actionDetailsHtml}
 
             <div class="home-banner-meta">
               <strong>Criado em:</strong> ${formatDate(banner.created_at)}
@@ -548,29 +759,39 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function renderHomeBanners(banners) {
+    if (!homeBannersList || !homeBannersListMessage) return;
+
     homeBannersList.innerHTML = "";
 
     if (!Array.isArray(banners) || banners.length === 0) {
       homeBannersListMessage.textContent = "Nenhum banner cadastrado no momento.";
+      refreshSectionHeight(homeBannersWrapper);
       return;
     }
 
     homeBannersListMessage.textContent = `${banners.length} banner(s) encontrado(s).`;
     homeBannersList.innerHTML = banners.map(createHomeBannerCardHtml).join("");
     bindHomeBannerActionButtons();
+    refreshSectionHeight(homeBannersWrapper);
   }
 
   function renderClients(clients) {
+    if (!clientsList || !clientsListMessage) return;
+
     clientsList.innerHTML = "";
 
     if (!clients || clients.length === 0) {
-      clientsListMessage.textContent = "Nenhum cliente cadastrado no momento.";
+      clientsListMessage.textContent = "Nenhum cliente encontrado.";
+      refreshSectionHeight(clientsSectionWrapper);
       return;
     }
 
     clientsListMessage.textContent = `${clients.length} cliente(s) encontrado(s).`;
 
     clients.forEach((client) => {
+      const isActive = client.is_active !== false;
+      const statusLabel = getClientStatusLabel(isActive);
+
       const card = document.createElement("div");
       card.className = "client-card";
 
@@ -621,16 +842,34 @@ document.addEventListener("DOMContentLoaded", async () => {
                   <span>${formatPhone(client.whatsapp) || "-"}</span>
                 </div>
               </div>
+
+              <div class="client-card-item">
+                <i class="fa-solid fa-circle-check client-info-icon"></i>
+                <div class="client-card-text">
+                  <strong>Status</strong>
+                  <span class="client-status-badge ${isActive ? "active" : "inactive"}">
+                    ${statusLabel}
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
 
           <div class="client-card-actions">
             <button
               type="button"
+              class="client-action-btn toggle-client-status-btn"
+              data-client-id="${client.user_id}"
+              data-client-name="${escapeHtml(client.full_name || "Cliente")}"
+              data-is-active="${isActive ? "true" : "false"}"
+            >
+              ${isActive ? "Inativar Cliente" : "Ativar Cliente"}
+            </button>
+
+            <button
+              type="button"
               class="client-action-btn upload-documents-btn"
               data-client-id="${client.user_id}"
-              data-client-name="${escapeHtml(client.full_name || "")}"
-              data-company-name="${escapeHtml(client.company_name || "")}"
             >
               Upload Documentos
             </button>
@@ -639,8 +878,6 @@ document.addEventListener("DOMContentLoaded", async () => {
               type="button"
               class="client-action-btn view-documents-btn"
               data-client-id="${client.user_id}"
-              data-client-name="${escapeHtml(client.full_name || "")}"
-              data-company-name="${escapeHtml(client.company_name || "")}"
             >
               Visualizar Documentos
             </button>
@@ -656,10 +893,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           </div>
         </div>
 
-        <div
-          id="upload-panel-${client.user_id}"
-          class="upload-panel hidden"
-        >
+        <div id="upload-panel-${client.user_id}" class="upload-panel hidden">
           <div class="upload-panel-header">
             <div>
               <div class="upload-panel-title">Enviar documento</div>
@@ -674,10 +908,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           </div>
         </div>
 
-        <div
-          id="documents-panel-${client.user_id}"
-          class="documents-panel hidden"
-        >
+        <div id="documents-panel-${client.user_id}" class="documents-panel hidden">
           <div class="documents-panel-header">
             <div>
               <div class="documents-panel-title">Documentos enviados</div>
@@ -696,6 +927,13 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     bindClientActionButtons();
     bindUploadForms();
+    refreshSectionHeight(clientsSectionWrapper);
+  }
+
+  function applyClientsFilter() {
+    const searchTerm = clientsSearchInput?.value || "";
+    const filteredClients = filterClients(allClientsCache, searchTerm);
+    renderClients(filteredClients);
   }
 
   async function loadClientDocuments(clientId) {
@@ -764,18 +1002,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (clearButton && clearButton.dataset.bound !== "true") {
       clearButton.dataset.bound = "true";
       clearButton.addEventListener("click", () => {
-        if (nameInput) {
-          nameInput.value = "";
-        }
-
-        if (categorySelect) {
-          categorySelect.value = "";
-        }
-
-        if (yearSelect) {
-          yearSelect.value = "";
-        }
-
+        if (nameInput) nameInput.value = "";
+        if (categorySelect) categorySelect.value = "";
+        if (yearSelect) yearSelect.value = "";
         renderFilteredDocuments(clientId);
       });
     }
@@ -785,9 +1014,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const content = document.getElementById(`documents-content-${clientId}`);
     const documents = clientDocumentsCache[clientId] || [];
 
-    if (!content) {
-      return;
-    }
+    if (!content) return;
 
     const filters = {
       name: document.getElementById(`filterName-${clientId}`)?.value || "",
@@ -802,16 +1029,9 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   async function renderClientDocumentsPanel(clientId) {
     const content = document.getElementById(`documents-content-${clientId}`);
+    if (!content) return;
 
-    if (!content) {
-      return;
-    }
-
-    content.innerHTML = `
-      <div class="empty-documents-message">
-        Carregando documentos...
-      </div>
-    `;
+    content.innerHTML = `<div class="empty-documents-message">Carregando documentos...</div>`;
 
     try {
       const documents = await loadClientDocuments(clientId);
@@ -830,8 +1050,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   async function renderHomeBannersPanel() {
+    if (!homeBannersListMessage || !homeBannersList) return;
+
     homeBannersListMessage.textContent = "Carregando banners...";
     homeBannersList.innerHTML = "";
+    refreshSectionHeight(homeBannersWrapper);
 
     try {
       const banners = await loadHomeBanners();
@@ -839,6 +1062,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     } catch (error) {
       console.error("Erro ao carregar banners da Home:", error);
       homeBannersListMessage.textContent = error.message || "Erro ao carregar banners.";
+      refreshSectionHeight(homeBannersWrapper);
     }
   }
 
@@ -883,10 +1107,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   async function deleteDocumentAsAdmin(documentId, clientId, fileName, buttonElement) {
     const confirmed = window.confirm(`Tem certeza que deseja excluir o documento "${fileName}"?`);
-
-    if (!confirmed) {
-      return;
-    }
+    if (!confirmed) return;
 
     const originalText = buttonElement.textContent;
     buttonElement.textContent = "Excluindo...";
@@ -954,14 +1175,66 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
+  async function updateClientStatusAsAdmin(clientId, clientName, currentIsActive, buttonElement) {
+    const nextIsActive = !currentIsActive;
+    const actionLabel = nextIsActive ? "ativar" : "inativar";
+
+    const confirmed = window.confirm(
+      `Tem certeza que deseja ${actionLabel} o cliente "${clientName}"?`
+    );
+
+    if (!confirmed) return;
+
+    const originalText = buttonElement.textContent;
+    buttonElement.textContent = nextIsActive ? "Ativando..." : "Inativando...";
+    buttonElement.disabled = true;
+    showAdminFeedback(`Atualizando status do cliente "${clientName}"...`, "info");
+
+    try {
+      const response = await fetch(`http://localhost:3000/admin/clients/${clientId}/status`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          is_active: nextIsActive
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Erro ao atualizar status do cliente.");
+      }
+
+      allClientsCache = allClientsCache.map((client) => {
+        if (client.user_id === clientId) {
+          return {
+            ...client,
+            is_active: nextIsActive
+          };
+        }
+        return client;
+      });
+
+      applyClientsFilter();
+      showAdminFeedback("Status do cliente atualizado com sucesso.", "success");
+    } catch (error) {
+      console.error("Erro ao atualizar status do cliente:", error);
+      showAdminFeedback(error.message || "Erro ao atualizar status do cliente.", "error");
+    } finally {
+      buttonElement.textContent = originalText;
+      buttonElement.disabled = false;
+    }
+  }
+
   async function deleteClientAsAdmin(clientId, clientName, buttonElement) {
     const confirmed = window.confirm(
       `Tem certeza que deseja excluir o cliente "${clientName}"?\n\nTodos os documentos e acessos serão removidos permanentemente.`
     );
 
-    if (!confirmed) {
-      return;
-    }
+    if (!confirmed) return;
 
     const originalText = buttonElement.textContent;
     buttonElement.textContent = "Excluindo...";
@@ -1052,7 +1325,17 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
-  async function createHomeBannerAsAdmin(title, link, isActive, imageFile, messageElement, submitButton) {
+  async function createHomeBannerAsAdmin(
+    title,
+    link,
+    description,
+    actionType,
+    linkTarget,
+    isActive,
+    imageFile,
+    messageElement,
+    submitButton
+  ) {
     const originalButtonText = submitButton.textContent;
 
     submitButton.disabled = true;
@@ -1064,6 +1347,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       const formData = new FormData();
       formData.append("title", title);
       formData.append("link", link || "");
+      formData.append("description", description || "");
+      formData.append("action_type", actionType);
+      formData.append("link_target", linkTarget || "");
       formData.append("is_active", String(isActive));
       formData.append("image", imageFile);
 
@@ -1134,10 +1420,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   async function deleteHomeBannerAsAdmin(bannerId, bannerTitle, buttonElement) {
     const confirmed = window.confirm(`Tem certeza que deseja excluir o banner "${bannerTitle}"?`);
-
-    if (!confirmed) {
-      return;
-    }
+    if (!confirmed) return;
 
     const originalText = buttonElement.textContent;
     buttonElement.disabled = true;
@@ -1174,9 +1457,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const uploadForms = document.querySelectorAll(".upload-form");
 
     uploadForms.forEach((form) => {
-      if (form.dataset.bound === "true") {
-        return;
-      }
+      if (form.dataset.bound === "true") return;
 
       form.dataset.bound = "true";
 
@@ -1184,14 +1465,14 @@ document.addEventListener("DOMContentLoaded", async () => {
         event.preventDefault();
 
         const clientId = form.dataset.clientId;
-        const category = document.getElementById(`uploadCategory-${clientId}`).value;
-        const subcategory = document.getElementById(`uploadSubcategory-${clientId}`).value.trim();
-        const year = document.getElementById(`uploadYear-${clientId}`).value.trim();
+        const category = document.getElementById(`uploadCategory-${clientId}`)?.value || "";
+        const subcategory = document.getElementById(`uploadSubcategory-${clientId}`)?.value.trim() || "";
+        const year = document.getElementById(`uploadYear-${clientId}`)?.value.trim() || "";
         const fileInput = document.getElementById(`uploadFile-${clientId}`);
         const message = document.getElementById(`uploadFormMessage-${clientId}`);
         const submitButton = form.querySelector(".upload-submit-btn");
 
-        if (!category || !year || !fileInput.files.length) {
+        if (!category || !year || !fileInput || !fileInput.files.length) {
           setInlineMessage(message, "Preencha os campos obrigatórios e selecione um arquivo.", "error");
           showAdminFeedback("Preencha os campos obrigatórios do upload.", "error");
           return;
@@ -1217,25 +1498,46 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function bindHomeBannerForm() {
-    if (!homeBannerForm || homeBannerForm.dataset.bound === "true") {
-      return;
-    }
+    if (!homeBannerForm || homeBannerForm.dataset.bound === "true") return;
 
     homeBannerForm.dataset.bound = "true";
 
     homeBannerForm.addEventListener("submit", async (event) => {
       event.preventDefault();
 
-      const title = document.getElementById("bannerTitle").value.trim();
-      const link = document.getElementById("bannerLink").value.trim();
-      const isActive = document.getElementById("bannerIsActive").checked;
+      const title = document.getElementById("bannerTitle")?.value.trim() || "";
+      const actionType = document.getElementById("bannerActionType")?.value || "link";
+      const linkTarget = document.getElementById("bannerLinkTarget")?.value || "";
+      const link = document.getElementById("bannerLink")?.value.trim() || "";
+      const description = document.getElementById("bannerDescription")?.value.trim() || "";
+      const isActive = document.getElementById("bannerIsActive")?.checked || false;
       const imageInput = document.getElementById("bannerImage");
       const submitButton = document.getElementById("saveBannerBtn");
 
-      if (!title || !imageInput.files.length) {
+      if (!title || !imageInput || !imageInput.files.length) {
         setInlineMessage(homeBannerMessage, "Preencha o título e selecione uma imagem.", "error");
         showAdminFeedback("Preencha os campos obrigatórios do banner.", "error");
         return;
+      }
+
+      if (actionType === "modal" && !description) {
+        setInlineMessage(homeBannerMessage, "Para banner informativo, preencha a descrição detalhada.", "error");
+        showAdminFeedback("Descrição obrigatória para banner do tipo modal.", "error");
+        return;
+      }
+
+      if (actionType === "link") {
+        if (!linkTarget) {
+          setInlineMessage(homeBannerMessage, "Selecione um destino para o banner.", "error");
+          showAdminFeedback("Destino obrigatório para banner do tipo link.", "error");
+          return;
+        }
+
+        if (linkTarget === "custom" && !link) {
+          setInlineMessage(homeBannerMessage, "Informe o link personalizado.", "error");
+          showAdminFeedback("Link personalizado obrigatório.", "error");
+          return;
+        }
       }
 
       const imageFile = imageInput.files[0];
@@ -1243,6 +1545,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       const success = await createHomeBannerAsAdmin(
         title,
         link,
+        description,
+        actionType,
+        linkTarget,
         isActive,
         imageFile,
         homeBannerMessage,
@@ -1251,7 +1556,17 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       if (success) {
         homeBannerForm.reset();
-        document.getElementById("bannerIsActive").checked = true;
+
+        const bannerIsActive = document.getElementById("bannerIsActive");
+        const bannerActionTypeField = document.getElementById("bannerActionType");
+        const bannerLinkTargetField = document.getElementById("bannerLinkTarget");
+
+        if (bannerIsActive) bannerIsActive.checked = true;
+        if (bannerActionTypeField) bannerActionTypeField.value = "link";
+        if (bannerLinkTargetField) bannerLinkTargetField.value = "";
+
+        updateBannerFormVisibility();
+        refreshSectionHeight(homeBannersWrapper);
       }
     });
   }
@@ -1261,9 +1576,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const deleteButtons = document.querySelectorAll(".delete-home-banner-btn");
 
     toggleButtons.forEach((button) => {
-      if (button.dataset.bound === "true") {
-        return;
-      }
+      if (button.dataset.bound === "true") return;
 
       button.dataset.bound = "true";
 
@@ -1281,9 +1594,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
 
     deleteButtons.forEach((button) => {
-      if (button.dataset.bound === "true") {
-        return;
-      }
+      if (button.dataset.bound === "true") return;
 
       button.dataset.bound = "true";
 
@@ -1302,6 +1613,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function bindClientActionButtons() {
+    const toggleStatusButtons = document.querySelectorAll(".toggle-client-status-btn");
     const uploadButtons = document.querySelectorAll(".upload-documents-btn");
     const viewButtons = document.querySelectorAll(".view-documents-btn");
     const deleteClientButtons = document.querySelectorAll(".delete-client-btn");
@@ -1311,10 +1623,27 @@ document.addEventListener("DOMContentLoaded", async () => {
     const replaceInputs = document.querySelectorAll(".replace-document-file-input");
     const menuToggles = document.querySelectorAll(".document-menu-toggle");
 
+    toggleStatusButtons.forEach((button) => {
+      if (button.dataset.bound === "true") return;
+
+      button.dataset.bound = "true";
+
+      button.addEventListener("click", async () => {
+        const clientId = button.dataset.clientId;
+        const clientName = button.dataset.clientName || "Cliente";
+        const currentIsActive = button.dataset.isActive === "true";
+
+        if (!clientId) {
+          showAdminFeedback("Cliente inválido para alteração de status.", "error");
+          return;
+        }
+
+        await updateClientStatusAsAdmin(clientId, clientName, currentIsActive, button);
+      });
+    });
+
     uploadButtons.forEach((button) => {
-      if (button.dataset.bound === "true") {
-        return;
-      }
+      if (button.dataset.bound === "true") return;
 
       button.dataset.bound = "true";
 
@@ -1322,27 +1651,25 @@ document.addEventListener("DOMContentLoaded", async () => {
         const clientId = button.dataset.clientId;
         const uploadPanel = document.getElementById(`upload-panel-${clientId}`);
 
-        if (!uploadPanel) {
-          return;
-        }
+        if (!uploadPanel) return;
 
         const isHidden = uploadPanel.classList.contains("hidden");
 
         if (!isHidden) {
           uploadPanel.classList.add("hidden");
           button.textContent = "Upload Documentos";
+          refreshSectionHeight(clientsSectionWrapper);
           return;
         }
 
         uploadPanel.classList.remove("hidden");
         button.textContent = "Ocultar Upload";
+        refreshSectionHeight(clientsSectionWrapper);
       });
     });
 
     viewButtons.forEach((button) => {
-      if (button.dataset.bound === "true") {
-        return;
-      }
+      if (button.dataset.bound === "true") return;
 
       button.dataset.bound = "true";
 
@@ -1350,29 +1677,28 @@ document.addEventListener("DOMContentLoaded", async () => {
         const clientId = button.dataset.clientId;
         const panel = document.getElementById(`documents-panel-${clientId}`);
 
-        if (!panel) {
-          return;
-        }
+        if (!panel) return;
 
         const isHidden = panel.classList.contains("hidden");
 
         if (!isHidden) {
           panel.classList.add("hidden");
           button.textContent = "Visualizar Documentos";
+          refreshSectionHeight(clientsSectionWrapper);
           return;
         }
 
         panel.classList.remove("hidden");
         button.textContent = "Ocultar Documentos";
+        refreshSectionHeight(clientsSectionWrapper);
 
         await renderClientDocumentsPanel(clientId);
+        refreshSectionHeight(clientsSectionWrapper);
       });
     });
 
     deleteClientButtons.forEach((button) => {
-      if (button.dataset.bound === "true") {
-        return;
-      }
+      if (button.dataset.bound === "true") return;
 
       button.dataset.bound = "true";
 
@@ -1390,9 +1716,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
 
     menuToggles.forEach((button) => {
-      if (button.dataset.bound === "true") {
-        return;
-      }
+      if (button.dataset.bound === "true") return;
 
       button.dataset.bound = "true";
 
@@ -1402,9 +1726,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         const documentId = button.dataset.documentId;
         const dropdown = document.getElementById(`documentActions-${documentId}`);
 
-        if (!dropdown) {
-          return;
-        }
+        if (!dropdown) return;
 
         const isHidden = dropdown.classList.contains("hidden");
 
@@ -1421,9 +1743,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
 
     downloadButtons.forEach((button) => {
-      if (button.dataset.bound === "true") {
-        return;
-      }
+      if (button.dataset.bound === "true") return;
 
       button.dataset.bound = "true";
 
@@ -1440,9 +1760,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
 
     deleteButtons.forEach((button) => {
-      if (button.dataset.bound === "true") {
-        return;
-      }
+      if (button.dataset.bound === "true") return;
 
       button.dataset.bound = "true";
 
@@ -1461,9 +1779,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
 
     replaceButtons.forEach((button) => {
-      if (button.dataset.bound === "true") {
-        return;
-      }
+      if (button.dataset.bound === "true") return;
 
       button.dataset.bound = "true";
 
@@ -1481,9 +1797,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
 
     replaceInputs.forEach((input) => {
-      if (input.dataset.bound === "true") {
-        return;
-      }
+      if (input.dataset.bound === "true") return;
 
       input.dataset.bound = "true";
 
@@ -1509,6 +1823,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   async function loadClients() {
+    if (!clientsListMessage || !clientsList) return;
+
     clientsListMessage.textContent = "Carregando clientes...";
     clientsList.innerHTML = "";
 
@@ -1526,66 +1842,85 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (!response.ok) {
         clientsListMessage.textContent = data.error || "Erro ao carregar clientes.";
         showAdminFeedback(data.error || "Erro ao carregar clientes.", "error");
+        refreshSectionHeight(clientsSectionWrapper);
         return;
       }
 
-      renderClients(data);
+      allClientsCache = Array.isArray(data) ? data : [];
+      applyClientsFilter();
     } catch (error) {
       console.error("Erro ao carregar clientes:", error);
       clientsListMessage.textContent = "Erro ao conectar com o servidor.";
       showAdminFeedback("Erro ao conectar com o servidor.", "error");
+      refreshSectionHeight(clientsSectionWrapper);
     }
   }
 
-  logoutBtn.addEventListener("click", () => {
+  logoutBtn?.addEventListener("click", () => {
     localStorage.removeItem("access_token");
     localStorage.removeItem("profile");
     window.location.href = "login.html";
   });
 
-  toggleCreateClientBtn.addEventListener("click", () => {
+  toggleCreateClientBtn?.addEventListener("click", () => {
     toggleCreateClientForm();
   });
 
-  toggleClientsListBtn.addEventListener("click", () => {
+  toggleClientsListBtn?.addEventListener("click", () => {
+    if (!clientsSectionWrapper) return;
+
     const isHidden = clientsSectionWrapper.classList.contains("hidden");
 
     if (isHidden) {
       showClientsList();
+      refreshSectionHeight(clientsSectionWrapper);
     } else {
       hideClientsList();
     }
   });
 
-  toggleHomeBannersBtn.addEventListener("click", async () => {
+  toggleHomeBannersBtn?.addEventListener("click", async () => {
+    if (!homeBannersWrapper) return;
+
     const isHidden = homeBannersWrapper.classList.contains("hidden");
 
     if (isHidden) {
       showHomeBanners();
       await renderHomeBannersPanel();
+      refreshSectionHeight(homeBannersWrapper);
     } else {
       hideHomeBanners();
     }
   });
 
-  cpfCnpjInput.addEventListener("input", (event) => {
+  clientsSearchInput?.addEventListener("input", () => {
+    applyClientsFilter();
+  });
+
+  bannerActionType?.addEventListener("change", () => {
+    updateBannerFormVisibility();
+  });
+
+  bannerLinkTarget?.addEventListener("change", () => {
+    updateBannerFormVisibility();
+  });
+
+  cpfCnpjInput?.addEventListener("input", (event) => {
     event.target.value = formatCpfCnpj(event.target.value);
   });
 
-  phoneInput.addEventListener("input", (event) => {
+  phoneInput?.addEventListener("input", (event) => {
     event.target.value = formatPhone(event.target.value);
   });
 
-  whatsappInput.addEventListener("input", (event) => {
+  whatsappInput?.addEventListener("input", (event) => {
     event.target.value = formatPhone(event.target.value);
   });
 
-  copyTemporaryPasswordBtn.addEventListener("click", async () => {
-    const password = temporaryPasswordField.value;
+  copyTemporaryPasswordBtn?.addEventListener("click", async () => {
+    const password = temporaryPasswordField?.value || "";
 
-    if (!password) {
-      return;
-    }
+    if (!password) return;
 
     try {
       await navigator.clipboard.writeText(password);
@@ -1598,36 +1933,43 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     setTimeout(() => {
-      copyTemporaryPasswordBtn.textContent = "Copiar senha";
+      if (copyTemporaryPasswordBtn) {
+        copyTemporaryPasswordBtn.textContent = "Copiar senha";
+      }
     }, 2000);
   });
 
-  createClientForm.addEventListener("submit", async (event) => {
+  createClientForm?.addEventListener("submit", async (event) => {
     event.preventDefault();
 
-    createClientMessage.textContent = "Enviando...";
+    if (createClientMessage) {
+      createClientMessage.textContent = "Enviando...";
+    }
+
     hidePasswordBox();
     hideAdminFeedback();
 
     const formData = {
-      full_name: document.getElementById("fullName").value.trim(),
-      company_name: document.getElementById("companyName").value.trim(),
-      cpf_cnpj: onlyDigits(document.getElementById("cpfCnpj").value),
-      email: document.getElementById("email").value.trim(),
+      full_name: document.getElementById("fullName")?.value.trim() || "",
+      company_name: document.getElementById("companyName")?.value.trim() || "",
+      cpf_cnpj: onlyDigits(document.getElementById("cpfCnpj")?.value || ""),
+      email: document.getElementById("email")?.value.trim() || "",
       role: "client",
-      address_zip: onlyDigits(document.getElementById("addressZip").value),
-      address_street: document.getElementById("addressStreet").value.trim(),
-      address_number: document.getElementById("addressNumber").value.trim(),
-      address_complement: document.getElementById("addressComplement").value.trim(),
-      address_neighborhood: document.getElementById("addressNeighborhood").value.trim(),
-      address_city: document.getElementById("addressCity").value.trim(),
-      address_state: document.getElementById("addressState").value.trim(),
-      phone: onlyDigits(document.getElementById("phone").value),
-      whatsapp: onlyDigits(document.getElementById("whatsapp").value)
+      address_zip: onlyDigits(document.getElementById("addressZip")?.value || ""),
+      address_street: document.getElementById("addressStreet")?.value.trim() || "",
+      address_number: document.getElementById("addressNumber")?.value.trim() || "",
+      address_complement: document.getElementById("addressComplement")?.value.trim() || "",
+      address_neighborhood: document.getElementById("addressNeighborhood")?.value.trim() || "",
+      address_city: document.getElementById("addressCity")?.value.trim() || "",
+      address_state: document.getElementById("addressState")?.value.trim() || "",
+      phone: onlyDigits(document.getElementById("phone")?.value || ""),
+      whatsapp: onlyDigits(document.getElementById("whatsapp")?.value || "")
     };
 
     if (!formData.full_name || !formData.company_name || !formData.cpf_cnpj || !formData.email) {
-      createClientMessage.textContent = "Preencha os campos obrigatórios.";
+      if (createClientMessage) {
+        createClientMessage.textContent = "Preencha os campos obrigatórios.";
+      }
       showAdminFeedback("Preencha os campos obrigatórios do cadastro.", "error");
       return;
     }
@@ -1645,14 +1987,19 @@ document.addEventListener("DOMContentLoaded", async () => {
       const data = await response.json();
 
       if (!response.ok) {
-        createClientMessage.textContent = data.error || "Erro ao cadastrar cliente.";
+        if (createClientMessage) {
+          createClientMessage.textContent = data.error || "Erro ao cadastrar cliente.";
+        }
         showAdminFeedback(data.error || "Erro ao cadastrar cliente.", "error");
+        refreshSectionHeight(createClientWrapper);
         return;
       }
 
-      createClientMessage.textContent = "Cliente cadastrado com sucesso.";
-      showAdminFeedback("Cliente cadastrado com sucesso.", "success");
+      if (createClientMessage) {
+        createClientMessage.textContent = "Cliente cadastrado com sucesso.";
+      }
 
+      showAdminFeedback("Cliente cadastrado com sucesso.", "success");
       createClientForm.reset();
 
       if (data.temporary_password) {
@@ -1662,20 +2009,36 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
 
       showCreateClientForm();
+      refreshSectionHeight(createClientWrapper);
       await loadClients();
     } catch (error) {
       console.error("Erro ao cadastrar cliente:", error);
-      createClientMessage.textContent = "Erro ao conectar.";
+
+      if (createClientMessage) {
+        createClientMessage.textContent = "Erro ao conectar.";
+      }
+
       showAdminFeedback("Erro ao conectar para cadastrar cliente.", "error");
+      refreshSectionHeight(createClientWrapper);
     }
   });
 
   bindHomeBannerForm();
 
+  prepareCollapsibleSection(createClientWrapper);
+  prepareCollapsibleSection(clientsSectionWrapper);
+  prepareCollapsibleSection(homeBannersWrapper);
+
   loadAdminInfo();
   hidePasswordBox();
-  hideCreateClientForm();
-  showClientsList();
-  hideHomeBanners();
+  collapseSectionInstant(createClientWrapper);
+  collapseSectionInstant(clientsSectionWrapper);
+  collapseSectionInstant(homeBannersWrapper);
+
+  if (toggleCreateClientBtn) toggleCreateClientBtn.textContent = "Novo Cliente";
+  if (toggleClientsListBtn) toggleClientsListBtn.textContent = "Exibir Clientes";
+  if (toggleHomeBannersBtn) toggleHomeBannersBtn.textContent = "Exibir Banners";
+
+  updateBannerFormVisibility();
   await loadClients();
 });

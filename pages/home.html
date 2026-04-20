@@ -1,38 +1,950 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Home - CASEG Protege</title>
 
-    <link rel="stylesheet" href="../assets/css/style.css">
+    <link rel="stylesheet" href="../assets/css/style.css" />
+    <link
+        rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
+    />
+
+    <style>
+        .home-main-container {
+            width: 100%;
+            max-width: 1280px;
+            margin: 0 auto;
+            padding: 24px 20px 60px;
+        }
+
+        .site-header .header-container {
+            max-width: 1280px;
+            margin: 0 auto;
+        }
+
+        .home-banners-section {
+            margin-top: 24px;
+        }
+
+        .home-carousel-wrapper {
+            position: relative;
+            width: 100%;
+        }
+
+        .home-carousel {
+            position: relative;
+            overflow: hidden;
+            border-radius: 24px;
+            min-height: 320px;
+            background: linear-gradient(135deg, #f8fafc, #e2e8f0);
+            box-shadow: 0 12px 28px rgba(0, 0, 0, 0.10);
+            touch-action: pan-y;
+        }
+
+        .home-carousel-track {
+            display: flex;
+            transition: transform 0.5s ease;
+            will-change: transform;
+        }
+
+        .home-carousel-slide {
+            min-width: 100%;
+            flex: 0 0 100%;
+            position: relative;
+        }
+
+        .home-carousel-slide-button {
+            display: block;
+            width: 100%;
+            border: none;
+            background: transparent;
+            padding: 0;
+            cursor: pointer;
+        }
+
+        .home-carousel-slide-button img {
+            width: 100%;
+            height: auto;
+            display: block;
+            object-fit: cover;
+            max-height: 520px;
+            user-select: none;
+            -webkit-user-drag: none;
+        }
+
+        .home-carousel-placeholder {
+            min-height: 320px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 40px 24px;
+            color: #475569;
+        }
+
+        .home-carousel-placeholder-content {
+            max-width: 700px;
+        }
+
+        .home-carousel-placeholder-content i {
+            font-size: 42px;
+            color: #0b6b79;
+            margin-bottom: 14px;
+        }
+
+        .home-carousel-placeholder-content h2 {
+            font-size: 30px;
+            color: #0f172a;
+            margin-bottom: 12px;
+        }
+
+        .home-carousel-placeholder-content p {
+            margin: 0;
+            font-size: 17px;
+            line-height: 1.7;
+        }
+
+        .home-carousel-nav {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 48px;
+            height: 48px;
+            border: none;
+            border-radius: 999px;
+            background: rgba(15, 23, 42, 0.60);
+            color: #ffffff;
+            cursor: pointer;
+            z-index: 5;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            transition: background 0.2s ease, transform 0.2s ease;
+        }
+
+        .home-carousel-nav:hover {
+            background: rgba(15, 23, 42, 0.80);
+        }
+
+        .home-carousel-nav.prev {
+            left: 16px;
+        }
+
+        .home-carousel-nav.next {
+            right: 16px;
+        }
+
+        .home-carousel-nav.hidden {
+            display: none;
+        }
+
+        .home-carousel-dots {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            margin-top: 18px;
+        }
+
+        .home-carousel-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 999px;
+            border: none;
+            background: #cbd5e1;
+            cursor: pointer;
+            transition: transform 0.2s ease, background 0.2s ease;
+        }
+
+        .home-carousel-dot.active {
+            background: #0b6b79;
+            transform: scale(1.15);
+        }
+
+        .home-carousel-dot:hover {
+            background: #94a3b8;
+        }
+
+        .home-institutional {
+            margin-top: 42px;
+        }
+
+        .section-title {
+            text-align: center;
+            margin-bottom: 24px;
+        }
+
+        .section-title h2 {
+            margin-bottom: 10px;
+        }
+
+        .section-title p {
+            max-width: 780px;
+            margin: 0 auto;
+        }
+
+        .home-institutional-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 20px;
+            align-items: stretch;
+        }
+
+        .home-institutional-card {
+            background: #ffffff;
+            border: 1px solid #e5e7eb;
+            border-radius: 20px;
+            padding: 24px;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.05);
+            transition: transform 0.25s ease, box-shadow 0.25s ease;
+            min-height: 100%;
+        }
+
+        .home-institutional-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 14px 26px rgba(0, 0, 0, 0.08);
+        }
+
+        .home-institutional-icon {
+            width: 52px;
+            height: 52px;
+            border-radius: 14px;
+            background: #ecfeff;
+            color: #0b6b79;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            margin-bottom: 16px;
+        }
+
+        .home-institutional-card h3 {
+            margin: 0 0 12px;
+            color: #0f172a;
+            font-size: 22px;
+        }
+
+        .home-institutional-card p {
+            margin: 0;
+            color: #475569;
+            line-height: 1.7;
+            font-size: 15px;
+        }
+
+        .home-about {
+            margin-top: 42px;
+        }
+
+        .home-about-cards {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 20px;
+            align-items: stretch;
+        }
+
+        .home-about-cards .about-card {
+            min-height: 100%;
+        }
+
+        .home-cta {
+            margin-top: 42px;
+            text-align: center;
+            background: #ffffff;
+            border: 1px solid #e5e7eb;
+            border-radius: 20px;
+            padding: 32px 24px;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.05);
+        }
+
+        .home-cta h2 {
+            margin-bottom: 12px;
+        }
+
+        .home-cta p {
+            margin-bottom: 20px;
+        }
+
+        .banner-modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.45);
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            z-index: 9999;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.25s ease, visibility 0.25s ease;
+        }
+
+        .banner-modal-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .banner-modal {
+            width: 100%;
+            max-width: 760px;
+            background: #ffffff;
+            border-radius: 24px;
+            box-shadow: 0 24px 60px rgba(0, 0, 0, 0.24);
+            overflow: hidden;
+            transform: translateY(18px) scale(0.98);
+            transition: transform 0.25s ease;
+        }
+
+        .banner-modal-overlay.active .banner-modal {
+            transform: translateY(0) scale(1);
+        }
+
+        .banner-modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 16px;
+            padding: 24px 24px 14px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .banner-modal-title {
+            margin: 0;
+            font-size: 28px;
+            line-height: 1.2;
+            color: #0f172a;
+        }
+
+        .banner-modal-close {
+            border: none;
+            background: #f1f5f9;
+            color: #0f172a;
+            width: 42px;
+            height: 42px;
+            border-radius: 999px;
+            cursor: pointer;
+            font-size: 18px;
+            flex-shrink: 0;
+            transition: background 0.2s ease, transform 0.2s ease;
+        }
+
+        .banner-modal-close:hover {
+            background: #e2e8f0;
+            transform: scale(1.05);
+        }
+
+        .banner-modal-body {
+            padding: 22px 24px 28px;
+        }
+
+        .banner-modal-text {
+            margin: 0;
+            color: #334155;
+            line-height: 1.8;
+            font-size: 17px;
+            white-space: pre-line;
+        }
+
+        body.modal-open {
+            overflow: hidden;
+        }
+
+        @media (max-width: 900px) {
+            .home-institutional-grid,
+            .home-about-cards {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .home-main-container {
+                padding: 20px 16px 50px;
+            }
+
+            .home-carousel {
+                border-radius: 18px;
+                min-height: 220px;
+            }
+
+            .home-carousel-placeholder {
+                min-height: 220px;
+            }
+
+            .home-carousel-placeholder-content h2 {
+                font-size: 24px;
+            }
+
+            .home-carousel-placeholder-content p {
+                font-size: 16px;
+            }
+
+            .home-carousel-nav {
+                width: 42px;
+                height: 42px;
+            }
+
+            .home-carousel-nav.prev {
+                left: 10px;
+            }
+
+            .home-carousel-nav.next {
+                right: 10px;
+            }
+
+            .home-institutional-card h3 {
+                font-size: 20px;
+            }
+
+            .home-cta {
+                padding: 28px 20px;
+            }
+
+            .banner-modal-header {
+                padding: 20px 20px 12px;
+            }
+
+            .banner-modal-title {
+                font-size: 24px;
+            }
+
+            .banner-modal-body {
+                padding: 18px 20px 24px;
+            }
+
+            .banner-modal-text {
+                font-size: 16px;
+            }
+        }
+    </style>
 </head>
 <body>
 
-<header>
-    <h1>CASEG Protege</h1>
+    <header class="site-header">
+        <div class="header-container">
+            <a href="home.html" class="logo-link reveal-on-load delay-1">
+                <img
+                    src="/site-caseg-protege/logo_transparente.png"
+                    alt="Logo CASEG Protege"
+                    class="site-logo"
+                />
+            </a>
 
-    <nav>
-        <a href="../index.html">Home</a>
-        <a href="servicos.html">Serviços</a>
-        <a href="avisos.html">Avisos</a>
-        <a href="contato.html">Contato</a>
-        <a href="login.html">Área do Cliente</a>
-    </nav>
-</header>
+            <nav class="main-nav reveal-on-load delay-2">
+                <a href="servicos.html">Serviços</a>
+                <a href="avisos.html">Sobre</a>
+                <a href="contato.html">Contato</a>
+                <a href="login.html" class="nav-login">
+                    <i class="fa-regular fa-user"></i>
+                    Entrar
+                </a>
+            </nav>
+        </div>
+    </header>
 
-<main>
-    <h2>Home</h2>
-    <p>Página inicial da CASEG Protege</p>
-</main>
+    <main class="home-main-container">
+        <section class="home-banners-section reveal-on-load delay-2">
+            <div id="homeCarouselWrapper" class="home-carousel-wrapper">
+                <div class="home-carousel" id="homeCarousel">
+                    <div id="homeCarouselTrack" class="home-carousel-track">
+                        <div class="home-carousel-slide">
+                            <div class="home-carousel-placeholder">
+                                <div class="home-carousel-placeholder-content">
+                                    <i class="fa-solid fa-images"></i>
+                                    <h2>Carregando banners da Home...</h2>
+                                    <p>
+                                        Os banners cadastrados no painel administrativo
+                                        aparecerão aqui em formato de carrossel.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
 
-<footer>
-    <p>© CASEG Protege</p>
-    <p>
-        <a href="termos-de-uso.html">Termos de Uso</a> —
-        <a href="politica-privacidade.html">Política de Privacidade</a>
-    </p>
-</footer>
+                    <button
+                        type="button"
+                        class="home-carousel-nav prev hidden"
+                        id="homeCarouselPrev"
+                        aria-label="Banner anterior"
+                    >
+                        <i class="fa-solid fa-chevron-left"></i>
+                    </button>
 
+                    <button
+                        type="button"
+                        class="home-carousel-nav next hidden"
+                        id="homeCarouselNext"
+                        aria-label="Próximo banner"
+                    >
+                        <i class="fa-solid fa-chevron-right"></i>
+                    </button>
+                </div>
+
+                <div id="homeCarouselDots" class="home-carousel-dots"></div>
+            </div>
+        </section>
+
+        <section class="home-institutional reveal-on-load delay-3">
+            <div class="section-title">
+                <h2>Conheça melhor a CASEG Protege</h2>
+                <p>
+                    Uma estrutura preparada para unir segurança, organização e atendimento profissional.
+                </p>
+            </div>
+
+            <div class="home-institutional-grid">
+                <article class="home-institutional-card reveal-on-load delay-3">
+                    <div class="home-institutional-icon">
+                        <i class="fa-regular fa-building"></i>
+                    </div>
+                    <h3>Quem Somos</h3>
+                    <p>
+                        A CASEG Protege atua com foco em organização, segurança documental
+                        e apoio operacional, oferecendo uma estrutura pensada para gerar
+                        confiança, praticidade e suporte profissional aos clientes.
+                    </p>
+                </article>
+
+                <article class="home-institutional-card reveal-on-load delay-4">
+                    <div class="home-institutional-icon">
+                        <i class="fa-solid fa-briefcase"></i>
+                    </div>
+                    <h3>O que entregamos</h3>
+                    <p>
+                        Entregamos uma experiência mais organizada e segura para o acesso
+                        às informações, com centralização de documentos, comunicação mais clara
+                        e uma base preparada para informativos, serviços e relacionamento.
+                    </p>
+                </article>
+
+                <article class="home-institutional-card reveal-on-load delay-5">
+                    <div class="home-institutional-icon">
+                        <i class="fa-solid fa-users"></i>
+                    </div>
+                    <h3>Pra quem entregamos</h3>
+                    <p>
+                        Nossa estrutura é voltada para empresas e clientes que precisam
+                        de mais controle, praticidade e confiança na gestão de documentos,
+                        informações e processos de atendimento.
+                    </p>
+                </article>
+            </div>
+        </section>
+
+        <section class="home-about reveal-on-load delay-4">
+            <div class="section-title">
+                <h2>Sobre a CASEG Protege</h2>
+                <p>
+                    Uma estrutura pensada para oferecer atendimento, organização
+                    documental e acesso seguro às informações dos clientes.
+                </p>
+            </div>
+
+            <div class="home-about-cards">
+                <div class="about-card reveal-on-load delay-4">
+                    <h3>Segurança</h3>
+                    <p>
+                        Controle de acesso, autenticação segura e proteção no
+                        armazenamento dos documentos.
+                    </p>
+                </div>
+
+                <div class="about-card reveal-on-load delay-5">
+                    <h3>Organização</h3>
+                    <p>
+                        Centralização de arquivos, dados e processos em um ambiente
+                        limpo e eficiente.
+                    </p>
+                </div>
+
+                <div class="about-card reveal-on-load delay-6">
+                    <h3>Praticidade</h3>
+                    <p>
+                        Uma experiência simples e objetiva para facilitar a rotina
+                        administrativa e do cliente.
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <section class="home-cta reveal-on-load delay-5">
+            <h2>Precisa acessar seus documentos ou falar com nossa equipe?</h2>
+            <p>
+                Entre na Área do Cliente ou utilize nossos canais de contato para atendimento.
+            </p>
+
+            <div class="home-cta-actions">
+                <a href="login.html" class="btn-primary">Entrar</a>
+                <a href="contato.html" class="btn-secondary">Falar Conosco</a>
+            </div>
+        </section>
+    </main>
+
+    <div class="banner-modal-overlay" id="bannerModalOverlay">
+        <div class="banner-modal" id="bannerModal">
+            <div class="banner-modal-header">
+                <h2 class="banner-modal-title" id="bannerModalTitle">Título do Banner</h2>
+
+                <button
+                    type="button"
+                    class="banner-modal-close"
+                    id="bannerModalClose"
+                    aria-label="Fechar modal"
+                >
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="banner-modal-body">
+                <p class="banner-modal-text" id="bannerModalText"></p>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <p>© CASEG Protege</p>
+        <p>
+            <a href="termos-de-uso.html">Termos de Uso</a> —
+            <a href="politica-privacidade.html">Política de Privacidade</a>
+        </p>
+    </footer>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const homeCarousel = document.getElementById("homeCarousel");
+            const homeCarouselTrack = document.getElementById("homeCarouselTrack");
+            const homeCarouselDots = document.getElementById("homeCarouselDots");
+            const homeCarouselPrev = document.getElementById("homeCarouselPrev");
+            const homeCarouselNext = document.getElementById("homeCarouselNext");
+
+            const bannerModalOverlay = document.getElementById("bannerModalOverlay");
+            const bannerModalTitle = document.getElementById("bannerModalTitle");
+            const bannerModalText = document.getElementById("bannerModalText");
+            const bannerModalClose = document.getElementById("bannerModalClose");
+
+            let banners = [];
+            let currentSlide = 0;
+            let autoplayInterval = null;
+            let isMouseOverCarousel = false;
+            let isTouchInteracting = false;
+            let touchStartX = 0;
+            let touchStartY = 0;
+            let touchEndX = 0;
+            let touchEndY = 0;
+            const autoplayDelay = 5000;
+            const swipeThreshold = 50;
+
+            function openBannerModal(title, description) {
+                bannerModalTitle.textContent = title || "Informativo";
+                bannerModalText.textContent = description || "Conteúdo não disponível.";
+                bannerModalOverlay.classList.add("active");
+                document.body.classList.add("modal-open");
+            }
+
+            function closeBannerModal() {
+                bannerModalOverlay.classList.remove("active");
+                document.body.classList.remove("modal-open");
+            }
+
+            function getResolvedLink(banner) {
+                const linkTarget = String(banner.link_target || "").trim();
+                const customLink = String(banner.link || "").trim();
+
+                if (linkTarget === "contato") {
+                    return "contato.html";
+                }
+
+                if (linkTarget === "servicos") {
+                    return "servicos.html";
+                }
+
+                if (linkTarget === "whatsapp") {
+                    return customLink || "contato.html";
+                }
+
+                if (linkTarget === "custom") {
+                    return customLink || "";
+                }
+
+                return customLink || "";
+            }
+
+            function updateCarousel() {
+                homeCarouselTrack.style.transform = `translateX(-${currentSlide * 100}%)`;
+
+                const dots = homeCarouselDots.querySelectorAll(".home-carousel-dot");
+                dots.forEach((dot, index) => {
+                    dot.classList.toggle("active", index === currentSlide);
+                });
+            }
+
+            function goToSlide(index) {
+                if (!banners.length) {
+                    return;
+                }
+
+                if (index < 0) {
+                    currentSlide = banners.length - 1;
+                } else if (index >= banners.length) {
+                    currentSlide = 0;
+                } else {
+                    currentSlide = index;
+                }
+
+                updateCarousel();
+            }
+
+            function nextSlide() {
+                goToSlide(currentSlide + 1);
+            }
+
+            function prevSlide() {
+                goToSlide(currentSlide - 1);
+            }
+
+            function stopAutoplay() {
+                if (autoplayInterval) {
+                    clearInterval(autoplayInterval);
+                    autoplayInterval = null;
+                }
+            }
+
+            function startAutoplay() {
+                stopAutoplay();
+
+                if (banners.length <= 1 || isMouseOverCarousel || isTouchInteracting) {
+                    return;
+                }
+
+                autoplayInterval = setInterval(() => {
+                    if (!isMouseOverCarousel && !isTouchInteracting) {
+                        nextSlide();
+                    }
+                }, autoplayDelay);
+            }
+
+            function restartAutoplay() {
+                startAutoplay();
+            }
+
+            function handleBannerAction(index) {
+                const banner = banners[index];
+
+                if (!banner) {
+                    return;
+                }
+
+                const actionType = String(banner.action_type || "link").trim();
+                const resolvedLink = getResolvedLink(banner);
+
+                if (actionType === "modal") {
+                    openBannerModal(banner.title || "Informativo", banner.description || "");
+                    return;
+                }
+
+                if (actionType === "link" && resolvedLink) {
+                    const isExternal = resolvedLink.startsWith("http://") || resolvedLink.startsWith("https://");
+
+                    if (isExternal) {
+                        window.open(resolvedLink, "_blank", "noopener,noreferrer");
+                    } else {
+                        window.location.href = resolvedLink;
+                    }
+                }
+            }
+
+            function handleSwipeGesture() {
+                const deltaX = touchEndX - touchStartX;
+                const deltaY = touchEndY - touchStartY;
+
+                if (Math.abs(deltaX) < swipeThreshold || Math.abs(deltaX) < Math.abs(deltaY)) {
+                    return;
+                }
+
+                if (deltaX < 0) {
+                    nextSlide();
+                } else {
+                    prevSlide();
+                }
+
+                restartAutoplay();
+            }
+
+            function renderCarousel(data) {
+                banners = Array.isArray(data) ? data.filter((banner) => banner.image_url) : [];
+                currentSlide = 0;
+
+                if (!banners.length) {
+                    homeCarouselTrack.innerHTML = `
+                        <div class="home-carousel-slide">
+                            <div class="home-carousel-placeholder">
+                                <div class="home-carousel-placeholder-content">
+                                    <i class="fa-solid fa-images"></i>
+                                    <h2>Nenhum banner disponível no momento</h2>
+                                    <p>
+                                        Assim que o administrador cadastrar banners ativos,
+                                        eles aparecerão aqui automaticamente.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+
+                    homeCarouselDots.innerHTML = "";
+                    homeCarouselPrev.classList.add("hidden");
+                    homeCarouselNext.classList.add("hidden");
+                    stopAutoplay();
+                    return;
+                }
+
+                homeCarouselTrack.innerHTML = banners.map((banner, index) => {
+                    const title = String(banner.title || "Banner CASEG Protege").replace(/"/g, "&quot;");
+                    const imageUrl = String(banner.image_url || "").replace(/"/g, "&quot;");
+
+                    return `
+                        <div class="home-carousel-slide">
+                            <button
+                                type="button"
+                                class="home-carousel-slide-button"
+                                data-slide-index="${index}"
+                                aria-label="${title}"
+                            >
+                                <img src="${imageUrl}" alt="${title}" />
+                            </button>
+                        </div>
+                    `;
+                }).join("");
+
+                homeCarouselDots.innerHTML = banners.map((_, index) => `
+                    <button
+                        type="button"
+                        class="home-carousel-dot ${index === 0 ? "active" : ""}"
+                        data-dot-index="${index}"
+                        aria-label="Ir para o banner ${index + 1}"
+                    ></button>
+                `).join("");
+
+                homeCarouselPrev.classList.toggle("hidden", banners.length <= 1);
+                homeCarouselNext.classList.toggle("hidden", banners.length <= 1);
+
+                updateCarousel();
+                bindCarouselEvents();
+                startAutoplay();
+            }
+
+            function bindCarouselEvents() {
+                const slideButtons = document.querySelectorAll(".home-carousel-slide-button");
+                const dots = document.querySelectorAll(".home-carousel-dot");
+
+                slideButtons.forEach((button) => {
+                    button.addEventListener("click", function () {
+                        const index = Number(button.dataset.slideIndex);
+                        handleBannerAction(index);
+                    });
+                });
+
+                dots.forEach((dot) => {
+                    dot.addEventListener("click", function () {
+                        const index = Number(dot.dataset.dotIndex);
+                        goToSlide(index);
+                        restartAutoplay();
+                    });
+                });
+            }
+
+            async function loadHomeBanners() {
+                try {
+                    const response = await fetch("http://localhost:3000/notices", {
+                        method: "GET",
+                        headers: {
+                            "Content-Type": "application/json"
+                        }
+                    });
+
+                    const data = await response.json();
+
+                    if (!response.ok) {
+                        renderCarousel([]);
+                        return;
+                    }
+
+                    renderCarousel(data);
+                } catch (error) {
+                    console.error("Erro ao carregar banners da Home:", error);
+                    renderCarousel([]);
+                }
+            }
+
+            homeCarouselPrev.addEventListener("click", function () {
+                prevSlide();
+                restartAutoplay();
+            });
+
+            homeCarouselNext.addEventListener("click", function () {
+                nextSlide();
+                restartAutoplay();
+            });
+
+            homeCarousel.addEventListener("mouseenter", function () {
+                isMouseOverCarousel = true;
+                stopAutoplay();
+            });
+
+            homeCarousel.addEventListener("mouseleave", function () {
+                isMouseOverCarousel = false;
+                startAutoplay();
+            });
+
+            homeCarousel.addEventListener("touchstart", function (event) {
+                if (!event.touches || !event.touches.length) {
+                    return;
+                }
+
+                isTouchInteracting = true;
+                stopAutoplay();
+
+                touchStartX = event.touches[0].clientX;
+                touchStartY = event.touches[0].clientY;
+                touchEndX = touchStartX;
+                touchEndY = touchStartY;
+            }, { passive: true });
+
+            homeCarousel.addEventListener("touchmove", function (event) {
+                if (!event.touches || !event.touches.length) {
+                    return;
+                }
+
+                touchEndX = event.touches[0].clientX;
+                touchEndY = event.touches[0].clientY;
+            }, { passive: true });
+
+            homeCarousel.addEventListener("touchend", function () {
+                handleSwipeGesture();
+                isTouchInteracting = false;
+                startAutoplay();
+            });
+
+            bannerModalClose.addEventListener("click", closeBannerModal);
+
+            bannerModalOverlay.addEventListener("click", function (event) {
+                if (event.target === bannerModalOverlay) {
+                    closeBannerModal();
+                }
+            });
+
+            document.addEventListener("keydown", function (event) {
+                if (event.key === "Escape" && bannerModalOverlay.classList.contains("active")) {
+                    closeBannerModal();
+                }
+            });
+
+            loadHomeBanners();
+        });
+    </script>
+
+    <script src="../assets/js/site-animations.js"></script>
 </body>
 </html>

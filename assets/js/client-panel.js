@@ -353,18 +353,3 @@ document.addEventListener("DOMContentLoaded", function () {
 
   initClientPanel();
 });
-/* ===============================
-   INIT
-================================ */
-function initClientPanel() {
-  const accessAllowed = validateClientAccess();
-
-  if (!accessAllowed) {
-    return;
-  }
-
-  loadClientInfo();
-  loadDocuments();
-}
-
-initClientPanel();

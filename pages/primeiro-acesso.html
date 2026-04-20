@@ -104,16 +104,22 @@
 </head>
 <body>
 
-<header>
-    <h1>CASEG Protege</h1>
+<header class="site-header">
+    <div class="header-container">
+        <a href="home.html" class="logo-link">
+            <img
+                src="/site-caseg-protege/logo_transparente.png"
+                alt="Logo CASEG Protege"
+                class="site-logo"
+            />
+        </a>
 
-    <nav>
-        <a href="../index.html">Home</a>
-        <a href="servicos.html">Serviços</a>
-        <a href="avisos.html">Avisos</a>
-        <a href="contato.html">Contato</a>
-        <a href="login.html">Área do Cliente</a>
-    </nav>
+        <nav class="main-nav">
+            <a href="home.html">Home</a>
+            <a href="avisos.html">Sobre</a>
+            <a href="contato.html">Contato</a>
+        </nav>
+    </div>
 </header>
 
 <main>
@@ -127,6 +133,7 @@
 
         <form id="firstAccessForm">
             <label for="newPassword">Nova senha</label><br>
+
             <div class="password-wrapper">
                 <input
                     type="password"
@@ -150,6 +157,7 @@
             </ul>
 
             <label for="confirmPassword">Confirmar nova senha</label><br>
+
             <div class="password-wrapper">
                 <input
                     type="password"

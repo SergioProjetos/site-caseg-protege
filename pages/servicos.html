@@ -1,74 +1,159 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Serviços - CASEG Protege</title>
 
-    <link rel="stylesheet" href="../assets/css/style.css">
-
-    <script>
-        const token = localStorage.getItem("access_token");
-        const profile = JSON.parse(localStorage.getItem("profile"));
-
-        if (!token || !profile) {
-            alert("Você precisa fazer login.");
-            window.location.href = "login.html";
-        }
-
-        if (profile.role !== "client") {
-            alert("Acesso restrito.");
-            window.location.href = "login.html";
-        }
-
-        if (profile.must_change_password === true) {
-            window.location.href = "primeiro-acesso.html";
-        }
-    </script>
+    <link rel="stylesheet" href="../assets/css/style.css" />
+    <link
+        rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
+    />
 </head>
 <body>
 
-<header>
-    <h1>CASEG Protege</h1>
+    <header class="site-header">
+        <div class="header-container">
+            <a href="home.html" class="logo-link reveal-on-load delay-1">
+                <img
+                    src="/site-caseg-protege/logo_transparente.png"
+                    alt="Logo CASEG Protege"
+                    class="site-logo"
+                />
+            </a>
 
-    <nav>
-        <a href="../index.html">Home</a>
-        <a href="servicos.html">Serviços</a>
-        <a href="avisos.html">Avisos</a>
-        <a href="contato.html">Contato</a>
-        <a href="login.html">Área do Cliente</a>
-    </nav>
-</header>
+            <nav class="main-nav reveal-on-load delay-2">
+                <a href="servicos.html">Serviços</a>
+                <a href="avisos.html">Sobre</a>
+                <a href="contato.html">Contato</a>
+                <a href="login.html" class="nav-login">
+                    <i class="fa-regular fa-user"></i>
+                    Entrar
+                </a>
+            </nav>
+        </div>
+    </header>
 
-<main>
-    <h2>Painel do Cliente</h2>
-
-    <div class="client-info">
-        <h3 id="welcomeMessage"></h3>
-        <p id="companyName"></p>
-        <p>Bem-vindo ao painel do cliente da CASEG Protege.</p>
-    </div>
-
-    <div class="client-cards">
-        <section class="client-card">
-            <h3>Documentos</h3>
-
-            <div id="documentsList"></div>
+    <main>
+        <section class="home-hero reveal-on-load delay-2">
+            <div class="home-hero-content">
+                <span class="home-badge">Nossos Serviços</span>
+                <h2>Soluções completas em Segurança do Trabalho</h2>
+                <p>
+                    A CASEG Protege oferece serviços especializados para garantir
+                    segurança, conformidade legal, prevenção de riscos e organização
+                    documental para sua empresa.
+                </p>
+            </div>
         </section>
-    </div>
 
-    <button id="logoutBtn">Sair da conta</button>
-</main>
+        <section class="home-about reveal-on-load delay-3">
+            <div class="section-title">
+                <h2>Serviços Oferecidos</h2>
+                <p>
+                    Conheça as soluções que a CASEG Protege disponibiliza para apoiar
+                    sua empresa com segurança, técnica e responsabilidade.
+                </p>
+            </div>
 
-<footer>
-    <p>© CASEG Protege</p>
-    <p>
-        <a href="termos-de-uso.html">Termos de Uso</a> —
-        <a href="politica-privacidade.html">Política de Privacidade</a>
-    </p>
-</footer>
+            <div class="home-about-cards">
+                <div class="about-card reveal-on-load delay-3">
+                    <h3>Assessoria Mensal</h3>
+                    <p>
+                        Acompanhamento contínuo das demandas de segurança do trabalho,
+                        com suporte técnico e organização preventiva.
+                    </p>
+                </div>
 
-<script src="../assets/js/client-panel.js"></script>
+                <div class="about-card reveal-on-load delay-4">
+                    <h3>Visita Técnica</h3>
+                    <p>
+                        Avaliação presencial do ambiente de trabalho para identificar
+                        riscos, necessidades e melhorias.
+                    </p>
+                </div>
+
+                <div class="about-card reveal-on-load delay-5">
+                    <h3>Pericial Técnica</h3>
+                    <p>
+                        Elaboração de pareceres e análises técnicas com base em critérios
+                        profissionais e exigências legais.
+                    </p>
+                </div>
+
+                <div class="about-card reveal-on-load delay-3">
+                    <h3>Auditorias</h3>
+                    <p>
+                        Verificação dos processos, documentos e práticas adotadas pela
+                        empresa para reforçar conformidade e prevenção.
+                    </p>
+                </div>
+
+                <div class="about-card reveal-on-load delay-4">
+                    <h3>Elaboração de CIPA / CIPATR e SIPAT</h3>
+                    <p>
+                        Estruturação, organização e suporte na implementação dessas ações
+                        e comissões internas de prevenção.
+                    </p>
+                </div>
+
+                <div class="about-card reveal-on-load delay-5">
+                    <h3>Avaliação Ambiental</h3>
+                    <p>
+                        Análise de agentes químicos, físicos e biológicos presentes no
+                        ambiente de trabalho.
+                    </p>
+                </div>
+
+                <div class="about-card reveal-on-load delay-3">
+                    <h3>Treinamentos NR's</h3>
+                    <p>
+                        Capacitações conforme as Normas Regulamentadoras, com foco em
+                        segurança, prevenção e cumprimento legal.
+                    </p>
+                </div>
+
+                <div class="about-card reveal-on-load delay-4">
+                    <h3>Lançamentos eSocial</h3>
+                    <p>
+                        Envio e acompanhamento dos eventos S-2210, S-2220, S-2221 e
+                        S-2240 com responsabilidade técnica.
+                    </p>
+                </div>
+
+                <div class="about-card reveal-on-load delay-5">
+                    <h3>Palestras Motivacionais</h3>
+                    <p>
+                        Conteúdos voltados ao engajamento das equipes, valorizando
+                        comportamento seguro, cultura preventiva e motivação.
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <section class="home-cta reveal-on-load delay-4">
+            <h2>Quer saber mais sobre nossos serviços?</h2>
+            <p>
+                Entre em contato com nossa equipe e descubra a melhor solução para a sua empresa.
+            </p>
+
+            <div class="home-cta-actions">
+                <a href="contato.html" class="btn-primary">Solicitar Atendimento</a>
+                <a href="login.html" class="btn-secondary">Área do Cliente</a>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <p>© CASEG Protege</p>
+        <p>
+            <a href="termos-de-uso.html">Termos de Uso</a> —
+            <a href="politica-privacidade.html">Política de Privacidade</a>
+        </p>
+    </footer>
+
+    <script src="../assets/js/site-animations.js"></script>
 
 </body>
 </html>

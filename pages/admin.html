@@ -4,17 +4,38 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Painel Administrativo - CASEG Protege</title>
+
+  <link rel="stylesheet" href="../assets/css/style.css" />
   <link rel="stylesheet" href="../assets/css/admin.css" />
 
-  <!-- Font Awesome -->
   <link
     rel="stylesheet"
     href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
   />
 </head>
 <body>
+
+  <header class="site-header">
+    <div class="header-container">
+      <a href="home.html" class="logo-link reveal-on-load delay-1">
+        <img
+          src="/site-caseg-protege/logo_transparente.png"
+          alt="Logo CASEG Protege"
+          class="site-logo"
+        />
+      </a>
+
+      <nav class="main-nav reveal-on-load delay-2">
+        <a href="home.html">Home</a>
+        <a href="servicos.html">Serviços</a>
+        <a href="avisos.html">Sobre</a>
+        <a href="contato.html">Contato</a>
+      </nav>
+    </div>
+  </header>
+
   <div class="admin-container">
-    <header class="admin-header">
+    <header class="admin-header reveal-on-load delay-3">
       <div>
         <h1>Painel Administrativo</h1>
         <p id="adminWelcome">Carregando...</p>
@@ -26,7 +47,7 @@
     <div id="adminFeedback" class="admin-feedback hidden"></div>
 
     <main class="admin-main">
-      <section class="admin-section">
+      <section class="admin-section reveal-on-load delay-3">
         <div class="section-header">
           <div>
             <h2>Cadastrar Cliente</h2>
@@ -204,12 +225,12 @@
         </div>
       </section>
 
-      <section class="admin-section">
+      <section class="admin-section reveal-on-load delay-4">
         <div class="section-header">
           <div>
             <h2>Gerenciar Clientes</h2>
             <p class="section-description">
-              Visualize os clientes cadastrados no sistema e acesse as ações de cada cliente.
+              Visualize os clientes cadastrados, filtre rapidamente e altere o status de cada cliente.
             </p>
           </div>
 
@@ -219,12 +240,23 @@
         </div>
 
         <div id="clientsSectionWrapper" class="hidden">
+          <div class="admin-form" style="margin-bottom: 20px;">
+            <div class="form-group form-group-full">
+              <label for="clientsSearchInput">Buscar cliente</label>
+              <input
+                type="text"
+                id="clientsSearchInput"
+                placeholder="Digite nome do responsável, empresa ou CPF/CNPJ"
+              />
+            </div>
+          </div>
+
           <div id="clientsListMessage" class="list-message">Carregando clientes...</div>
           <div id="clientsList" class="clients-list"></div>
         </div>
       </section>
 
-      <section class="admin-section">
+      <section class="admin-section reveal-on-load delay-5">
         <div class="section-header">
           <div>
             <h2>Banners da Home</h2>
@@ -253,13 +285,42 @@
               </div>
 
               <div class="form-group">
-                <label for="bannerLink">Link</label>
+                <label for="bannerActionType">Tipo de ação</label>
+                <select id="bannerActionType" name="bannerActionType" required>
+                  <option value="link">Redirecionar</option>
+                  <option value="modal">Abrir Informativo (Popout)</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label for="bannerLinkTarget">Destino</label>
+                <select id="bannerLinkTarget" name="bannerLinkTarget">
+                  <option value="">Selecione o destino</option>
+                  <option value="contato">Página de Contato</option>
+                  <option value="servicos">Página de Serviços</option>
+                  <option value="whatsapp">WhatsApp</option>
+                  <option value="custom">Link Personalizado</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label for="bannerLink">Link personalizado</label>
                 <input
                   type="url"
                   id="bannerLink"
                   name="bannerLink"
                   placeholder="https://..."
                 />
+              </div>
+
+              <div class="form-group form-group-full">
+                <label for="bannerDescription">Descrição detalhada</label>
+                <textarea
+                  id="bannerDescription"
+                  name="bannerDescription"
+                  placeholder="Descrição detalhada para exibir no popout..."
+                  rows="5"
+                ></textarea>
               </div>
 
               <div class="form-group form-group-full">
@@ -296,5 +357,6 @@
   </div>
 
   <script src="../assets/js/admin.js"></script>
+  <script src="../assets/js/site-animations.js"></script>
 </body>
 </html>

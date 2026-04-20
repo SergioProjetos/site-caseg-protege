@@ -193,6 +193,14 @@ function isStrongPassword(password) {
   return validation.minLength && validation.hasUppercase && validation.hasNumber;
 }
 
+function isValidBannerActionType(value) {
+  return ["modal", "link"].includes(String(value || "").trim());
+}
+
+function isValidBannerLinkTarget(value) {
+  return ["contato", "servicos", "whatsapp", "custom"].includes(String(value || "").trim());
+}
+
 async function findDuplicateDocument({ clientId, category, subcategory, year, fileName }) {
   let query = adminSupabase
     .from("documents")
@@ -243,13 +251,19 @@ app.post("/login", async (req, res) => {
 
     const { data: profile, error: profileError } = await adminSupabase
       .from("profiles")
-      .select("user_id, email, role, full_name, company_name, must_change_password")
+      .select("user_id, email, role, full_name, company_name, must_change_password, is_active")
       .eq("cpf_cnpj", cpf_cnpj)
       .single();
 
     if (profileError || !profile) {
       return res.status(400).json({
         error: "CPF/CNPJ não encontrado"
+      });
+    }
+
+    if (profile.role === "client" && profile.is_active === false) {
+      return res.status(403).json({
+        error: "Este cliente está inativo. Entre em contato com a administração."
       });
     }
 
@@ -274,7 +288,8 @@ app.post("/login", async (req, res) => {
         full_name: profile.full_name,
         company_name: profile.company_name,
         email: profile.email,
-        must_change_password: profile.must_change_password
+        must_change_password: profile.must_change_password,
+        is_active: profile.is_active
       },
       session: authData.session
     });
@@ -447,6 +462,7 @@ app.post("/clients", async (req, res) => {
         email: normalizedEmail,
         role: "client",
         must_change_password: true,
+        is_active: true,
         address_zip: normalizedZip,
         address_street: address_street || null,
         address_number: address_number || null,
@@ -474,7 +490,8 @@ app.post("/clients", async (req, res) => {
         company_name,
         cpf_cnpj: normalizedCpfCnpj,
         email: normalizedEmail,
-        role: "client"
+        role: "client",
+        is_active: true
       },
       temporary_password: temporaryPassword
     });
@@ -502,6 +519,7 @@ app.get("/clients", async (req, res) => {
         phone,
         whatsapp,
         role,
+        is_active,
         created_at
       `)
       .eq("role", "client")
@@ -516,6 +534,78 @@ app.get("/clients", async (req, res) => {
     return res.status(200).json(data || []);
   } catch (error) {
     console.error("ERRO EM GET /clients:", error);
+    res.status(500).json({ error: "Erro interno do servidor" });
+  }
+});
+
+app.put("/admin/clients/:clientId/status", async (req, res) => {
+  try {
+    const adminAccess = await validateAdminAccess(req, res);
+    if (!adminAccess) {
+      return;
+    }
+
+    const { clientId } = req.params;
+    const { is_active } = req.body;
+
+    if (!clientId) {
+      return res.status(400).json({
+        error: "clientId é obrigatório."
+      });
+    }
+
+    if (typeof is_active !== "boolean") {
+      return res.status(400).json({
+        error: "is_active deve ser boolean."
+      });
+    }
+
+    const { data: currentClient, error: currentClientError } = await adminSupabase
+      .from("profiles")
+      .select("user_id, full_name, role, is_active")
+      .eq("user_id", clientId)
+      .eq("role", "client")
+      .single();
+
+    if (currentClientError || !currentClient) {
+      return res.status(404).json({
+        error: "Cliente não encontrado."
+      });
+    }
+
+    const { data: updatedClient, error: updateError } = await adminSupabase
+      .from("profiles")
+      .update({
+        is_active
+      })
+      .eq("user_id", clientId)
+      .eq("role", "client")
+      .select(`
+        user_id,
+        full_name,
+        company_name,
+        cpf_cnpj,
+        email,
+        phone,
+        whatsapp,
+        role,
+        is_active,
+        created_at
+      `)
+      .single();
+
+    if (updateError || !updatedClient) {
+      return res.status(500).json({
+        error: updateError?.message || "Erro ao atualizar status do cliente."
+      });
+    }
+
+    return res.status(200).json({
+      message: "Status do cliente atualizado com sucesso.",
+      client: updatedClient
+    });
+  } catch (error) {
+    console.error("ERRO EM PUT /admin/clients/:clientId/status:", error);
     res.status(500).json({ error: "Erro interno do servidor" });
   }
 });
@@ -1099,7 +1189,7 @@ app.get("/admin/notices", async (req, res) => {
 
     const { data, error } = await adminSupabase
       .from("notices")
-      .select("id, title, image_url, link, is_active, created_at")
+      .select("id, title, image_url, link, description, action_type, link_target, is_active, created_at")
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -1142,6 +1232,9 @@ app.post("/admin/notices/upload", (req, res, next) => {
 
     const title = normalizeText(req.body.title);
     const link = normalizeOptionalText(req.body.link);
+    const description = normalizeOptionalText(req.body.description);
+    const actionType = normalizeText(req.body.action_type);
+    const linkTarget = normalizeOptionalText(req.body.link_target);
     const isActive = String(req.body.is_active).toLowerCase() === "true";
     const image = req.file;
 
@@ -1149,6 +1242,34 @@ app.post("/admin/notices/upload", (req, res, next) => {
       return res.status(400).json({
         error: "Campos obrigatórios: title e image."
       });
+    }
+
+    if (!actionType || !isValidBannerActionType(actionType)) {
+      return res.status(400).json({
+        error: "action_type inválido. Use 'modal' ou 'link'."
+      });
+    }
+
+    if (actionType === "modal") {
+      if (!description) {
+        return res.status(400).json({
+          error: "Para banners do tipo modal, a descrição é obrigatória."
+        });
+      }
+    }
+
+    if (actionType === "link") {
+      if (!linkTarget || !isValidBannerLinkTarget(linkTarget)) {
+        return res.status(400).json({
+          error: "link_target inválido. Use 'contato', 'servicos', 'whatsapp' ou 'custom'."
+        });
+      }
+
+      if (linkTarget === "custom" && !link) {
+        return res.status(400).json({
+          error: "Para link personalizado, o campo link é obrigatório."
+        });
+      }
     }
 
     if (!image.mimetype.startsWith("image/")) {
@@ -1162,7 +1283,7 @@ app.post("/admin/notices/upload", (req, res, next) => {
     const storagePath = `home-banners/${timestamp}_${sanitizedFileName}`;
 
     const { error: uploadError } = await adminSupabase.storage
-      .from("notices")
+      .from("banners")
       .upload(storagePath, image.buffer, {
         contentType: image.mimetype,
         upsert: false
@@ -1175,13 +1296,13 @@ app.post("/admin/notices/upload", (req, res, next) => {
     }
 
     const { data: publicUrlData } = adminSupabase.storage
-      .from("notices")
+      .from("banners")
       .getPublicUrl(storagePath);
 
     const imageUrl = publicUrlData?.publicUrl || null;
 
     if (!imageUrl) {
-      await adminSupabase.storage.from("notices").remove([storagePath]);
+      await adminSupabase.storage.from("banners").remove([storagePath]);
 
       return res.status(500).json({
         error: "Não foi possível gerar a URL pública da imagem do banner."
@@ -1193,14 +1314,17 @@ app.post("/admin/notices/upload", (req, res, next) => {
       .insert({
         title,
         image_url: imageUrl,
-        link,
+        link: actionType === "link" ? link : null,
+        description: actionType === "modal" ? description : null,
+        action_type: actionType,
+        link_target: actionType === "link" ? linkTarget : null,
         is_active: isActive
       })
-      .select("id, title, image_url, link, is_active, created_at")
+      .select("id, title, image_url, link, description, action_type, link_target, is_active, created_at")
       .single();
 
     if (insertError) {
-      await adminSupabase.storage.from("notices").remove([storagePath]);
+      await adminSupabase.storage.from("banners").remove([storagePath]);
 
       return res.status(500).json({
         error: insertError.message || "Erro ao salvar banner no banco."
@@ -1257,7 +1381,7 @@ app.put("/admin/notices/:noticeId/toggle", async (req, res) => {
         is_active: isActive
       })
       .eq("id", noticeId)
-      .select("id, title, image_url, link, is_active, created_at")
+      .select("id, title, image_url, link, description, action_type, link_target, is_active, created_at")
       .single();
 
     if (updateError || !updatedNotice) {
@@ -1304,13 +1428,13 @@ app.delete("/admin/notices/:noticeId", async (req, res) => {
     }
 
     if (currentNotice.image_url) {
-      const marker = "/storage/v1/object/public/notices/";
+      const marker = "/storage/v1/object/public/banners/";
       const splitPath = currentNotice.image_url.split(marker);
       const filePath = splitPath.length > 1 ? splitPath[1] : null;
 
       if (filePath) {
         const { error: removeImageError } = await adminSupabase.storage
-          .from("notices")
+          .from("banners")
           .remove([filePath]);
 
         if (removeImageError) {
@@ -1343,7 +1467,7 @@ app.get("/notices", async (req, res) => {
   try {
     const { data, error } = await adminSupabase
       .from("notices")
-      .select("id, title, image_url, link, is_active, created_at")
+      .select("id, title, image_url, link, description, action_type, link_target, is_active, created_at")
       .eq("is_active", true)
       .order("created_at", { ascending: false });
 
@@ -1369,6 +1493,7 @@ console.log("POST /login");
 console.log("PUT /update-password");
 console.log("POST /clients");
 console.log("GET /clients");
+console.log("PUT /admin/clients/:clientId/status");
 console.log("DELETE /admin/clients/:clientId");
 console.log("GET /clients/:clientId/documents");
 console.log("POST /admin/documents/upload");
