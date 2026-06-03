@@ -13,349 +13,1267 @@
     href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
   />
 </head>
-<body>
 
-  <header class="site-header">
-    <div class="header-container">
-      <a href="home.html" class="logo-link reveal-on-load delay-1">
-        <img
-          src="/site-caseg-protege/logo_transparente.png"
-          alt="Logo CASEG Protege"
-          class="site-logo"
-        />
-      </a>
+<body class="admin-panel-page">
+  <div class="admin-app-shell">
+    <aside class="admin-sidebar">
+      <div class="admin-sidebar-inner">
+        <a href="#dashboard" class="admin-sidebar-brand" aria-label="CASEG Protege - Painel Administrativo">
+          <img
+            src="../assets/img/logo_footer.png"
+            alt="Logo CASEG Protege"
+            class="admin-sidebar-logo"
+          />
+        </a>
 
-      <nav class="main-nav reveal-on-load delay-2">
-        <a href="home.html">Home</a>
-        <a href="servicos.html">Serviços</a>
-        <a href="avisos.html">Sobre</a>
-        <a href="contato.html">Contato</a>
-      </nav>
-    </div>
-  </header>
+        <nav class="admin-sidebar-nav" aria-label="Menu administrativo">
+          <div class="admin-sidebar-group">
+            <a href="#dashboard" class="admin-sidebar-link active">
+              <span class="admin-sidebar-link-icon">
+                <i class="fa-solid fa-database" aria-hidden="true"></i>
+              </span>
+              <span>Dashboard</span>
+            </a>
 
-  <div class="admin-container">
-    <header class="admin-header reveal-on-load delay-3">
-      <div>
-        <h1>Painel Administrativo</h1>
-        <p id="adminWelcome">Carregando...</p>
+            <a href="../pages/home.html" class="admin-sidebar-link">
+              <span class="admin-sidebar-link-icon">
+                <i class="fa-solid fa-house" aria-hidden="true"></i>
+              </span>
+              <span>Home</span>
+            </a>
+
+            <a href="#clientes" class="admin-sidebar-link">
+              <span class="admin-sidebar-link-icon">
+                <i class="fa-solid fa-users" aria-hidden="true"></i>
+              </span>
+              <span>Clientes</span>
+            </a>
+
+            <a href="#banners" class="admin-sidebar-link">
+              <span class="admin-sidebar-link-icon">
+                <i class="fa-regular fa-image" aria-hidden="true"></i>
+              </span>
+              <span>Banners</span>
+            </a>
+          </div>
+
+          <div class="admin-sidebar-divider"></div>
+
+          <div class="admin-sidebar-group admin-sidebar-group-bottom">
+            <a href="#sair" class="admin-sidebar-link admin-sidebar-link-logout">
+              <span class="admin-sidebar-link-icon">
+                <i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i>
+              </span>
+              <span>Sair</span>
+            </a>
+          </div>
+        </nav>
+
+        <div class="admin-sidebar-visual" aria-hidden="true"></div>
       </div>
+    </aside>
 
-      <button id="logoutBtn">Sair</button>
-    </header>
+    <div class="admin-workspace">
+      <main class="admin-container">
+        <section class="admin-dashboard-hero reveal-on-load delay-1">
+          <header id="dashboard" class="admin-page-heading">
+            <h1>Painel Administrativo</h1>
+            <p id="adminWelcome">Carregando...</p>
+          </header>
 
-    <div id="adminFeedback" class="admin-feedback hidden"></div>
+          <div id="dashboardContent" class="admin-dashboard-content">
+            <section class="admin-dashboard-cards" aria-label="Cards principais do dashboard">
+              <article class="admin-stat-card">
+                <div class="admin-stat-icon">
+                  <i class="fa-solid fa-users" aria-hidden="true"></i>
+                </div>
 
-    <main class="admin-main">
-      <section class="admin-section reveal-on-load delay-3">
-        <div class="section-header">
-          <div>
-            <h2>Cadastrar Cliente</h2>
-            <p class="section-description">
-              Crie o acesso inicial do cliente. Depois, ele poderá definir a própria senha.
-            </p>
+                <div class="admin-stat-content">
+                  <span>Clientes Cadastrados</span>
+                  <strong id="dashboardTotalClients">0</strong>
+                  <small>Total de clientes</small>
+                </div>
+              </article>
+
+              <article class="admin-stat-card">
+                <div class="admin-stat-icon">
+                  <i class="fa-solid fa-user-check" aria-hidden="true"></i>
+                </div>
+
+                <div class="admin-stat-content">
+                  <span>Clientes Ativos</span>
+                  <strong id="dashboardActiveClients">0</strong>
+                  <small>Clientes com acesso ativo</small>
+                </div>
+              </article>
+
+              <article class="admin-stat-card">
+                <div class="admin-stat-icon">
+                  <i class="fa-solid fa-user-xmark" aria-hidden="true"></i>
+                </div>
+
+                <div class="admin-stat-content">
+                  <span>Clientes Inativos</span>
+                  <strong id="dashboardInactiveClients">0</strong>
+                  <small>Clientes sem acesso</small>
+                </div>
+              </article>
+
+              <article class="admin-stat-card">
+                <div class="admin-stat-icon">
+                  <i class="fa-regular fa-image" aria-hidden="true"></i>
+                </div>
+
+                <div class="admin-stat-content">
+                  <span>Banners Ativos</span>
+                  <strong id="dashboardActiveBanners">0</strong>
+                  <small>Banners publicados</small>
+                </div>
+              </article>
+            </section>
+
+            <section class="dashboard-block dashboard-summary-block" aria-label="Resumo geral">
+              <div class="dashboard-block-header">
+                <div>
+                  <span class="section-kicker">Resumo</span>
+                  <h2>Resumo Geral</h2>
+                </div>
+
+                <p>
+                  Visão rápida dos principais números da área administrativa.
+                </p>
+              </div>
+
+              <div class="dashboard-summary-grid">
+                <article class="dashboard-summary-card">
+                  <span>Total de documentos</span>
+                  <strong id="dashboardTotalDocuments">0</strong>
+                  <small>Documentos cadastrados no sistema</small>
+                </article>
+
+                <article class="dashboard-summary-card">
+                  <span>Documentos este mês</span>
+                  <strong id="dashboardDocumentsThisMonth">0</strong>
+                  <small>Novos documentos enviados</small>
+                </article>
+
+                <article class="dashboard-summary-card">
+                  <span>Clientes este mês</span>
+                  <strong id="dashboardClientsThisMonth">0</strong>
+                  <small>Novos clientes cadastrados</small>
+                </article>
+
+                <article class="dashboard-summary-card">
+                  <span>Banners inativos</span>
+                  <strong id="dashboardInactiveBanners">0</strong>
+                  <small>Banners fora de exibição</small>
+                </article>
+              </div>
+            </section>
+
+            <section class="dashboard-block dashboard-quick-actions-block" aria-label="Ações rápidas">
+              <div class="dashboard-block-header">
+                <div>
+                  <span class="section-kicker">Atalhos</span>
+                  <h2>Ações Rápidas</h2>
+                </div>
+
+                <p>
+                  Acesse rapidamente as principais funções do painel.
+                </p>
+              </div>
+
+              <div class="dashboard-quick-actions-grid">
+                <button type="button" id="dashboardQuickNewClientBtn" class="dashboard-quick-action-btn">
+                  <span class="dashboard-quick-action-icon">
+                    <i class="fa-solid fa-user-plus" aria-hidden="true"></i>
+                  </span>
+
+                  <span class="dashboard-quick-action-content">
+                    <strong>Novo Cliente</strong>
+                    <small>Cadastrar novo acesso</small>
+                  </span>
+                </button>
+
+                <button type="button" id="dashboardQuickClientsBtn" class="dashboard-quick-action-btn">
+                  <span class="dashboard-quick-action-icon">
+                    <i class="fa-solid fa-users-gear" aria-hidden="true"></i>
+                  </span>
+
+                  <span class="dashboard-quick-action-content">
+                    <strong>Gerenciar Clientes</strong>
+                    <small>Visualizar lista completa</small>
+                  </span>
+                </button>
+
+                <button type="button" id="dashboardQuickCreateBannerBtn" class="dashboard-quick-action-btn">
+                  <span class="dashboard-quick-action-icon">
+                    <i class="fa-regular fa-square-plus" aria-hidden="true"></i>
+                  </span>
+
+                  <span class="dashboard-quick-action-content">
+                    <strong>Criar Banner</strong>
+                    <small>Adicionar novo banner</small>
+                  </span>
+                </button>
+
+                <button type="button" id="dashboardQuickBannersBtn" class="dashboard-quick-action-btn">
+                  <span class="dashboard-quick-action-icon">
+                    <i class="fa-regular fa-images" aria-hidden="true"></i>
+                  </span>
+
+                  <span class="dashboard-quick-action-content">
+                    <strong>Ver Banners</strong>
+                    <small>Gerenciar banners da Home</small>
+                  </span>
+                </button>
+              </div>
+            </section>
+
+            <section class="dashboard-block dashboard-renewal-block" aria-label="Avisos de renovação">
+              <div class="dashboard-block-header">
+                <div>
+                  <span class="section-kicker">Renovação</span>
+                  <h2>Avisos de Renovação</h2>
+                </div>
+
+                <p>
+                  Documentos vencidos ou próximos do vencimento.
+                </p>
+              </div>
+
+              <div class="dashboard-renewal-filters" aria-label="Filtro dos avisos de renovação">
+                <div class="dashboard-renewal-filter-group">
+                  <label for="dashboardRenewalStatusFilter">Prazo</label>
+
+                  <select id="dashboardRenewalStatusFilter">
+                    <option value="all">Todos</option>
+                    <option value="expired">Vencidos</option>
+                    <option value="due_today">Vence hoje</option>
+                    <option value="due_soon">Próximos</option>
+                  </select>
+                </div>
+
+                <div class="dashboard-renewal-filter-action">
+                  <button type="button" id="dashboardRenewalClearFiltersBtn">
+                    Limpar filtro
+                  </button>
+                </div>
+              </div>
+
+              <div class="dashboard-table-wrapper dashboard-renewal-scroll-area">
+                <table class="dashboard-renewal-table">
+                  <thead>
+                    <tr>
+                      <th>Empresa</th>
+                      <th>Documento</th>
+                      <th>Prazo</th>
+                      <th>Observação</th>
+                    </tr>
+                  </thead>
+
+                  <tbody id="dashboardRenewalAlertsBody">
+                    <tr class="dashboard-empty-row">
+                      <td colspan="4">
+                        Nenhum aviso de renovação carregado.
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <section class="dashboard-block dashboard-activities-block" aria-label="Atividades recentes">
+              <div class="dashboard-block-header">
+                <div>
+                  <span class="section-kicker">Histórico</span>
+                  <h2>Atividades Recentes</h2>
+                </div>
+
+                <p>
+                  Últimas movimentações registradas no painel.
+                </p>
+              </div>
+
+              <div id="dashboardRecentActivitiesList" class="dashboard-activities-list dashboard-activities-scroll-area">
+                <article class="dashboard-activity-item dashboard-empty-activity">
+                  <div class="dashboard-activity-marker" aria-hidden="true"></div>
+
+                  <div class="dashboard-activity-content">
+                    <strong>Nenhuma atividade carregada</strong>
+                    <p>
+                      As movimentações recentes aparecerão aqui.
+                    </p>
+                  </div>
+                </article>
+              </div>
+            </section>
           </div>
+        </section>
 
-          <button type="button" id="toggleCreateClientBtn" class="section-action-btn">
-            Novo Cliente
-          </button>
-        </div>
+        <div id="adminFeedback" class="admin-feedback hidden"></div>
 
-        <div id="createClientWrapper" class="hidden">
-          <form id="createClientForm" class="admin-form">
-            <div class="form-grid">
-              <div class="form-group">
-                <label for="fullName">Nome do cliente</label>
-                <input
-                  type="text"
-                  id="fullName"
-                  name="fullName"
-                  placeholder="Digite o nome do cliente"
-                  required
-                />
+        <section class="admin-content-grid">
+          <section class="admin-section reveal-on-load delay-4">
+            <div class="section-header">
+              <div class="section-header-content">
+                <div class="section-icon">
+                  <i class="fa-solid fa-users" aria-hidden="true"></i>
+                </div>
+
+                <div>
+                  <span class="section-kicker">Gestão</span>
+                  <h2>Gerenciar Clientes</h2>
+                  <p class="section-description">
+                    Visualize os clientes cadastrados, filtre rapidamente e altere o status de cada cliente.
+                  </p>
+                </div>
               </div>
 
-              <div class="form-group">
-                <label for="companyName">Nome da empresa</label>
-                <input
-                  type="text"
-                  id="companyName"
-                  name="companyName"
-                  placeholder="Digite o nome da empresa"
-                  required
-                />
-              </div>
+              <div class="section-header-actions">
+                <button type="button" id="toggleClientsListBtn" class="section-action-btn">
+                  Exibir Clientes
+                </button>
 
-              <div class="form-group">
-                <label for="cpfCnpj">CPF ou CNPJ</label>
-                <input
-                  type="text"
-                  id="cpfCnpj"
-                  name="cpfCnpj"
-                  placeholder="Digite o CPF ou CNPJ"
-                  required
-                />
-              </div>
-
-              <div class="form-group">
-                <label for="email">E-mail</label>
-                <input
-                  type="email"
-                  id="email"
-                  name="email"
-                  placeholder="Digite o e-mail do cliente"
-                  required
-                />
-              </div>
-
-              <div class="form-group">
-                <label for="addressZip">CEP</label>
-                <input
-                  type="text"
-                  id="addressZip"
-                  name="addressZip"
-                  placeholder="Digite o CEP"
-                />
-              </div>
-
-              <div class="form-group">
-                <label for="addressStreet">Rua / Logradouro</label>
-                <input
-                  type="text"
-                  id="addressStreet"
-                  name="addressStreet"
-                  placeholder="Digite a rua"
-                />
-              </div>
-
-              <div class="form-group">
-                <label for="addressNumber">Número</label>
-                <input
-                  type="text"
-                  id="addressNumber"
-                  name="addressNumber"
-                  placeholder="Digite o número"
-                />
-              </div>
-
-              <div class="form-group">
-                <label for="addressComplement">Complemento</label>
-                <input
-                  type="text"
-                  id="addressComplement"
-                  name="addressComplement"
-                  placeholder="Digite o complemento"
-                />
-              </div>
-
-              <div class="form-group">
-                <label for="addressNeighborhood">Bairro</label>
-                <input
-                  type="text"
-                  id="addressNeighborhood"
-                  name="addressNeighborhood"
-                  placeholder="Digite o bairro"
-                />
-              </div>
-
-              <div class="form-group">
-                <label for="addressCity">Cidade</label>
-                <input
-                  type="text"
-                  id="addressCity"
-                  name="addressCity"
-                  placeholder="Digite a cidade"
-                />
-              </div>
-
-              <div class="form-group">
-                <label for="addressState">Estado</label>
-                <input
-                  type="text"
-                  id="addressState"
-                  name="addressState"
-                  placeholder="Digite o estado"
-                />
-              </div>
-
-              <div class="form-group">
-                <label for="phone">Telefone</label>
-                <input
-                  type="text"
-                  id="phone"
-                  name="phone"
-                  placeholder="Digite o telefone"
-                />
-              </div>
-
-              <div class="form-group">
-                <label for="whatsapp">WhatsApp</label>
-                <input
-                  type="text"
-                  id="whatsapp"
-                  name="whatsapp"
-                  placeholder="Digite o WhatsApp"
-                />
+                <i class="fa-solid fa-chevron-right section-arrow" aria-hidden="true"></i>
               </div>
             </div>
 
-            <div class="form-actions">
-              <button type="submit" id="createClientBtn">Cadastrar Cliente</button>
+            <div id="clientsSectionWrapper" class="hidden">
+              <div class="clients-toolbar-card">
+                <div class="clients-toolbar-grid">
+                  <div class="clients-toolbar-search">
+                    <label for="clientsSearchInput">Buscar</label>
+
+                    <div class="clients-search-field">
+                      <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+
+                      <input
+                        type="text"
+                        id="clientsSearchInput"
+                        placeholder="Buscar cliente, empresa ou e-mail..."
+                      />
+                    </div>
+                  </div>
+
+                  <div class="clients-toolbar-select">
+                    <label for="clientsStatusFilter">Status</label>
+
+                    <select id="clientsStatusFilter">
+                      <option value="all">Todos</option>
+                      <option value="active">Ativos</option>
+                      <option value="inactive">Inativos</option>
+                    </select>
+                  </div>
+
+                  <div class="clients-toolbar-select">
+                    <label for="clientsTypeFilter">Tipo</label>
+
+                    <select id="clientsTypeFilter">
+                      <option value="all">Todos</option>
+                      <option value="pf">Pessoa Física</option>
+                      <option value="pj">Pessoa Jurídica</option>
+                    </select>
+                  </div>
+
+                  <div class="clients-toolbar-action">
+                    <button type="button" id="clientsQuickCreateBtn" class="clients-quick-create-btn">
+                      <i class="fa-solid fa-plus" aria-hidden="true"></i>
+                      <span>Novo Cliente</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div id="clientsListMessage" class="list-message">
+                Carregando clientes...
+              </div>
+
+              <div id="clientsList" class="clients-list clients-list-modern clients-list-scroll-area"></div>
             </div>
+          </section>
 
-            <p id="createClientMessage" class="form-message"></p>
+          <section class="admin-section reveal-on-load delay-5">
+            <div class="section-header">
+              <div class="section-header-content">
+                <div class="section-icon">
+                  <i class="fa-regular fa-images" aria-hidden="true"></i>
+                </div>
 
-            <div id="temporaryPasswordBox" class="temporary-password-box hidden">
-              <h3>Acesso inicial do cliente</h3>
-              <p class="temporary-password-info">
-                Guarde esta senha temporária. Ela será usada para o primeiro acesso do cliente.
-              </p>
+                <div>
+                  <span class="section-kicker">Home</span>
+                  <h2 id="homeBannerSectionTitle">Banners da Home</h2>
+                  <p class="section-description">
+                    Cadastre, edite, ordene e gerencie os banners globais que serão exibidos futuramente na Home.
+                  </p>
+                </div>
+              </div>
 
-              <div class="temporary-password-row">
-                <input
-                  type="text"
-                  id="temporaryPasswordField"
-                  readonly
-                  value=""
-                />
-                <button type="button" id="copyTemporaryPasswordBtn">Copiar senha</button>
+              <div class="section-header-actions">
+                <button type="button" id="toggleHomeBannersBtn" class="section-action-btn">
+                  Exibir Banners
+                </button>
+
+                <i class="fa-solid fa-chevron-right section-arrow" aria-hidden="true"></i>
               </div>
             </div>
-          </form>
+
+            <div id="homeBannersWrapper" class="hidden">
+              <div class="banner-create-toolbar">
+                <div>
+                  <h3>Gerenciamento de banners</h3>
+                  <p>
+                    Clique em Criar Banner para abrir o formulário de cadastro.
+                  </p>
+                </div>
+
+                <button type="button" id="toggleBannerFormBtn" class="section-action-btn">
+                  Criar Banner
+                </button>
+              </div>
+
+              <form id="homeBannerForm" class="admin-form hidden">
+                <input type="hidden" id="bannerEditId" value="" />
+
+                <div id="bannerEditModeBox" class="banner-edit-mode-box hidden">
+                  <div>
+                    <strong>Modo edição ativado</strong>
+                    <p>
+                      Você está editando um banner existente. Altere os dados desejados e salve.
+                    </p>
+                  </div>
+
+                  <button type="button" id="cancelBannerEditBtn">
+                    Cancelar edição
+                  </button>
+                </div>
+
+                <div class="form-grid">
+                  <div class="form-group">
+                    <label for="bannerTitle">Título</label>
+                    <input
+                      type="text"
+                      id="bannerTitle"
+                      name="bannerTitle"
+                      placeholder="Digite o título do banner"
+                      required
+                    />
+                  </div>
+
+                  <div class="form-group">
+                    <label for="bannerActionType">Tipo de ação</label>
+                    <select id="bannerActionType" name="bannerActionType" required>
+                      <option value="link">Redirecionar</option>
+                      <option value="modal">Abrir Informativo (Popout)</option>
+                    </select>
+                  </div>
+
+                  <div id="bannerLinkTargetGroup" class="form-group">
+                    <label for="bannerLinkTarget">Destino</label>
+                    <select id="bannerLinkTarget" name="bannerLinkTarget">
+                      <option value="">Selecione o destino</option>
+                      <option value="contato">Página de Contato</option>
+                      <option value="servicos">Página de Serviços</option>
+                      <option value="whatsapp">WhatsApp</option>
+                      <option value="custom">Link Personalizado</option>
+                    </select>
+                  </div>
+
+                  <div id="bannerCustomLinkGroup" class="form-group">
+                    <label for="bannerLink">Link personalizado</label>
+                    <input
+                      type="url"
+                      id="bannerLink"
+                      name="bannerLink"
+                      placeholder="https://..."
+                    />
+                  </div>
+
+                  <div id="bannerDescriptionGroup" class="form-group form-group-full">
+                    <label for="bannerDescription">Descrição detalhada</label>
+                    <textarea
+                      id="bannerDescription"
+                      name="bannerDescription"
+                      placeholder="Descrição detalhada para exibir no popout..."
+                      rows="5"
+                    ></textarea>
+                  </div>
+
+                  <div id="bannerCurrentImageBox" class="form-group form-group-full hidden">
+                    <label>Imagem atual</label>
+
+                    <div class="banner-current-image-preview">
+                      <img
+                        id="bannerCurrentImage"
+                        src=""
+                        alt="Imagem atual do banner"
+                      />
+                    </div>
+                  </div>
+
+                  <div class="form-group form-group-full">
+                    <label for="bannerImage">Imagem do banner</label>
+                    <input
+                      type="file"
+                      id="bannerImage"
+                      name="bannerImage"
+                      accept="image/*"
+                      required
+                    />
+                  </div>
+
+                  <div class="form-group form-group-full">
+                    <label class="checkbox-label">
+                      <input type="checkbox" id="bannerIsActive" checked />
+                      Cadastrar banner como ativo
+                    </label>
+                  </div>
+                </div>
+
+                <div class="form-actions banner-form-actions">
+                  <button type="submit" id="saveBannerBtn">Salvar Banner</button>
+
+                  <button
+                    type="button"
+                    id="cancelBannerEditBtnBottom"
+                    class="secondary-action-btn hidden"
+                  >
+                    Cancelar edição
+                  </button>
+                </div>
+
+                <p id="homeBannerMessage" class="form-message"></p>
+              </form>
+
+              <div id="homeBannersListMessage" class="list-message">
+                Carregando banners...
+              </div>
+
+              <div id="homeBannersList" class="home-banners-list"></div>
+            </div>
+          </section>
+        </section>
+
+        <footer class="admin-footer">
+          <img
+            src="../assets/img/logo_footer.png"
+            alt="Logo CASEG Protege"
+            class="admin-footer-logo"
+          />
+
+          <p>© 2025 CASEG Protege. Todos os direitos reservados.</p>
+
+          <span>Versão 1.0.0</span>
+        </footer>
+      </main>
+    </div>
+  </div>
+
+  <div
+    id="createClientModal"
+    class="admin-modal hidden"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="createClientModalTitle"
+    aria-hidden="true"
+  >
+    <div id="createClientModalBackdrop" class="admin-modal-backdrop"></div>
+
+    <section class="admin-modal-panel">
+      <header class="admin-modal-header">
+        <div class="admin-modal-title-group">
+          <span class="section-kicker">Clientes</span>
+
+          <h2 id="createClientModalTitle">Cadastrar Cliente</h2>
+
+          <p>
+            Crie o acesso inicial do cliente. Depois, ele poderá definir a própria senha.
+          </p>
         </div>
-      </section>
 
-      <section class="admin-section reveal-on-load delay-4">
-        <div class="section-header">
-          <div>
-            <h2>Gerenciar Clientes</h2>
-            <p class="section-description">
-              Visualize os clientes cadastrados, filtre rapidamente e altere o status de cada cliente.
-            </p>
-          </div>
+        <button
+          type="button"
+          id="closeCreateClientModalBtn"
+          class="admin-modal-close-btn"
+          aria-label="Fechar cadastro de cliente"
+        >
+          <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+        </button>
+      </header>
 
-          <button type="button" id="toggleClientsListBtn" class="section-action-btn">
-            Exibir Clientes
-          </button>
-        </div>
-
-        <div id="clientsSectionWrapper" class="hidden">
-          <div class="admin-form" style="margin-bottom: 20px;">
-            <div class="form-group form-group-full">
-              <label for="clientsSearchInput">Buscar cliente</label>
+      <div id="createClientWrapper" class="admin-modal-body">
+        <form id="createClientForm" class="admin-form">
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="fullName">Nome do cliente</label>
               <input
                 type="text"
-                id="clientsSearchInput"
-                placeholder="Digite nome do responsável, empresa ou CPF/CNPJ"
+                id="fullName"
+                name="fullName"
+                placeholder="Digite o nome do cliente"
+                required
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="companyName">Nome da empresa</label>
+              <input
+                type="text"
+                id="companyName"
+                name="companyName"
+                placeholder="Digite o nome da empresa"
+                required
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="cpfCnpj">CPF ou CNPJ</label>
+              <input
+                type="text"
+                id="cpfCnpj"
+                name="cpfCnpj"
+                placeholder="Digite o CPF ou CNPJ"
+                required
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="email">E-mail</label>
+              <input
+                type="email"
+                id="email"
+                name="email"
+                placeholder="Digite o e-mail do cliente"
+                required
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="addressZip">CEP</label>
+              <input
+                type="text"
+                id="addressZip"
+                name="addressZip"
+                placeholder="Digite o CEP"
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="addressStreet">Rua / Logradouro</label>
+              <input
+                type="text"
+                id="addressStreet"
+                name="addressStreet"
+                placeholder="Digite a rua"
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="addressNumber">Número</label>
+              <input
+                type="text"
+                id="addressNumber"
+                name="addressNumber"
+                placeholder="Digite o número"
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="addressComplement">Complemento</label>
+              <input
+                type="text"
+                id="addressComplement"
+                name="addressComplement"
+                placeholder="Digite o complemento"
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="addressNeighborhood">Bairro</label>
+              <input
+                type="text"
+                id="addressNeighborhood"
+                name="addressNeighborhood"
+                placeholder="Digite o bairro"
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="addressCity">Cidade</label>
+              <input
+                type="text"
+                id="addressCity"
+                name="addressCity"
+                placeholder="Digite a cidade"
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="addressState">Estado</label>
+              <input
+                type="text"
+                id="addressState"
+                name="addressState"
+                placeholder="Digite o estado"
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="phone">Telefone</label>
+              <input
+                type="text"
+                id="phone"
+                name="phone"
+                placeholder="Digite o telefone"
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="whatsapp">WhatsApp</label>
+              <input
+                type="text"
+                id="whatsapp"
+                name="whatsapp"
+                placeholder="Digite o WhatsApp"
               />
             </div>
           </div>
 
-          <div id="clientsListMessage" class="list-message">Carregando clientes...</div>
-          <div id="clientsList" class="clients-list"></div>
-        </div>
-      </section>
+          <div class="form-actions">
+            <button type="submit" id="createClientBtn">Cadastrar Cliente</button>
 
-      <section class="admin-section reveal-on-load delay-5">
-        <div class="section-header">
-          <div>
-            <h2>Banners da Home</h2>
-            <p class="section-description">
-              Cadastre e gerencie os banners globais que serão exibidos futuramente na Home.
-            </p>
+            <button
+              type="button"
+              id="cancelCreateClientModalBtn"
+              class="secondary-action-btn"
+            >
+              Cancelar
+            </button>
           </div>
 
-          <button type="button" id="toggleHomeBannersBtn" class="section-action-btn">
-            Exibir Banners
-          </button>
-        </div>
+          <p id="createClientMessage" class="form-message"></p>
 
-        <div id="homeBannersWrapper" class="hidden">
-          <form id="homeBannerForm" class="admin-form">
-            <div class="form-grid">
-              <div class="form-group">
-                <label for="bannerTitle">Título</label>
-                <input
-                  type="text"
-                  id="bannerTitle"
-                  name="bannerTitle"
-                  placeholder="Digite o título do banner"
-                  required
-                />
-              </div>
+          <div id="temporaryPasswordBox" class="temporary-password-box hidden">
+            <h3>Acesso inicial do cliente</h3>
+            <p class="temporary-password-info">
+              Guarde esta senha temporária. Ela será usada para o primeiro acesso do cliente.
+            </p>
 
-              <div class="form-group">
-                <label for="bannerActionType">Tipo de ação</label>
-                <select id="bannerActionType" name="bannerActionType" required>
-                  <option value="link">Redirecionar</option>
-                  <option value="modal">Abrir Informativo (Popout)</option>
-                </select>
-              </div>
+            <div class="temporary-password-row">
+              <input
+                type="text"
+                id="temporaryPasswordField"
+                readonly
+                value=""
+              />
 
-              <div class="form-group">
-                <label for="bannerLinkTarget">Destino</label>
-                <select id="bannerLinkTarget" name="bannerLinkTarget">
-                  <option value="">Selecione o destino</option>
-                  <option value="contato">Página de Contato</option>
-                  <option value="servicos">Página de Serviços</option>
-                  <option value="whatsapp">WhatsApp</option>
-                  <option value="custom">Link Personalizado</option>
-                </select>
-              </div>
-
-              <div class="form-group">
-                <label for="bannerLink">Link personalizado</label>
-                <input
-                  type="url"
-                  id="bannerLink"
-                  name="bannerLink"
-                  placeholder="https://..."
-                />
-              </div>
-
-              <div class="form-group form-group-full">
-                <label for="bannerDescription">Descrição detalhada</label>
-                <textarea
-                  id="bannerDescription"
-                  name="bannerDescription"
-                  placeholder="Descrição detalhada para exibir no popout..."
-                  rows="5"
-                ></textarea>
-              </div>
-
-              <div class="form-group form-group-full">
-                <label for="bannerImage">Imagem do banner</label>
-                <input
-                  type="file"
-                  id="bannerImage"
-                  name="bannerImage"
-                  accept="image/*"
-                  required
-                />
-              </div>
-
-              <div class="form-group form-group-full">
-                <label class="checkbox-label">
-                  <input type="checkbox" id="bannerIsActive" checked />
-                  Cadastrar banner como ativo
-                </label>
-              </div>
+              <button type="button" id="copyTemporaryPasswordBtn">
+                Copiar senha
+              </button>
             </div>
-
-            <div class="form-actions">
-              <button type="submit" id="saveBannerBtn">Salvar Banner</button>
-            </div>
-
-            <p id="homeBannerMessage" class="form-message"></p>
-          </form>
-
-          <div id="homeBannersListMessage" class="list-message">Carregando banners...</div>
-          <div id="homeBannersList" class="home-banners-list"></div>
-        </div>
-      </section>
-    </main>
+          </div>
+        </form>
+      </div>
+    </section>
   </div>
 
+  <div
+    id="adminActionModal"
+    class="admin-action-modal hidden"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="adminActionModalTitle"
+    aria-describedby="adminActionModalMessage"
+    aria-hidden="true"
+  >
+    <div id="adminActionModalBackdrop" class="admin-action-modal-backdrop"></div>
+
+    <section class="admin-action-modal-panel">
+      <span class="admin-action-modal-top-line" aria-hidden="true"></span>
+
+      <div class="admin-action-modal-body">
+        <div id="adminActionModalIcon" class="admin-action-modal-icon success">
+          <i id="adminActionModalIconSymbol" class="fa-solid fa-check" aria-hidden="true"></i>
+        </div>
+
+        <div class="admin-action-modal-content">
+          <span id="adminActionModalKicker" class="admin-action-modal-kicker">
+            CASEG PROTEGE
+          </span>
+
+          <h2 id="adminActionModalTitle">
+            Ação concluída
+          </h2>
+
+          <p id="adminActionModalMessage">
+            Operação realizada com sucesso.
+          </p>
+        </div>
+      </div>
+
+      <div class="admin-action-modal-actions">
+        <button
+          type="button"
+          id="adminActionModalCancelBtn"
+          class="admin-action-modal-cancel hidden"
+        >
+          Cancelar
+        </button>
+
+        <button
+          type="button"
+          id="adminActionModalConfirmBtn"
+          class="admin-action-modal-confirm"
+        >
+          OK
+        </button>
+      </div>
+    </section>
+  </div>
+
+  <template id="clientCardTemplate">
+    <article class="client-card" data-client-card>
+      <div class="client-card-content">
+        <div class="client-card-avatar" data-client-avatar>
+          CL
+        </div>
+
+        <div class="client-card-main">
+          <div class="client-card-header">
+            <div class="client-card-title-block">
+              <h3 data-client-company>Nome da empresa</h3>
+              <p data-client-name>Nome do cliente</p>
+            </div>
+
+            <span class="client-status-badge active" data-client-status>
+              Ativo
+            </span>
+          </div>
+
+          <div class="client-card-info">
+            <div class="client-card-item">
+              <i class="fa-regular fa-id-card" aria-hidden="true"></i>
+              <strong data-client-document-label>CPF/CNPJ</strong>
+              <span data-client-document>00.000.000/0000-00</span>
+            </div>
+
+            <div class="client-card-item">
+              <i class="fa-regular fa-envelope" aria-hidden="true"></i>
+              <span data-client-email>cliente@email.com</span>
+            </div>
+
+            <div class="client-card-item">
+              <i class="fa-solid fa-phone" aria-hidden="true"></i>
+              <span data-client-phone>(00) 00000-0000</span>
+            </div>
+
+            <div class="client-card-item">
+              <i class="fa-brands fa-whatsapp" aria-hidden="true"></i>
+              <span data-client-whatsapp>(00) 00000-0000</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="client-card-actions">
+          <button
+            type="button"
+            class="client-action-btn documents toggle-documents-btn"
+            data-action="documents"
+            data-client-id=""
+          >
+            <i class="fa-regular fa-file-lines" aria-hidden="true"></i>
+            <span data-action-label>Visualizar Documentos</span>
+          </button>
+
+          <button
+            type="button"
+            class="client-action-btn upload toggle-upload-btn"
+            data-action="upload"
+            data-client-id=""
+          >
+            <i class="fa-solid fa-upload" aria-hidden="true"></i>
+            <span data-action-label>Upload de Documento</span>
+          </button>
+
+          <button
+            type="button"
+            class="client-action-btn warning toggle-client-status-btn"
+            data-action="status"
+            data-client-id=""
+            data-current-status=""
+          >
+            <i class="fa-solid fa-user-slash" aria-hidden="true"></i>
+            <span data-action-label>Inativar</span>
+          </button>
+
+          <button
+            type="button"
+            class="client-action-btn danger delete-client-btn"
+            data-action="delete"
+            data-client-id=""
+            data-client-name=""
+          >
+            <i class="fa-regular fa-trash-can" aria-hidden="true"></i>
+            <span data-action-label>Excluir</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="client-documents-wrapper hidden" data-client-documents-wrapper>
+        <div class="documents-loading-message" data-client-documents-loading>
+          Clique em "Visualizar Documentos" para carregar os documentos.
+        </div>
+
+        <div class="documents-content" data-client-documents-content></div>
+      </div>
+
+      <div class="client-upload-wrapper hidden" data-client-upload-wrapper></div>
+    </article>
+  </template>
+
+  <template id="clientUploadFormTemplate">
+    <form class="upload-form" data-upload-form data-client-id="">
+      <div class="upload-form-grid">
+        <div class="form-group">
+          <label>Cliente</label>
+          <input
+            type="text"
+            data-upload-client-name
+            readonly
+            value=""
+          />
+        </div>
+
+        <div class="form-group">
+          <label>Empresa</label>
+          <input
+            type="text"
+            data-upload-company-name
+            readonly
+            value=""
+          />
+        </div>
+
+        <div class="form-group">
+          <label>Categoria</label>
+          <select data-upload-category required>
+            <option value="">Selecione a categoria</option>
+            <option value="ASO">ASO</option>
+            <option value="PGR">PGR</option>
+            <option value="LTCAT">LTCAT</option>
+            <option value="PPP">PPP</option>
+            <option value="PCMSO">PCMSO</option>
+            <option value="Laudo de Insalubridade">Laudo de Insalubridade</option>
+            <option value="Laudo Ergonômico NR-17">Laudo Ergonômico NR-17</option>
+            <option value="Laudo de Periculosidade">Laudo de Periculosidade</option>
+            <option value="AET - Análise Ergonômica do Trabalho">AET - Análise Ergonômica do Trabalho</option>
+            <option value="PCA - Programa de Conservação Auditiva">PCA - Programa de Conservação Auditiva</option>
+            <option value="PPR - Programa de Proteção Respiratória">PPR - Programa de Proteção Respiratória</option>
+            <option value="APR - Análise Preliminar de Risco/HO">APR - Análise Preliminar de Risco/HO</option>
+            <option value="Manual de EPIs">Manual de EPIs</option>
+            <option value="Ordem de Serviço (NR 01)">Ordem de Serviço (NR 01)</option>
+            <option value="Certificados">Certificados</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Subcategoria</label>
+          <input
+            type="text"
+            data-upload-subcategory
+            placeholder="Digite a subcategoria"
+          />
+        </div>
+
+        <div class="form-group">
+          <label>Ano</label>
+          <input
+            type="number"
+            data-upload-year
+            placeholder="Digite o ano"
+            min="2000"
+            max="2100"
+            required
+          />
+        </div>
+
+        <div class="form-group">
+          <label>Data de lançamento</label>
+          <input
+            type="date"
+            data-upload-release-date
+            required
+          />
+        </div>
+
+        <div class="form-group">
+          <label>Data de validade</label>
+          <input
+            type="date"
+            data-upload-expiration-date
+            required
+          />
+        </div>
+
+        <div class="form-group">
+          <label>Arquivo</label>
+          <input
+            type="file"
+            data-upload-file
+            required
+          />
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <button type="submit" class="upload-submit-btn">
+          Enviar Documento
+        </button>
+      </div>
+
+      <div class="upload-form-message" data-upload-message></div>
+    </form>
+  </template>
+
+  <template id="documentsPanelTemplate">
+    <div class="documents-panel" data-documents-panel>
+      <div class="documents-filters" data-documents-filters>
+        <div class="documents-filter-group">
+          <label>Nome do arquivo</label>
+          <input
+            type="text"
+            class="document-filter-name"
+            data-document-filter-name
+            placeholder="Buscar por nome do arquivo"
+            value=""
+          />
+        </div>
+
+        <div class="documents-filter-group">
+          <label>Categoria</label>
+          <select
+            class="document-filter-category"
+            data-document-filter-category
+          >
+            <option value="">Todas</option>
+          </select>
+        </div>
+
+        <div class="documents-filter-group">
+          <label>Ano</label>
+          <select
+            class="document-filter-year"
+            data-document-filter-year
+          >
+            <option value="">Todos</option>
+          </select>
+        </div>
+
+        <div class="documents-filter-actions">
+          <button
+            type="button"
+            class="clear-filters-btn"
+            data-document-clear-filters
+          >
+            Limpar filtros
+          </button>
+        </div>
+      </div>
+
+      <div class="documents-results-info" data-documents-results-info></div>
+
+      <div class="documents-list documents-list-scroll-area" data-documents-list></div>
+    </div>
+  </template>
+
+  <template id="documentItemTemplate">
+    <div class="document-item" data-document-item>
+      <div class="document-item-top">
+        <div class="document-item-grid">
+          <div class="document-item-field">
+            <strong>Nome do arquivo</strong>
+            <span data-document-file-name>Documento</span>
+          </div>
+
+          <div class="document-item-field">
+            <strong>Categoria</strong>
+            <span data-document-category>-</span>
+          </div>
+
+          <div class="document-item-field">
+            <strong>Subcategoria</strong>
+            <span data-document-subcategory>-</span>
+          </div>
+
+          <div class="document-item-field">
+            <strong>Ano</strong>
+            <span data-document-year>-</span>
+          </div>
+
+          <div class="document-item-field">
+            <strong>Data de lançamento</strong>
+            <span data-document-release-date>-</span>
+          </div>
+
+          <div class="document-item-field">
+            <strong>Data de validade</strong>
+            <span data-document-expiration-date>-</span>
+          </div>
+        </div>
+
+        <div class="document-menu-wrapper">
+          <button
+            type="button"
+            class="document-menu-toggle"
+            data-document-menu-toggle
+            data-document-id=""
+            aria-label="Abrir ações do documento"
+          >
+            ▾
+          </button>
+
+          <div class="document-actions-dropdown hidden" data-document-actions>
+            <button
+              type="button"
+              class="document-action-btn download-document-btn"
+              data-document-download
+              data-document-id=""
+            >
+              Baixar
+            </button>
+
+            <button
+              type="button"
+              class="document-action-btn replace-document-btn"
+              data-document-replace
+              data-document-id=""
+              data-client-id=""
+              data-file-name=""
+            >
+              Substituir
+            </button>
+
+            <input
+              type="file"
+              class="replace-document-file-input hidden"
+              data-document-replace-input
+              data-document-id=""
+              data-client-id=""
+            />
+
+            <button
+              type="button"
+              class="document-action-btn delete-document-btn"
+              data-document-delete
+              data-document-id=""
+              data-client-id=""
+              data-file-name=""
+            >
+              Excluir
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </template>
+
+  <template id="emptyDocumentsTemplate">
+    <div class="empty-documents-message" data-empty-documents-message>
+      Nenhum documento encontrado para este cliente com os filtros selecionados.
+    </div>
+  </template>
+
+  <template id="homeBannerCardTemplate">
+    <article class="home-banner-card" data-home-banner-card data-banner-id="">
+      <div class="home-banner-drag-hint">
+        <i class="fa-solid fa-grip-vertical" aria-hidden="true"></i>
+        <span>Arraste para ordenar</span>
+      </div>
+
+      <div class="home-banner-top">
+        <div class="home-banner-preview">
+          <img
+            src=""
+            alt="Banner"
+            data-banner-image
+            draggable="false"
+          />
+        </div>
+
+        <div class="home-banner-info">
+          <div class="home-banner-title" data-banner-title>
+            Título do banner
+          </div>
+
+          <div class="home-banner-meta">
+            <strong>Tipo de ação:</strong>
+            <span data-banner-action-type>-</span>
+          </div>
+
+          <div class="home-banner-meta">
+            <strong>Destino:</strong>
+            <span data-banner-link-target>-</span>
+          </div>
+
+          <div class="home-banner-meta hidden" data-banner-link-row>
+            <strong>Link:</strong>
+            <a href="#" target="_blank" rel="noopener noreferrer" data-banner-link>
+              Link do banner
+            </a>
+          </div>
+
+          <details class="home-banner-description hidden" data-banner-description-box>
+            <summary>Ver descrição do banner</summary>
+            <div class="home-banner-description-content" data-banner-description></div>
+          </details>
+
+          <div class="home-banner-meta">
+            <strong>Criado em:</strong>
+            <span data-banner-created-at>-</span>
+          </div>
+
+          <div class="home-banner-status-row">
+            <span class="home-banner-status active" data-banner-status>
+              Ativo
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div class="home-banner-actions">
+        <button
+          type="button"
+          class="home-banner-action-btn toggle-banner-status-btn danger"
+          data-banner-status-button
+          data-banner-id=""
+          data-current-status=""
+        >
+          Desativar
+        </button>
+
+        <button
+          type="button"
+          class="home-banner-action-btn edit-banner-btn"
+          data-banner-edit
+          data-banner-id=""
+        >
+          Editar
+        </button>
+
+        <button
+          type="button"
+          class="home-banner-action-btn delete-banner-btn"
+          data-banner-delete
+          data-banner-id=""
+          data-banner-title=""
+        >
+          Excluir
+        </button>
+      </div>
+    </article>
+  </template>
+
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
   <script src="../assets/js/admin.js"></script>
   <script src="../assets/js/site-animations.js"></script>
 </body>

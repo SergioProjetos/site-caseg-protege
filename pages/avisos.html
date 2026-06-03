@@ -1,23 +1,662 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Sobre - CASEG Protege</title>
 
-    <link rel="stylesheet" href="../assets/css/style.css">
+    <link rel="stylesheet" href="../assets/css/style.css" />
     <link
         rel="stylesheet"
         href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
     />
+
+    <style>
+        .sobre-page {
+            --sobre-green: #176d2c;
+            --sobre-green-light: #1f8f3a;
+            --sobre-lime: #9fd117;
+            --sobre-text: #1a1a1a;
+            --sobre-muted: #59616d;
+            --sobre-bg: #f5f6f4;
+            --sobre-white: #ffffff;
+            --sobre-border: #e2e5e1;
+            --sobre-shadow: 0 14px 34px rgba(0, 0, 0, 0.08);
+            --sobre-shadow-soft: 0 10px 22px rgba(0, 0, 0, 0.08);
+
+            background: var(--sobre-bg);
+            color: var(--sobre-text);
+        }
+
+        .sobre-page * {
+            box-sizing: border-box;
+        }
+
+        .sobre-page .site-header {
+            background: var(--sobre-white);
+            border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+            box-shadow: 0 6px 22px rgba(0, 0, 0, 0.04);
+        }
+
+        .sobre-page .header-container {
+            max-width: 1500px;
+            margin: 0 auto;
+            padding: 14px 28px;
+            display: grid;
+            grid-template-columns: 260px 1fr 140px;
+            align-items: center;
+            gap: 24px;
+        }
+
+        .sobre-page .logo-link {
+            display: inline-flex;
+            align-items: center;
+            text-decoration: none;
+        }
+
+        .sobre-page .site-logo {
+            width: 190px;
+            height: auto;
+        }
+
+        .sobre-page .main-nav {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 46px;
+        }
+
+        .sobre-page .main-nav a {
+            color: #111111;
+            text-decoration: none;
+            font-size: 17px;
+            font-weight: 800;
+            padding: 10px 0;
+            transition: color 0.2s ease;
+            background: transparent;
+            border: none;
+        }
+
+        .sobre-page .main-nav a::before,
+        .sobre-page .main-nav a::after {
+            content: none !important;
+            display: none !important;
+        }
+
+        .sobre-page .main-nav a:hover,
+        .sobre-page .main-nav a.active {
+            color: var(--sobre-green);
+        }
+
+        .sobre-page .header-login-button {
+            height: 44px;
+            padding: 0 20px;
+            border-radius: 8px;
+            background: var(--sobre-green);
+            color: #ffffff;
+            text-decoration: none;
+            font-weight: 800;
+            font-size: 15px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 9px;
+            box-shadow: 0 10px 20px rgba(23, 109, 44, 0.20);
+            transition: transform 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .sobre-page .header-login-button:hover {
+            background: var(--sobre-green-light);
+            transform: translateY(-2px);
+            box-shadow: 0 14px 26px rgba(23, 109, 44, 0.26);
+        }
+
+        .sobre-page .header-login-button i {
+            font-size: 17px;
+        }
+
+        .sobre-main {
+            max-width: 1500px;
+            margin: 0 auto;
+            padding: 0 20px 28px;
+        }
+
+        .sobre-hero {
+            margin-top: 0;
+            border-radius: 18px;
+            overflow: hidden;
+            background: #041c13;
+            box-shadow: var(--sobre-shadow);
+        }
+
+        .sobre-hero img {
+            display: block;
+            width: 100%;
+            height: auto;
+            border-radius: 18px;
+        }
+
+        .sobre-content-card {
+            background: #ffffff;
+            border-radius: 0 0 18px 18px;
+            box-shadow: var(--sobre-shadow);
+            padding: 18px 40px 20px;
+        }
+
+        .sobre-section-title {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .sobre-section-title h2 {
+            margin: 0 0 6px;
+            font-size: 24px;
+            line-height: 1.2;
+            font-weight: 900;
+            color: #1e1e1e;
+        }
+
+        .sobre-section-title h2 span {
+            color: var(--sobre-green);
+        }
+
+        .sobre-section-title p {
+            margin: 0 auto;
+            max-width: 560px;
+            color: var(--sobre-muted);
+            font-size: 13px;
+            line-height: 1.45;
+        }
+
+        .sobre-valores-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 22px;
+            max-width: 1180px;
+            margin: 0 auto 18px;
+        }
+
+        .sobre-valor-card {
+            background: #ffffff;
+            border: 1px solid var(--sobre-border);
+            border-radius: 18px;
+            padding: 24px 26px;
+            min-height: 186px;
+            display: flex;
+            gap: 20px;
+            align-items: flex-start;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.03);
+            transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+        }
+
+        .sobre-valor-card:hover {
+            transform: translateY(-3px);
+            border-color: rgba(23, 109, 44, 0.24);
+            box-shadow: 0 14px 28px rgba(0, 0, 0, 0.08);
+        }
+
+        .sobre-valor-icon {
+            width: 62px;
+            height: 62px;
+            min-width: 62px;
+            border-radius: 50%;
+            background: var(--sobre-green);
+            color: #ffffff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            box-shadow: 0 10px 20px rgba(23, 109, 44, 0.15);
+        }
+
+        .sobre-valor-content h3 {
+            margin: 4px 0 10px;
+            color: var(--sobre-green);
+            font-size: 19px;
+            font-weight: 900;
+        }
+
+        .sobre-valor-content p {
+            margin: 0;
+            color: #4c5561;
+            font-size: 15px;
+            line-height: 1.75;
+            font-weight: 500;
+        }
+
+        .sobre-numeros {
+            max-width: 1280px;
+            margin: 0 auto 18px;
+            border-radius: 18px;
+            overflow: hidden;
+            background:
+                linear-gradient(
+                    90deg,
+                    rgba(0, 18, 12, 0.58) 0%,
+                    rgba(0, 18, 12, 0.42) 50%,
+                    rgba(0, 18, 12, 0.58) 100%
+                ),
+                url("../assets/img/fundo-industrial-caseg.png") center center / cover no-repeat;
+            box-shadow: var(--sobre-shadow-soft);
+        }
+
+        .sobre-numeros-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            padding: 16px 26px;
+        }
+
+        .sobre-numero-item {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 8px 18px;
+            position: relative;
+        }
+
+        .sobre-numero-item:not(:last-child)::after {
+            content: "";
+            position: absolute;
+            right: 0;
+            top: 12px;
+            bottom: 12px;
+            width: 1px;
+            background: rgba(255, 255, 255, 0.14);
+        }
+
+        .sobre-numero-icon {
+            width: 64px;
+            height: 64px;
+            min-width: 64px;
+            border-radius: 50%;
+            border: 2px solid rgba(159, 209, 23, 0.70);
+            color: var(--sobre-lime);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+        }
+
+        .sobre-numero-content strong {
+            display: block;
+            color: var(--sobre-lime);
+            font-size: 34px;
+            font-weight: 800;
+            line-height: 1;
+            margin-bottom: 8px;
+            letter-spacing: -0.3px;
+        }
+
+        .sobre-numero-content span {
+            display: block;
+            color: #ffffff;
+            font-size: 14px;
+            line-height: 1.55;
+            font-weight: 700;
+        }
+
+        .sobre-cta-banner {
+            position: relative;
+            max-width: 1280px;
+            margin: 0 auto;
+            overflow: hidden;
+            border-radius: 18px;
+            background: #ffffff;
+            border: 1px solid #d7ddd6;
+            box-shadow: var(--sobre-shadow-soft);
+        }
+
+        .sobre-cta-bg {
+            display: block;
+            width: 100%;
+            height: auto;
+            border-radius: 18px;
+        }
+
+        .sobre-cta-button {
+            position: absolute;
+            left: 33.6%;
+            bottom: 12.2%;
+            min-height: 42px;
+            padding: 0 22px;
+            border-radius: 8px;
+            background: var(--sobre-green);
+            color: #ffffff;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            font-weight: 800;
+            font-size: 15px;
+            box-shadow: 0 10px 20px rgba(23, 109, 44, 0.22);
+            transition: transform 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+            z-index: 3;
+        }
+
+        .sobre-cta-button:hover {
+            background: var(--sobre-green-light);
+            transform: translateY(-2px);
+            box-shadow: 0 14px 24px rgba(23, 109, 44, 0.26);
+        }
+
+        .sobre-page .site-footer {
+            position: relative;
+            overflow: hidden;
+            background:
+                linear-gradient(
+                    90deg,
+                    rgba(0, 15, 10, 0.74) 0%,
+                    rgba(0, 18, 12, 0.60) 45%,
+                    rgba(0, 15, 10, 0.74) 100%
+                ),
+                url("../assets/img/fundo-industrial-caseg.png") center center / cover no-repeat;
+            color: #ffffff;
+            border-top: none;
+            margin: 0;
+            padding: 14px 28px;
+            box-shadow: 0 -4px 18px rgba(0, 0, 0, 0.18);
+            border-radius: 0;
+        }
+
+        .sobre-page .footer-container {
+            position: relative;
+            z-index: 2;
+            max-width: 1500px;
+            margin: 0 auto;
+            min-height: 68px;
+            display: grid;
+            grid-template-columns: 215px 1fr auto;
+            align-items: center;
+            gap: 22px;
+        }
+
+        .sobre-page .footer-logo {
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+        }
+
+        .sobre-page .footer-logo img {
+            width: 152px;
+            height: auto;
+            filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.35));
+        }
+
+        .sobre-page .site-footer p {
+            margin: 0;
+            color: rgba(255, 255, 255, 0.95);
+            font-size: 13px;
+            text-align: center;
+            font-weight: 600;
+            line-height: 1.45;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+        }
+
+        .sobre-page .footer-links {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 16px;
+            font-size: 13px;
+        }
+
+        .sobre-page .site-footer a {
+            color: rgba(255, 255, 255, 0.95);
+            text-decoration: none;
+            font-weight: 600;
+            transition: color 0.2s ease;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+        }
+
+        .sobre-page .site-footer a:hover {
+            color: var(--sobre-lime);
+            text-decoration: none;
+        }
+
+        .sobre-page .footer-links span {
+            color: rgba(255, 255, 255, 0.45);
+        }
+
+        @media (max-width: 1200px) {
+            .sobre-page .header-container {
+                grid-template-columns: 210px 1fr 120px;
+            }
+
+            .sobre-page .main-nav {
+                gap: 30px;
+            }
+
+            .sobre-content-card {
+                padding: 18px 24px 20px;
+            }
+
+            .sobre-valores-grid {
+                gap: 14px;
+            }
+
+            .sobre-cta-button {
+                left: 33.5%;
+                bottom: 11.5%;
+                min-height: 38px;
+                padding: 0 18px;
+                font-size: 14px;
+            }
+        }
+
+        @media (max-width: 1024px) {
+            .sobre-valores-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .sobre-numeros-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 10px 0;
+            }
+
+            .sobre-numero-item:nth-child(2)::after {
+                display: none;
+            }
+
+            .sobre-cta-button {
+                left: 33%;
+                bottom: 10.5%;
+                min-height: 34px;
+                padding: 0 16px;
+                font-size: 13px;
+            }
+        }
+
+        @media (max-width: 900px) {
+            .sobre-page .header-container {
+                grid-template-columns: 1fr auto;
+                gap: 16px;
+                padding: 12px 20px;
+            }
+
+            .sobre-page .site-logo {
+                width: 155px;
+            }
+
+            .sobre-page .main-nav {
+                grid-column: 1 / -1;
+                order: 3;
+                width: 100%;
+                justify-content: center;
+                gap: 24px;
+            }
+
+            .sobre-page .main-nav a {
+                font-size: 15px;
+            }
+
+            .sobre-page .header-login-button {
+                height: 40px;
+                padding: 0 15px;
+                font-size: 13px;
+            }
+
+            .sobre-page .footer-container {
+                grid-template-columns: 1fr;
+                text-align: center;
+                justify-items: center;
+                gap: 8px;
+                min-height: auto;
+            }
+
+            .sobre-page .footer-logo {
+                justify-content: center;
+            }
+
+            .sobre-page .footer-logo img {
+                width: 136px;
+            }
+
+            .sobre-page .footer-links {
+                justify-content: center;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .sobre-main {
+                padding: 0 12px 24px;
+            }
+
+            .sobre-hero,
+            .sobre-hero img {
+                border-radius: 12px;
+            }
+
+            .sobre-content-card {
+                padding: 18px 16px 18px;
+                border-radius: 0 0 14px 14px;
+            }
+
+            .sobre-section-title h2 {
+                font-size: 22px;
+            }
+
+            .sobre-valor-card {
+                flex-direction: column;
+                min-height: auto;
+                padding: 18px;
+            }
+
+            .sobre-numeros-grid {
+                grid-template-columns: 1fr;
+                padding: 14px 16px;
+            }
+
+            .sobre-numero-item {
+                padding: 10px 0;
+            }
+
+            .sobre-numero-item::after {
+                display: none !important;
+            }
+
+            .sobre-cta-banner {
+                border-radius: 12px;
+            }
+
+            .sobre-cta-bg {
+                border-radius: 12px;
+            }
+
+            .sobre-cta-button {
+                left: 32.5%;
+                bottom: 9.5%;
+                min-height: 29px;
+                padding: 0 12px;
+                border-radius: 6px;
+                font-size: 11px;
+                gap: 7px;
+            }
+
+            .sobre-page .site-footer {
+                margin: 0;
+            }
+
+            .sobre-page .site-footer p,
+            .sobre-page .footer-links,
+            .sobre-page .site-footer a {
+                font-size: 12.2px;
+            }
+        }
+
+        @media (max-width: 620px) {
+            .sobre-cta-button {
+                left: 32%;
+                bottom: 8.5%;
+                min-height: 25px;
+                padding: 0 10px;
+                font-size: 9.5px;
+                gap: 6px;
+            }
+        }
+
+        @media (max-width: 520px) {
+            .sobre-page .header-container {
+                grid-template-columns: 1fr;
+                justify-items: center;
+            }
+
+            .sobre-page .main-nav {
+                gap: 16px;
+                flex-wrap: wrap;
+            }
+
+            .sobre-page .header-login-button {
+                width: 100%;
+            }
+
+            .sobre-valor-content p {
+                font-size: 14px;
+            }
+
+            .sobre-cta-button {
+                left: 31.5%;
+                bottom: 7.5%;
+                min-height: 22px;
+                padding: 0 8px;
+                font-size: 8px;
+                border-radius: 5px;
+            }
+
+            .sobre-page .footer-links {
+                flex-direction: column;
+                gap: 5px;
+            }
+
+            .sobre-page .footer-links span {
+                display: none;
+            }
+
+            .sobre-page .footer-logo img {
+                width: 130px;
+            }
+        }
+
+        @media (max-width: 420px) {
+            .sobre-cta-button {
+                position: static;
+                width: 100%;
+                min-height: 38px;
+                margin-top: 10px;
+                font-size: 12px;
+                border-radius: 7px;
+            }
+        }
+    </style>
 </head>
-<body>
+
+<body class="sobre-page">
 
     <header class="site-header">
         <div class="header-container">
             <a href="home.html" class="logo-link reveal-on-load delay-1">
                 <img
-                    src="/site-caseg-protege/logo_transparente.png"
+                    src="../assets/img/logo_transparente.png"
                     alt="Logo CASEG Protege"
                     class="site-logo"
                 />
@@ -26,69 +665,159 @@
             <nav class="main-nav reveal-on-load delay-2">
                 <a href="home.html">Home</a>
                 <a href="servicos.html">Serviços</a>
-                <a href="avisos.html">Sobre</a>
+                <a href="avisos.html" class="active">Sobre</a>
                 <a href="contato.html">Contato</a>
-                <a href="login.html" class="nav-login">
-                    <i class="fa-regular fa-user"></i>
-                    Entrar
-                </a>
             </nav>
+
+            <a href="login.html" class="header-login-button reveal-on-load delay-3">
+                <i class="fa-regular fa-user"></i>
+                Entrar
+            </a>
         </div>
     </header>
 
-    <main>
-        <section class="home-about reveal-on-load delay-3">
-            <div class="section-title">
-                <h2>Sobre a CASEG Protege</h2>
+    <main class="sobre-main">
+        <section class="sobre-hero reveal-on-load delay-2">
+            <img
+                src="../assets/img/imagem_sobre.png"
+                alt="Sobre a CASEG Protege"
+            />
+        </section>
+
+        <section class="sobre-content-card reveal-on-load delay-3">
+            <div class="sobre-section-title">
+                <h2>Nossos <span>Valores</span></h2>
                 <p>
-                    Conheça nossa empresa, nossa missão e nosso compromisso com a segurança e organização dos nossos clientes.
+                    Nossos princípios guiam cada ação e decisão, garantindo excelência
+                    e compromisso em tudo o que fazemos.
                 </p>
             </div>
 
-            <div class="home-about-cards">
-                <div class="about-card reveal-on-load delay-3">
-                    <h3>Quem Somos</h3>
-                    <p>
-                        A CASEG Protege atua oferecendo soluções em segurança do trabalho,
-                        organização documental e gestão de informações, com foco em eficiência,
-                        controle e confiabilidade.
-                    </p>
-                </div>
+            <div class="sobre-valores-grid">
+                <article class="sobre-valor-card reveal-on-load delay-3">
+                    <div class="sobre-valor-icon">
+                        <i class="fa-solid fa-users"></i>
+                    </div>
 
-                <div class="about-card reveal-on-load delay-4">
-                    <h3>Missão</h3>
-                    <p>
-                        Proporcionar aos nossos clientes uma estrutura organizada, segura e prática,
-                        garantindo acesso fácil às informações e conformidade com as exigências legais.
-                    </p>
-                </div>
+                    <div class="sobre-valor-content">
+                        <h3>Quem Somos</h3>
+                        <p>
+                            A CASEG Protege atua oferecendo soluções em segurança do trabalho,
+                            organização documental e gestão de informações, com foco em eficiência,
+                            controle e confiabilidade.
+                        </p>
+                    </div>
+                </article>
 
-                <div class="about-card reveal-on-load delay-5">
-                    <h3>Visão</h3>
-                    <p>
-                        Ser referência em gestão documental e suporte administrativo,
-                        trazendo inovação e simplicidade para empresas de todos os portes.
-                    </p>
-                </div>
+                <article class="sobre-valor-card reveal-on-load delay-4">
+                    <div class="sobre-valor-icon">
+                        <i class="fa-solid fa-bullseye"></i>
+                    </div>
+
+                    <div class="sobre-valor-content">
+                        <h3>Missão</h3>
+                        <p>
+                            Proporcionar aos nossos clientes uma estrutura organizada, segura e prática,
+                            garantindo acesso fácil às informações e conformidade com as exigências legais.
+                        </p>
+                    </div>
+                </article>
+
+                <article class="sobre-valor-card reveal-on-load delay-5">
+                    <div class="sobre-valor-icon">
+                        <i class="fa-regular fa-eye"></i>
+                    </div>
+
+                    <div class="sobre-valor-content">
+                        <h3>Visão</h3>
+                        <p>
+                            Ser referência em gestão documental e suporte administrativo, trazendo
+                            inovação e simplicidade para empresas de todos os portes.
+                        </p>
+                    </div>
+                </article>
             </div>
-        </section>
 
-        <section class="home-cta reveal-on-load delay-4">
-            <h2>Quer saber mais ou contratar nossos serviços?</h2>
-            <p>Entre em contato com nossa equipe e descubra como podemos ajudar.</p>
+            <section class="sobre-numeros reveal-on-load delay-4">
+                <div class="sobre-numeros-grid">
+                    <div class="sobre-numero-item">
+                        <div class="sobre-numero-icon">
+                            <i class="fa-solid fa-shield-halved"></i>
+                        </div>
 
-            <div class="home-cta-actions">
-                <a href="contato.html" class="btn-primary">Falar Conosco</a>
-            </div>
+                        <div class="sobre-numero-content">
+                            <strong>+10</strong>
+                            <span>Anos de experiência<br />no mercado</span>
+                        </div>
+                    </div>
+
+                    <div class="sobre-numero-item">
+                        <div class="sobre-numero-icon">
+                            <i class="fa-solid fa-users"></i>
+                        </div>
+
+                        <div class="sobre-numero-content">
+                            <strong>+100</strong>
+                            <span>Empresas atendidas<br />em todo o Brasil</span>
+                        </div>
+                    </div>
+
+                    <div class="sobre-numero-item">
+                        <div class="sobre-numero-icon">
+                            <i class="fa-regular fa-clipboard"></i>
+                        </div>
+
+                        <div class="sobre-numero-content">
+                            <strong>+15 mil</strong>
+                            <span>Documentos gerenciados<br />com segurança</span>
+                        </div>
+                    </div>
+
+                    <div class="sobre-numero-item">
+                        <div class="sobre-numero-icon">
+                            <i class="fa-solid fa-award"></i>
+                        </div>
+
+                        <div class="sobre-numero-content">
+                            <strong>100%</strong>
+                            <span>Compromisso com a<br />qualidade e conformidade</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="sobre-cta-banner reveal-on-load delay-5">
+                <img
+                    src="../assets/img/sobre-cta.png"
+                    alt="Quer saber mais ou contratar nossos serviços?"
+                    class="sobre-cta-bg"
+                />
+
+                <a href="contato.html" class="sobre-cta-button">
+                    <i class="fa-brands fa-whatsapp"></i>
+                    Entrar em contato
+                </a>
+            </section>
         </section>
     </main>
 
-    <footer>
-        <p>© CASEG Protege</p>
-        <p>
-            <a href="termos-de-uso.html">Termos de Uso</a> —
-            <a href="politica-privacidade.html">Política de Privacidade</a>
-        </p>
+    <footer class="site-footer">
+        <div class="footer-container">
+            <div class="footer-logo">
+                <img
+                    src="../assets/img/logo_footer.png"
+                    alt="Logo CASEG Protege"
+                />
+            </div>
+
+            <p>© 2025 CASEG Protege. Todos os direitos reservados.</p>
+
+            <div class="footer-links">
+                <a href="termos-de-uso.html">Termos de Uso</a>
+                <span>|</span>
+                <a href="politica-privacidade.html">Política de Privacidade</a>
+            </div>
+        </div>
     </footer>
 
     <script src="../assets/js/site-animations.js"></script>

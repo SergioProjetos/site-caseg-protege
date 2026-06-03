@@ -12,39 +12,198 @@
     />
 
     <style>
-        .home-main-container {
+        :root {
+            --caseg-green: #006b2f;
+            --caseg-green-dark: #005625;
+            --caseg-red: #d61f26;
+            --caseg-yellow: #ffb000;
+            --caseg-black: #111111;
+            --caseg-text: #333333;
+            --caseg-bg: #f7f7f7;
+            --caseg-footer: #151719;
+            --container-wide: 1240px;
+            --container-inner: 1110px;
+            --radius-banner: 18px;
+            --radius-card: 10px;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            margin: 0;
+            background: var(--caseg-bg);
+            color: var(--caseg-black);
+            overflow-x: hidden;
+            font-family: Arial, Helvetica, sans-serif;
+        }
+
+        .site-header {
+            background: #ffffff;
+            border-bottom: 1px solid #e5e7eb;
+            position: relative;
+        }
+
+        .site-header::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
             width: 100%;
-            max-width: 1280px;
-            margin: 0 auto;
-            padding: 24px 20px 60px;
+            height: 4px;
+            background: linear-gradient(
+                90deg,
+                var(--caseg-green) 0%,
+                #1f8f3a 33%,
+                var(--caseg-yellow) 68%,
+                var(--caseg-red) 100%
+            );
         }
 
         .site-header .header-container {
-            max-width: 1280px;
+            width: calc(100% - 56px);
+            max-width: var(--container-wide);
             margin: 0 auto;
+            min-height: 74px;
+            padding: 10px 0 8px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 30px;
+        }
+
+        .header-brand {
+            display: flex;
+            align-items: center;
+            gap: 18px;
+            min-width: 0;
+            flex: 1;
+        }
+
+        .logo-link {
+            display: inline-flex;
+            align-items: center;
+            flex-shrink: 0;
+            text-decoration: none;
+        }
+
+        .site-logo {
+            width: 215px;
+            height: auto;
+            display: block;
+        }
+
+        .header-tagline-inline {
+            display: flex;
+            align-items: center;
+            min-width: 0;
+            max-width: 340px;
+            padding-left: 4px;
+            border-left: 1px solid rgba(0, 0, 0, 0.08);
+        }
+
+        .header-tagline-inline p {
+            margin: 0;
+            font-size: 15px;
+            line-height: 1.4;
+            font-weight: 700;
+            color: #4b5563;
+            letter-spacing: 0.2px;
+        }
+
+        .header-tagline-inline p span {
+            color: var(--caseg-green);
+            font-weight: 900;
+        }
+
+        .main-nav {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 28px;
+            flex-wrap: wrap;
+            flex-shrink: 0;
+        }
+
+        .main-nav a {
+            color: #111111;
+            font-size: 16px;
+            font-weight: 800;
+            text-decoration: none;
+            padding: 8px 8px;
+            border-radius: 8px;
+            line-height: 1;
+            transition: color 0.2s ease, background 0.2s ease;
+        }
+
+        .main-nav a:hover {
+            background: transparent;
+            color: var(--caseg-green);
+        }
+
+        .main-nav .nav-login {
+            border: 1.5px solid var(--caseg-green);
+            color: var(--caseg-green);
+            border-radius: 10px;
+            padding: 11px 20px;
+            background: #ffffff;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-left: 8px;
+            transition: all 0.2s ease;
+        }
+
+        .main-nav .nav-login:hover {
+            background: var(--caseg-green);
+            color: #ffffff;
+        }
+
+        .home-main-container {
+            width: 100%;
+            max-width: 100%;
+            margin: 0 auto;
+            padding: 16px 0 0;
         }
 
         .home-banners-section {
-            margin-top: 24px;
+            width: calc(100% - 56px);
+            max-width: var(--container-wide);
+            margin: 0 auto;
+            padding: 0;
+            background: transparent;
+            border: none;
+            box-shadow: none;
+            border-radius: 0;
+            overflow: visible;
         }
 
         .home-carousel-wrapper {
             position: relative;
             width: 100%;
+            margin: 0 auto;
         }
 
         .home-carousel {
             position: relative;
+            width: 100%;
             overflow: hidden;
-            border-radius: 24px;
-            min-height: 320px;
-            background: linear-gradient(135deg, #f8fafc, #e2e8f0);
-            box-shadow: 0 12px 28px rgba(0, 0, 0, 0.10);
+            border-radius: var(--radius-banner);
+            background: #061b11;
+            box-shadow: 0 16px 36px rgba(0, 0, 0, 0.15);
             touch-action: pan-y;
+            aspect-ratio: 16 / 5;
         }
 
         .home-carousel-track {
             display: flex;
+            width: 100%;
+            height: 100%;
             transition: transform 0.5s ease;
             will-change: transform;
         }
@@ -53,11 +212,13 @@
             min-width: 100%;
             flex: 0 0 100%;
             position: relative;
+            height: 100%;
         }
 
         .home-carousel-slide-button {
             display: block;
             width: 100%;
+            height: 100%;
             border: none;
             background: transparent;
             padding: 0;
@@ -66,67 +227,88 @@
 
         .home-carousel-slide-button img {
             width: 100%;
-            height: auto;
+            height: 100%;
             display: block;
             object-fit: cover;
-            max-height: 520px;
+            object-position: center center;
             user-select: none;
             -webkit-user-drag: none;
         }
 
         .home-carousel-placeholder {
-            min-height: 320px;
+            width: 100%;
+            height: 100%;
+            min-height: 300px;
             display: flex;
             align-items: center;
-            justify-content: center;
-            text-align: center;
-            padding: 40px 24px;
-            color: #475569;
+            justify-content: flex-start;
+            padding: 46px;
+            color: #ffffff;
+            background:
+                linear-gradient(
+                    90deg,
+                    rgba(0, 37, 18, 0.96),
+                    rgba(0, 37, 18, 0.78),
+                    rgba(0, 37, 18, 0.28)
+                ),
+                radial-gradient(
+                    circle at left,
+                    rgba(31, 143, 58, 0.38),
+                    transparent 45%
+                );
         }
 
         .home-carousel-placeholder-content {
-            max-width: 700px;
+            max-width: 620px;
         }
 
         .home-carousel-placeholder-content i {
             font-size: 42px;
-            color: #0b6b79;
-            margin-bottom: 14px;
+            color: #53c653;
+            margin-bottom: 16px;
         }
 
         .home-carousel-placeholder-content h2 {
-            font-size: 30px;
-            color: #0f172a;
-            margin-bottom: 12px;
+            font-size: 48px;
+            line-height: 1.05;
+            color: #ffffff;
+            margin: 0 0 18px;
+            font-weight: 900;
+        }
+
+        .home-carousel-placeholder-content h2 span {
+            color: #55c84f;
         }
 
         .home-carousel-placeholder-content p {
             margin: 0;
-            font-size: 17px;
+            font-size: 18px;
             line-height: 1.7;
+            color: #f8fafc;
+            max-width: 560px;
         }
 
         .home-carousel-nav {
             position: absolute;
             top: 50%;
             transform: translateY(-50%);
-            width: 48px;
-            height: 48px;
+            width: 46px;
+            height: 46px;
             border: none;
             border-radius: 999px;
-            background: rgba(15, 23, 42, 0.60);
+            background: rgba(0, 0, 0, 0.48);
             color: #ffffff;
             cursor: pointer;
             z-index: 5;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 18px;
-            transition: background 0.2s ease, transform 0.2s ease;
+            font-size: 16px;
+            transition: background 0.2s ease;
         }
 
         .home-carousel-nav:hover {
-            background: rgba(15, 23, 42, 0.80);
+            background: rgba(0, 107, 47, 0.96);
         }
 
         .home-carousel-nav.prev {
@@ -142,34 +324,51 @@
         }
 
         .home-carousel-dots {
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: 15px;
+            z-index: 8;
             display: flex;
             justify-content: center;
             align-items: center;
             gap: 10px;
-            margin-top: 18px;
+            margin: 0;
         }
 
         .home-carousel-dot {
-            width: 12px;
-            height: 12px;
+            width: 10px;
+            height: 10px;
             border-radius: 999px;
             border: none;
-            background: #cbd5e1;
+            background: #ffffff;
+            opacity: 0.92;
             cursor: pointer;
-            transition: transform 0.2s ease, background 0.2s ease;
+            transition: transform 0.2s ease, background 0.2s ease, opacity 0.2s ease;
         }
 
         .home-carousel-dot.active {
-            background: #0b6b79;
-            transform: scale(1.15);
+            background: #00a83b;
+            transform: scale(1.18);
+            opacity: 1;
         }
 
         .home-carousel-dot:hover {
-            background: #94a3b8;
+            background: #00a83b;
+            opacity: 1;
+        }
+
+        .home-institutional,
+        .home-about,
+        .home-services {
+            width: calc(100% - 56px);
+            max-width: var(--container-inner);
+            margin-left: auto;
+            margin-right: auto;
         }
 
         .home-institutional {
-            margin-top: 42px;
+            margin-top: 22px;
         }
 
         .section-title {
@@ -178,213 +377,1096 @@
         }
 
         .section-title h2 {
-            margin-bottom: 10px;
+            margin: 0 0 8px;
+            color: #111111;
+            font-size: 28px;
+            line-height: 1.2;
+            font-weight: 900;
+        }
+
+        .section-title h2 span {
+            color: var(--caseg-green);
         }
 
         .section-title p {
-            max-width: 780px;
+            max-width: 820px;
             margin: 0 auto;
+            color: #333333;
+            font-size: 15px;
+            line-height: 1.45;
         }
 
         .home-institutional-grid {
             display: grid;
             grid-template-columns: repeat(3, minmax(0, 1fr));
-            gap: 20px;
+            gap: 22px;
             align-items: stretch;
+            width: 100%;
+            margin: 0 auto;
         }
 
         .home-institutional-card {
             background: #ffffff;
-            border: 1px solid #e5e7eb;
-            border-radius: 20px;
-            padding: 24px;
-            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.05);
+            border: 1px solid #eeeeee;
+            border-radius: var(--radius-card);
+            padding: 28px 26px;
+            box-shadow: 0 8px 22px rgba(0, 0, 0, 0.07);
             transition: transform 0.25s ease, box-shadow 0.25s ease;
-            min-height: 100%;
+            min-height: 250px;
+            display: flex;
+            flex-direction: column;
         }
 
         .home-institutional-card:hover {
             transform: translateY(-4px);
-            box-shadow: 0 14px 26px rgba(0, 0, 0, 0.08);
+            box-shadow: 0 14px 30px rgba(0, 0, 0, 0.10);
         }
 
         .home-institutional-icon {
-            width: 52px;
-            height: 52px;
-            border-radius: 14px;
-            background: #ecfeff;
-            color: #0b6b79;
+            width: 56px;
+            height: 56px;
+            border-radius: 10px;
+            background: var(--caseg-green);
+            color: #ffffff;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 22px;
-            margin-bottom: 16px;
+            font-size: 24px;
+            margin-bottom: 18px;
+            flex-shrink: 0;
         }
 
         .home-institutional-card h3 {
-            margin: 0 0 12px;
-            color: #0f172a;
-            font-size: 22px;
+            margin: 0 0 14px;
+            color: #111111;
+            font-size: 18px;
+            font-weight: 900;
         }
 
         .home-institutional-card p {
             margin: 0;
-            color: #475569;
-            line-height: 1.7;
+            color: #333333;
+            line-height: 1.8;
             font-size: 15px;
         }
 
+        .home-card-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: auto;
+            padding-top: 22px;
+            color: var(--caseg-green);
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 900;
+        }
+
+        .home-card-link i {
+            font-size: 13px !important;
+        }
+
         .home-about {
-            margin-top: 42px;
+            margin-top: 24px;
+            padding: 0;
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            border-radius: 0 !important;
         }
 
         .home-about-cards {
             display: grid;
             grid-template-columns: repeat(3, minmax(0, 1fr));
-            gap: 20px;
+            gap: 22px;
             align-items: stretch;
+            width: 100%;
+            margin: 0 auto;
         }
 
-        .home-about-cards .about-card {
-            min-height: 100%;
-        }
-
-        .home-cta {
-            margin-top: 42px;
-            text-align: center;
+        .about-card {
+            position: relative;
+            overflow: hidden;
             background: #ffffff;
-            border: 1px solid #e5e7eb;
-            border-radius: 20px;
-            padding: 32px 24px;
-            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.05);
+            border: 1.5px solid rgba(0, 107, 47, 0.42);
+            border-radius: var(--radius-card);
+            padding: 24px 26px;
+            min-height: 165px;
+            box-shadow: none;
         }
 
-        .home-cta h2 {
-            margin-bottom: 12px;
+        .about-card-content {
+            position: relative;
+            z-index: 2;
         }
 
-        .home-cta p {
-            margin-bottom: 20px;
+        .about-card h3 {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            margin: 0 0 14px;
+            color: var(--caseg-green);
+            font-size: 18px;
+            font-weight: 900;
         }
 
-        .banner-modal-overlay {
-            position: fixed;
-            inset: 0;
-            background: rgba(15, 23, 42, 0.45);
-            backdrop-filter: blur(6px);
-            -webkit-backdrop-filter: blur(6px);
+        .about-card h3 i {
+            font-size: 34px;
+            color: var(--caseg-green);
+            flex-shrink: 0;
+        }
+
+        .about-card p {
+            position: relative;
+            z-index: 2;
+            margin: 0;
+            color: #111111;
+            line-height: 1.7;
+            font-size: 15px;
+            max-width: 78%;
+        }
+
+        .about-card-bg-icon {
+            position: absolute;
+            right: 18px;
+            bottom: 8px;
+            font-size: 104px;
+            color: rgba(0, 0, 0, 0.055);
+            line-height: 1;
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        .about-card-ornament {
+            position: absolute;
+            left: 30px;
+            bottom: 16px;
+            display: grid;
+            grid-template-columns: repeat(2, 7px);
+            gap: 7px;
+            z-index: 1;
+            opacity: 0.45;
+        }
+
+        .about-card-ornament span {
+            width: 7px;
+            height: 7px;
+            background: rgba(0, 0, 0, 0.08);
+            transform: rotate(45deg);
+            border-radius: 1px;
+        }
+
+        .about-card.security-card .about-card-bg-icon {
+            right: 24px;
+            bottom: 10px;
+            font-size: 106px;
+        }
+
+        .about-card.organization-card .about-card-bg-icon {
+            right: 18px;
+            bottom: 8px;
+            font-size: 98px;
+        }
+
+        .about-card.practicality-card .about-card-bg-icon {
+            right: 18px;
+            bottom: 8px;
+            font-size: 102px;
+        }
+
+        .home-services {
+            margin-top: 28px;
+        }
+
+        .home-section-kicker {
+            text-align: center;
+            color: var(--caseg-green);
+            font-size: 14px;
+            font-weight: 900;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+
+        .home-services-grid {
+            display: grid;
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+            gap: 16px;
+            width: 100%;
+            margin: 0 auto;
+        }
+
+        .home-service-card {
+            background: #ffffff;
+            border-radius: var(--radius-card);
+            padding: 24px 18px;
+            text-align: center;
+            border: 1px solid #eeeeee;
+            box-shadow: 0 8px 22px rgba(0, 0, 0, 0.06);
+            min-height: 220px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .home-service-card > i {
+            font-size: 42px;
+            margin-bottom: 16px;
+        }
+
+        .home-service-card:nth-child(1) > i,
+        .home-service-card:nth-child(3) > i {
+            color: #1f8f3a;
+        }
+
+        .home-service-card:nth-child(2) > i,
+        .home-service-card:nth-child(5) > i {
+            color: var(--caseg-yellow);
+        }
+
+        .home-service-card:nth-child(4) > i {
+            color: var(--caseg-red);
+        }
+
+        .home-service-card h3 {
+            margin: 0 0 10px;
+            color: #111111;
+            font-size: 16px;
+            line-height: 1.25;
+            font-weight: 900;
+        }
+
+        .home-service-card p {
+            margin: 0;
+            color: #333333;
+            font-size: 13px;
+            line-height: 1.55;
+        }
+
+        .home-service-more {
+            border: none;
+            background: transparent;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin-top: auto;
+            padding: 18px 0 0;
+            color: var(--caseg-green);
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 900;
+            cursor: pointer;
+            font-family: inherit;
+        }
+
+        .home-service-more i {
+            font-size: 13px !important;
+            margin: 0 !important;
+            transition: transform 0.2s ease;
+        }
+
+        .home-service-more:hover {
+            color: var(--caseg-green-dark);
+        }
+
+        .home-service-more:hover i {
+            transform: translateX(3px);
+        }
+
+        /* ===== FAIXA DE NÚMEROS ALINHADA COM OS CARDS ===== */
+        .home-numbers {
+            width: calc(100% - 56px);
+            max-width: var(--container-inner);
+            margin: 26px auto 0;
+            border-radius: 18px;
+            overflow: hidden;
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 0;
+            background-image: url("../assets/img/fundo-industrial-caseg.png");
+            background-position: center;
+            background-size: cover;
+            background-repeat: no-repeat;
+            box-shadow: 0 14px 28px rgba(0, 0, 0, 0.16);
+        }
+
+        .home-number-item {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 20px 18px;
+            border-right: 1px solid rgba(255, 255, 255, 0.14);
+            background: transparent;
+        }
+
+        .home-number-item:last-child {
+            border-right: none;
+        }
+
+        .home-number-item i {
+            width: 58px;
+            height: 58px;
+            border-radius: 999px;
+            border: 2px solid #b8ef14;
+            color: #b8ef14;
+            font-size: 24px;
+            flex-shrink: 0;
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 20px;
-            z-index: 9999;
+            background: rgba(0, 0, 0, 0.22);
+        }
+
+        .home-number-item strong {
+            display: block;
+            font-size: 20px;
+            line-height: 1.1;
+            margin-bottom: 5px;
+            color: #b8ef14;
+            font-weight: 900;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+        }
+
+        .home-number-item span {
+            display: block;
+            font-size: 13px;
+            line-height: 1.45;
+            color: #ffffff;
+            font-weight: 700;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+        }
+
+        .home-cta {
+            position: relative;
+            overflow: hidden;
+            width: calc(100% - 56px);
+            max-width: var(--container-inner);
+            margin: 26px auto 0;
+            background: #ffffff;
+            border: none;
+            border-radius: 0;
+            padding: 26px 42px 28px;
+            box-shadow: none;
+            display: grid;
+            grid-template-columns: 300px 1fr 245px;
+            gap: 20px;
+            align-items: center;
+        }
+
+        .home-cta-left {
+            position: relative;
+            min-height: 178px;
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            z-index: 2;
+        }
+
+        .home-cta-dots {
+            position: absolute;
+            top: 8px;
+            left: 0;
+            display: grid;
+            grid-template-columns: repeat(4, 6px);
+            gap: 6px;
+            opacity: 0.35;
+            z-index: 1;
+        }
+
+        .home-cta-dots span {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #bcbcbc;
+        }
+
+        .home-cta-epi-img {
+            position: relative;
+            z-index: 2;
+            width: 265px;
+            max-width: 100%;
+            height: auto;
+            display: block;
+            object-fit: contain;
+        }
+
+        .home-cta-content {
+            position: relative;
+            z-index: 2;
+            text-align: left;
+            max-width: 520px;
+        }
+
+        .home-cta h2 {
+            margin: 0 0 10px;
+            color: #111111;
+            font-size: 25px;
+            line-height: 1.16;
+            font-weight: 900;
+        }
+
+        .home-cta h2 span {
+            color: var(--caseg-green);
+        }
+
+        .home-cta p {
+            margin: 0 0 18px;
+            color: #333333;
+            font-size: 14px;
+            line-height: 1.55;
+            max-width: 430px;
+        }
+
+        .home-cta-actions {
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            gap: 14px;
+            flex-wrap: nowrap;
+            margin: 0;
+        }
+
+        .btn-primary,
+        .btn-secondary {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 9px;
+            border-radius: 8px;
+            padding: 13px 22px;
+            font-size: 14px;
+            font-weight: 900;
+            text-decoration: none;
+            min-width: 160px;
+            white-space: nowrap;
+        }
+
+        .btn-primary {
+            background: var(--caseg-green);
+            border: 1.5px solid var(--caseg-green);
+            color: #ffffff;
+        }
+
+        .btn-primary:hover {
+            background: var(--caseg-green-dark);
+            border-color: var(--caseg-green-dark);
+        }
+
+        .btn-secondary {
+            background: #ffffff;
+            border: 1.5px solid var(--caseg-green);
+            color: var(--caseg-green);
+        }
+
+        .btn-secondary:hover {
+            background: var(--caseg-green);
+            color: #ffffff;
+        }
+
+        .home-cta-watermark {
+            position: relative;
+            z-index: 2;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            pointer-events: none;
+        }
+
+        .home-cta-watermark img {
+            width: 225px;
+            max-width: 100%;
+            height: auto;
+            display: block;
+            object-fit: contain;
+            opacity: 1;
+            filter: none;
+        }
+
+        .service-modal-overlay,
+        .banner-modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.52);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 22px;
             opacity: 0;
             visibility: hidden;
             transition: opacity 0.25s ease, visibility 0.25s ease;
         }
 
+        .service-modal-overlay {
+            z-index: 10000;
+        }
+
+        .banner-modal-overlay {
+            z-index: 9999;
+        }
+
+        .service-modal-overlay.active,
         .banner-modal-overlay.active {
             opacity: 1;
             visibility: visible;
         }
 
+        .service-modal,
         .banner-modal {
             width: 100%;
-            max-width: 760px;
+            max-width: 820px;
             background: #ffffff;
             border-radius: 24px;
-            box-shadow: 0 24px 60px rgba(0, 0, 0, 0.24);
             overflow: hidden;
-            transform: translateY(18px) scale(0.98);
+            box-shadow: 0 28px 70px rgba(0, 0, 0, 0.28);
+            transform: translateY(18px) scale(0.97);
             transition: transform 0.25s ease;
+            position: relative;
         }
 
+        .service-modal-overlay.active .service-modal,
         .banner-modal-overlay.active .banner-modal {
             transform: translateY(0) scale(1);
         }
 
-        .banner-modal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            gap: 16px;
-            padding: 24px 24px 14px;
-            border-bottom: 1px solid #e5e7eb;
+        .service-modal::before,
+        .banner-modal::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 5px;
+            background: linear-gradient(
+                90deg,
+                var(--caseg-green) 0%,
+                #1f8f3a 33%,
+                var(--caseg-yellow) 68%,
+                var(--caseg-red) 100%
+            );
         }
 
+        .service-modal-header,
+        .banner-modal-header {
+            padding: 30px 32px 18px;
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 22px;
+            border-bottom: 1px solid #edf0f2;
+        }
+
+        .service-modal-heading,
+        .banner-modal-heading {
+            display: flex;
+            align-items: center;
+            gap: 18px;
+        }
+
+        .service-modal-icon,
+        .banner-modal-icon {
+            width: 64px;
+            height: 64px;
+            border-radius: 16px;
+            background: rgba(0, 107, 47, 0.10);
+            color: var(--caseg-green);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            flex-shrink: 0;
+        }
+
+        .banner-modal-icon {
+            font-size: 31px;
+        }
+
+        .service-modal-icon.yellow {
+            background: rgba(255, 176, 0, 0.14);
+            color: var(--caseg-yellow);
+        }
+
+        .service-modal-icon.red {
+            background: rgba(214, 31, 38, 0.12);
+            color: var(--caseg-red);
+        }
+
+        .service-modal-title-group span,
+        .banner-modal-title-group span {
+            display: block;
+            margin-bottom: 6px;
+            color: var(--caseg-green);
+            text-transform: uppercase;
+            font-size: 12px;
+            font-weight: 900;
+            letter-spacing: 0.8px;
+        }
+
+        .service-modal-title-group h2,
         .banner-modal-title {
             margin: 0;
+            color: #111111;
             font-size: 28px;
             line-height: 1.2;
-            color: #0f172a;
+            font-weight: 900;
         }
 
+        .service-modal-close,
         .banner-modal-close {
-            border: none;
-            background: #f1f5f9;
-            color: #0f172a;
             width: 42px;
             height: 42px;
+            border: none;
             border-radius: 999px;
+            background: #f1f5f9;
+            color: #111111;
             cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             font-size: 18px;
             flex-shrink: 0;
-            transition: background 0.2s ease, transform 0.2s ease;
+            transition: background 0.2s ease, color 0.2s ease;
         }
 
+        .service-modal-close:hover,
         .banner-modal-close:hover {
-            background: #e2e8f0;
-            transform: scale(1.05);
+            background: var(--caseg-green);
+            color: #ffffff;
+        }
+
+        .service-modal-body,
+        .banner-modal-body {
+            padding: 24px 32px 8px;
+            position: relative;
         }
 
         .banner-modal-body {
-            padding: 22px 24px 28px;
+            padding: 24px 32px 34px;
         }
 
+        .service-modal-body::after,
+        .banner-modal-body::after {
+            content: "";
+            position: absolute;
+            pointer-events: none;
+            background: url("../assets/img/icone-documentos-home.png") center/contain no-repeat;
+            opacity: 0.10;
+        }
+
+        .service-modal-body::after {
+            right: 26px;
+            bottom: 8px;
+            width: 160px;
+            height: 160px;
+        }
+
+        .banner-modal-body::after {
+            right: 28px;
+            bottom: 0;
+            width: 170px;
+            height: 170px;
+        }
+
+        .service-modal-description,
         .banner-modal-text {
             margin: 0;
             color: #334155;
+            font-size: 16px;
             line-height: 1.8;
-            font-size: 17px;
+            max-width: 680px;
+            position: relative;
+            z-index: 2;
+        }
+
+        .service-modal-description {
+            margin-bottom: 20px;
+            line-height: 1.75;
+            max-width: 660px;
+        }
+
+        .banner-modal-text {
             white-space: pre-line;
+        }
+
+        .service-modal-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+            position: relative;
+            z-index: 2;
+        }
+
+        .service-modal-list li {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            color: #1f2937;
+            font-size: 14px;
+            line-height: 1.5;
+            background: #f8fafc;
+            border: 1px solid #eef2f7;
+            border-radius: 12px;
+            padding: 12px 14px;
+        }
+
+        .service-modal-list li i {
+            color: var(--caseg-green);
+            margin-top: 3px;
+            flex-shrink: 0;
+        }
+
+        .service-modal-footer {
+            padding: 22px 32px 30px;
+            display: flex;
+            justify-content: flex-start;
+            align-items: center;
+            gap: 14px;
+            flex-wrap: wrap;
+        }
+
+        .service-modal-footer .btn-primary,
+        .service-modal-footer .btn-secondary {
+            min-width: 170px;
         }
 
         body.modal-open {
             overflow: hidden;
         }
 
+        .caseg-footer {
+            margin-top: 0;
+            background: var(--caseg-footer);
+            color: #ffffff;
+            border-top: none;
+            padding: 28px 0 18px;
+            position: relative;
+        }
+
+        .caseg-footer::after {
+            content: "";
+            position: absolute;
+            left: 0;
+            bottom: 0;
+            width: 100%;
+            height: 4px;
+            background: linear-gradient(
+                90deg,
+                var(--caseg-green) 0%,
+                #1f8f3a 33%,
+                var(--caseg-yellow) 68%,
+                var(--caseg-red) 100%
+            );
+        }
+
+        .caseg-footer-container {
+            width: calc(100% - 56px);
+            max-width: var(--container-inner);
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1.35fr 0.8fr 1fr 1fr;
+            gap: 34px;
+            text-align: left;
+            align-items: start;
+        }
+
+        .caseg-footer-logo {
+            width: 180px;
+            height: auto;
+            margin-bottom: 10px;
+            display: block;
+        }
+
+        .caseg-footer p {
+            margin: 0;
+            color: #f3f4f6;
+            font-size: 14px;
+            line-height: 1.55;
+        }
+
+        .caseg-footer h3 {
+            margin: 0 0 12px;
+            color: #ffffff;
+            font-size: 16px;
+        }
+
+        .caseg-footer a {
+            display: block;
+            color: #ffffff;
+            text-decoration: none;
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+
+        .caseg-footer a:hover {
+            color: #5ad16b;
+            text-decoration: none;
+        }
+
+        .caseg-footer-social {
+            display: flex;
+            gap: 10px;
+            margin-top: 14px;
+        }
+
+        .caseg-footer-social a {
+            width: 30px;
+            height: 30px;
+            margin: 0;
+            border-radius: 999px;
+            background: var(--caseg-green);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #ffffff;
+        }
+
+        .caseg-footer-bottom {
+            width: calc(100% - 56px);
+            max-width: var(--container-inner);
+            margin: 20px auto 0;
+            padding-top: 12px;
+            border-top: 1px solid rgba(255, 255, 255, 0.12);
+            text-align: center;
+            color: #ffffff;
+            font-size: 13px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .caseg-footer-bottom a {
+            display: inline;
+            margin: 0;
+            color: #ffffff;
+            font-size: inherit;
+        }
+
+        @media (max-width: 1100px) {
+            .site-header .header-container,
+            .home-banners-section,
+            .home-institutional,
+            .home-about,
+            .home-services,
+            .home-cta,
+            .caseg-footer-container,
+            .caseg-footer-bottom {
+                width: calc(100% - 44px);
+            }
+
+            .home-numbers {
+                width: calc(100% - 44px);
+                max-width: var(--container-inner);
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .home-number-item:nth-child(2) {
+                border-right: none;
+            }
+
+            .home-number-item:nth-child(1),
+            .home-number-item:nth-child(2) {
+                border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+            }
+
+            .header-tagline-inline {
+                max-width: 260px;
+            }
+
+            .header-tagline-inline p {
+                font-size: 14px;
+            }
+
+            .home-services-grid {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+            }
+
+            .home-cta {
+                grid-template-columns: 250px 1fr 190px;
+                gap: 16px;
+                padding: 24px 24px 28px;
+            }
+
+            .home-cta-epi-img {
+                width: 230px;
+            }
+
+            .home-cta-watermark img {
+                width: 180px;
+            }
+
+            .btn-primary,
+            .btn-secondary {
+                min-width: 145px;
+                padding: 12px 18px;
+            }
+        }
+
         @media (max-width: 900px) {
+            .site-header .header-container {
+                flex-direction: column;
+                justify-content: center;
+                gap: 12px;
+                padding: 12px 0 10px;
+                min-height: auto;
+            }
+
+            .header-brand {
+                width: 100%;
+                justify-content: center;
+                flex-direction: column;
+                gap: 10px;
+            }
+
+            .header-tagline-inline {
+                max-width: 100%;
+                padding-left: 0;
+                border-left: none;
+                text-align: center;
+                justify-content: center;
+            }
+
+            .main-nav {
+                justify-content: center;
+                gap: 14px;
+            }
+
             .home-institutional-grid,
             .home-about-cards {
                 grid-template-columns: 1fr;
             }
+
+            .home-institutional-card {
+                min-height: auto;
+            }
+
+            .about-card p {
+                max-width: 85%;
+            }
+
+            .home-cta {
+                grid-template-columns: 1fr;
+                text-align: center;
+                gap: 12px;
+            }
+
+            .home-cta-left {
+                justify-content: center;
+                min-height: auto;
+            }
+
+            .home-cta-content {
+                text-align: center;
+                max-width: 100%;
+                margin-left: auto;
+                margin-right: auto;
+            }
+
+            .home-cta p {
+                margin-left: auto;
+                margin-right: auto;
+            }
+
+            .home-cta-actions {
+                justify-content: center;
+            }
+
+            .home-cta-watermark {
+                display: none;
+            }
+
+            .caseg-footer-container {
+                grid-template-columns: 1fr 1fr;
+            }
+
+            .service-modal-list {
+                grid-template-columns: 1fr;
+            }
+
+            .service-modal-body::after,
+            .banner-modal-body::after {
+                width: 120px;
+                height: 120px;
+                opacity: 0.07;
+            }
         }
 
         @media (max-width: 768px) {
+            .site-header .header-container,
+            .home-banners-section,
+            .home-institutional,
+            .home-about,
+            .home-services,
+            .home-cta,
+            .caseg-footer-container,
+            .caseg-footer-bottom {
+                width: calc(100% - 28px);
+            }
+
+            .home-numbers {
+                width: calc(100% - 28px);
+                max-width: 100%;
+                grid-template-columns: 1fr;
+            }
+
+            .site-header .header-container {
+                min-height: auto;
+                padding: 12px 0 10px;
+            }
+
+            .site-logo {
+                width: 170px;
+            }
+
+            .header-tagline-inline p {
+                font-size: 13px;
+                line-height: 1.5;
+            }
+
+            .main-nav {
+                gap: 8px;
+            }
+
+            .main-nav a {
+                font-size: 13px;
+                padding: 6px 6px;
+            }
+
+            .main-nav .nav-login {
+                padding: 8px 12px;
+            }
+
             .home-main-container {
-                padding: 20px 16px 50px;
+                padding-top: 14px;
             }
 
             .home-carousel {
-                border-radius: 18px;
-                min-height: 220px;
+                border-radius: 14px;
+                aspect-ratio: 16 / 9;
             }
 
             .home-carousel-placeholder {
-                min-height: 220px;
+                min-height: 240px;
+                padding: 26px 22px;
             }
 
             .home-carousel-placeholder-content h2 {
-                font-size: 24px;
+                font-size: 32px;
             }
 
             .home-carousel-placeholder-content p {
-                font-size: 16px;
+                font-size: 15px;
             }
 
             .home-carousel-nav {
-                width: 42px;
-                height: 42px;
+                width: 38px;
+                height: 38px;
+                font-size: 14px;
             }
 
             .home-carousel-nav.prev {
@@ -395,48 +1477,172 @@
                 right: 10px;
             }
 
-            .home-institutional-card h3 {
-                font-size: 20px;
-            }
-
-            .home-cta {
-                padding: 28px 20px;
-            }
-
-            .banner-modal-header {
-                padding: 20px 20px 12px;
-            }
-
-            .banner-modal-title {
+            .section-title h2 {
                 font-size: 24px;
             }
 
-            .banner-modal-body {
-                padding: 18px 20px 24px;
+            .about-card {
+                min-height: auto;
             }
 
+            .about-card p {
+                max-width: 100%;
+                padding-right: 56px;
+            }
+
+            .about-card-bg-icon {
+                font-size: 82px !important;
+                right: 14px !important;
+                bottom: 10px !important;
+            }
+
+            .home-services-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .home-number-item {
+                border-right: none;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.14) !important;
+                padding: 18px 16px;
+            }
+
+            .home-number-item:last-child {
+                border-bottom: none !important;
+            }
+
+            .home-number-item strong {
+                font-size: 18px;
+            }
+
+            .home-number-item span {
+                font-size: 12px;
+            }
+
+            .home-cta {
+                padding: 22px 16px 24px;
+            }
+
+            .home-cta-epi-img {
+                width: 230px;
+            }
+
+            .home-cta h2 {
+                font-size: 24px;
+            }
+
+            .home-cta-actions {
+                flex-direction: row;
+                justify-content: center;
+                gap: 12px;
+                flex-wrap: wrap;
+            }
+
+            .btn-primary,
+            .btn-secondary {
+                width: auto;
+                min-width: 140px;
+                padding: 12px 16px;
+            }
+
+            .caseg-footer-container {
+                grid-template-columns: 1fr;
+                text-align: center;
+            }
+
+            .caseg-footer-logo {
+                margin-left: auto;
+                margin-right: auto;
+            }
+
+            .caseg-footer-social {
+                justify-content: center;
+            }
+
+            .caseg-footer-bottom {
+                flex-direction: column;
+                gap: 6px;
+            }
+
+            .service-modal-overlay,
+            .banner-modal-overlay {
+                padding: 14px;
+            }
+
+            .service-modal,
+            .banner-modal {
+                border-radius: 18px;
+            }
+
+            .service-modal-header,
+            .banner-modal-header {
+                padding: 24px 20px 16px;
+                gap: 14px;
+            }
+
+            .service-modal-heading,
+            .banner-modal-heading {
+                gap: 14px;
+            }
+
+            .service-modal-icon,
+            .banner-modal-icon {
+                width: 54px;
+                height: 54px;
+                font-size: 26px;
+                border-radius: 14px;
+            }
+
+            .service-modal-title-group h2,
+            .banner-modal-title {
+                font-size: 22px;
+            }
+
+            .service-modal-body,
+            .banner-modal-body {
+                padding: 20px 20px 24px;
+            }
+
+            .service-modal-description,
             .banner-modal-text {
-                font-size: 16px;
+                font-size: 15px;
+            }
+
+            .service-modal-footer {
+                padding: 20px 20px 24px;
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .service-modal-footer .btn-primary,
+            .service-modal-footer .btn-secondary {
+                width: 100%;
             }
         }
     </style>
 </head>
-<body>
 
+<body>
     <header class="site-header">
         <div class="header-container">
-            <a href="home.html" class="logo-link reveal-on-load delay-1">
-                <img
-                    src="/site-caseg-protege/logo_transparente.png"
-                    alt="Logo CASEG Protege"
-                    class="site-logo"
-                />
-            </a>
+            <div class="header-brand">
+                <a href="home.html" class="logo-link reveal-on-load delay-1">
+                    <img
+                        src="../assets/img/logo_transparente.png"
+                        alt="Logo CASEG Protege"
+                        class="site-logo"
+                    />
+                </a>
+
+                <div class="header-tagline-inline reveal-on-load delay-2">
+                    <p><span>CASEG Protege</span>, a segurança que sua empresa precisa.</p>
+                </div>
+            </div>
 
             <nav class="main-nav reveal-on-load delay-2">
                 <a href="servicos.html">Serviços</a>
                 <a href="avisos.html">Sobre</a>
                 <a href="contato.html">Contato</a>
+
                 <a href="login.html" class="nav-login">
                     <i class="fa-regular fa-user"></i>
                     Entrar
@@ -453,11 +1659,12 @@
                         <div class="home-carousel-slide">
                             <div class="home-carousel-placeholder">
                                 <div class="home-carousel-placeholder-content">
-                                    <i class="fa-solid fa-images"></i>
-                                    <h2>Carregando banners da Home...</h2>
+                                    <i class="fa-solid fa-helmet-safety"></i>
+                                    <h2>Sobre a <span>CASEG</span> Protege</h2>
                                     <p>
-                                        Os banners cadastrados no painel administrativo
-                                        aparecerão aqui em formato de carrossel.
+                                        Referência em segurança do trabalho e saúde do colaborador,
+                                        oferecendo soluções completas para um ambiente mais seguro,
+                                        produtivo e em conformidade com as normas.
                                     </p>
                                 </div>
                             </div>
@@ -489,7 +1696,7 @@
 
         <section class="home-institutional reveal-on-load delay-3">
             <div class="section-title">
-                <h2>Conheça melhor a CASEG Protege</h2>
+                <h2>Conheça melhor a <span>CASEG Protege</span></h2>
                 <p>
                     Uma estrutura preparada para unir segurança, organização e atendimento profissional.
                 </p>
@@ -498,87 +1705,289 @@
             <div class="home-institutional-grid">
                 <article class="home-institutional-card reveal-on-load delay-3">
                     <div class="home-institutional-icon">
-                        <i class="fa-regular fa-building"></i>
+                        <i class="fa-solid fa-people-group"></i>
                     </div>
-                    <h3>Quem Somos</h3>
+
+                    <h3>Quem somos</h3>
+
                     <p>
                         A CASEG Protege atua com foco em organização, segurança documental
                         e apoio operacional, oferecendo uma estrutura pensada para gerar
                         confiança, praticidade e suporte profissional aos clientes.
                     </p>
+
+                    <a href="avisos.html" class="home-card-link">
+                        Saiba mais
+                        <i class="fa-solid fa-arrow-right"></i>
+                    </a>
                 </article>
 
                 <article class="home-institutional-card reveal-on-load delay-4">
                     <div class="home-institutional-icon">
                         <i class="fa-solid fa-briefcase"></i>
                     </div>
+
                     <h3>O que entregamos</h3>
+
                     <p>
                         Entregamos uma experiência mais organizada e segura para o acesso
-                        às informações, com centralização de documentos, comunicação mais clara
-                        e uma base preparada para informativos, serviços e relacionamento.
+                        às informações, com centralização de documentos, comunicação clara
+                        e uma estrutura preparada para informações, serviços e relacionamentos.
                     </p>
+
+                    <a href="servicos.html" class="home-card-link">
+                        Saiba mais
+                        <i class="fa-solid fa-arrow-right"></i>
+                    </a>
                 </article>
 
                 <article class="home-institutional-card reveal-on-load delay-5">
                     <div class="home-institutional-icon">
-                        <i class="fa-solid fa-users"></i>
+                        <i class="fa-regular fa-star"></i>
                     </div>
+
                     <h3>Pra quem entregamos</h3>
+
                     <p>
                         Nossa estrutura é voltada para empresas e clientes que precisam
                         de mais controle, praticidade e confiança na gestão de documentos,
                         informações e processos de atendimento.
                     </p>
+
+                    <a href="contato.html" class="home-card-link">
+                        Saiba mais
+                        <i class="fa-solid fa-arrow-right"></i>
+                    </a>
                 </article>
             </div>
         </section>
 
         <section class="home-about reveal-on-load delay-4">
             <div class="section-title">
-                <h2>Sobre a CASEG Protege</h2>
+                <h2>Sobre a <span>CASEG Protege</span></h2>
                 <p>
-                    Uma estrutura pensada para oferecer atendimento, organização
-                    documental e acesso seguro às informações dos clientes.
+                    Uma estrutura pensada para oferecer atendimento, organização documental
+                    e acesso seguro às informações dos clientes.
                 </p>
             </div>
 
             <div class="home-about-cards">
-                <div class="about-card reveal-on-load delay-4">
-                    <h3>Segurança</h3>
-                    <p>
-                        Controle de acesso, autenticação segura e proteção no
-                        armazenamento dos documentos.
-                    </p>
+                <div class="about-card security-card reveal-on-load delay-4">
+                    <div class="about-card-content">
+                        <h3>
+                            <i class="fa-solid fa-shield-halved"></i>
+                            Segurança
+                        </h3>
+
+                        <p>
+                            Controle de acesso, autenticação segura e proteção no
+                            armazenamento dos documentos.
+                        </p>
+                    </div>
+
+                    <div class="about-card-bg-icon" aria-hidden="true">
+                        <i class="fa-solid fa-lock"></i>
+                    </div>
+
+                    <div class="about-card-ornament" aria-hidden="true">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </div>
                 </div>
 
-                <div class="about-card reveal-on-load delay-5">
-                    <h3>Organização</h3>
-                    <p>
-                        Centralização de arquivos, dados e processos em um ambiente
-                        limpo e eficiente.
-                    </p>
+                <div class="about-card organization-card reveal-on-load delay-5">
+                    <div class="about-card-content">
+                        <h3>
+                            <i class="fa-regular fa-folder-open"></i>
+                            Organização
+                        </h3>
+
+                        <p>
+                            Centralização de arquivos, dados e processos em um ambiente
+                            limpo e eficiente.
+                        </p>
+                    </div>
+
+                    <div class="about-card-bg-icon" aria-hidden="true">
+                        <i class="fa-solid fa-folder-open"></i>
+                    </div>
+
+                    <div class="about-card-ornament" aria-hidden="true">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </div>
                 </div>
 
-                <div class="about-card reveal-on-load delay-6">
-                    <h3>Praticidade</h3>
-                    <p>
-                        Uma experiência simples e objetiva para facilitar a rotina
-                        administrativa e do cliente.
-                    </p>
+                <div class="about-card practicality-card reveal-on-load delay-6">
+                    <div class="about-card-content">
+                        <h3>
+                            <i class="fa-regular fa-user"></i>
+                            Praticidade
+                        </h3>
+
+                        <p>
+                            Uma experiência simples e objetiva para facilitar a rotina
+                            administrativa e do cliente.
+                        </p>
+                    </div>
+
+                    <div class="about-card-bg-icon" aria-hidden="true">
+                        <i class="fa-solid fa-shield-halved"></i>
+                    </div>
+
+                    <div class="about-card-ornament" aria-hidden="true">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </div>
                 </div>
             </div>
         </section>
 
-        <section class="home-cta reveal-on-load delay-5">
-            <h2>Precisa acessar seus documentos ou falar com nossa equipe?</h2>
-            <p>
-                Entre na Área do Cliente ou utilize nossos canais de contato para atendimento.
-            </p>
+        <section class="home-services reveal-on-load delay-5">
+            <div class="home-section-kicker">Nossos Serviços</div>
 
-            <div class="home-cta-actions">
-                <a href="login.html" class="btn-primary">Entrar</a>
-                <a href="contato.html" class="btn-secondary">Falar Conosco</a>
+            <div class="section-title">
+                <h2>Soluções completas para sua empresa</h2>
+            </div>
+
+            <div class="home-services-grid">
+                <article class="home-service-card">
+                    <i class="fa-solid fa-shield-halved"></i>
+                    <h3>Gestão de SST</h3>
+                    <p>Implantação e gestão completa de Segurança do Trabalho.</p>
+                    <button type="button" class="home-service-more" data-service="gestao-sst">
+                        Saiba mais
+                        <i class="fa-solid fa-arrow-right"></i>
+                    </button>
+                </article>
+
+                <article class="home-service-card">
+                    <i class="fa-solid fa-clipboard-list"></i>
+                    <h3>Laudos e Documentos</h3>
+                    <p>Elaboração de laudos técnicos e documentação obrigatória.</p>
+                    <button type="button" class="home-service-more" data-service="laudos-documentos">
+                        Saiba mais
+                        <i class="fa-solid fa-arrow-right"></i>
+                    </button>
+                </article>
+
+                <article class="home-service-card">
+                    <i class="fa-solid fa-graduation-cap"></i>
+                    <h3>Treinamentos</h3>
+                    <p>Treinamentos presenciais e online conforme as NRs.</p>
+                    <button type="button" class="home-service-more" data-service="treinamentos">
+                        Saiba mais
+                        <i class="fa-solid fa-arrow-right"></i>
+                    </button>
+                </article>
+
+                <article class="home-service-card">
+                    <i class="fa-solid fa-stethoscope"></i>
+                    <h3>Exames Ocupacionais</h3>
+                    <p>PCMSO, exames clínicos e complementares com agilidade e qualidade.</p>
+                    <button type="button" class="home-service-more" data-service="exames-ocupacionais">
+                        Saiba mais
+                        <i class="fa-solid fa-arrow-right"></i>
+                    </button>
+                </article>
+
+                <article class="home-service-card">
+                    <i class="fa-solid fa-file-lines"></i>
+                    <h3>eSocial SST</h3>
+                    <p>Gestão dos eventos de SST no eSocial com segurança e precisão.</p>
+                    <button type="button" class="home-service-more" data-service="esocial-sst">
+                        Saiba mais
+                        <i class="fa-solid fa-arrow-right"></i>
+                    </button>
+                </article>
+            </div>
+        </section>
+
+        <section class="home-numbers reveal-on-load delay-6">
+            <div class="home-number-item">
+                <i class="fa-solid fa-award"></i>
+                <div>
+                    <strong>+10 Anos</strong>
+                    <span>de experiência no mercado</span>
+                </div>
+            </div>
+
+            <div class="home-number-item">
+                <i class="fa-solid fa-users"></i>
+                <div>
+                    <strong>+100</strong>
+                    <span>empresas atendidas</span>
+                </div>
+            </div>
+
+            <div class="home-number-item">
+                <i class="fa-solid fa-shield-halved"></i>
+                <div>
+                    <strong>100%</strong>
+                    <span>compromisso com segurança</span>
+                </div>
+            </div>
+
+            <div class="home-number-item">
+                <i class="fa-solid fa-handshake"></i>
+                <div>
+                    <strong>Compromisso</strong>
+                    <span>com segurança e resultados</span>
+                </div>
+            </div>
+        </section>
+
+        <section class="home-cta reveal-on-load delay-7">
+            <div class="home-cta-left">
+                <div class="home-cta-dots" aria-hidden="true">
+                    <span></span><span></span><span></span><span></span>
+                    <span></span><span></span><span></span><span></span>
+                    <span></span><span></span><span></span><span></span>
+                    <span></span><span></span><span></span><span></span>
+                </div>
+
+                <img
+                    src="../assets/img/epi-home.png"
+                    alt="Conjunto de EPIs CASEG Protege"
+                    class="home-cta-epi-img"
+                />
+            </div>
+
+            <div class="home-cta-content">
+                <h2>
+                    Precisa acessar seus <span>documentos</span><br />
+                    ou falar com <span>nossa equipe?</span>
+                </h2>
+
+                <p>
+                    Entre na Área do Cliente ou utilize nossos canais de contato
+                    para atendimento.
+                </p>
+
+                <div class="home-cta-actions">
+                    <a href="login.html" class="btn-primary">
+                        <i class="fa-regular fa-user"></i>
+                        Entrar
+                    </a>
+
+                    <a href="contato.html" class="btn-secondary">
+                        <i class="fa-brands fa-whatsapp"></i>
+                        Fale Conosco
+                    </a>
+                </div>
+            </div>
+
+            <div class="home-cta-watermark" aria-hidden="true">
+                <img
+                    src="../assets/img/icone-documentos-home.png"
+                    alt=""
+                />
             </div>
         </section>
     </main>
@@ -586,7 +1995,16 @@
     <div class="banner-modal-overlay" id="bannerModalOverlay">
         <div class="banner-modal" id="bannerModal">
             <div class="banner-modal-header">
-                <h2 class="banner-modal-title" id="bannerModalTitle">Título do Banner</h2>
+                <div class="banner-modal-heading">
+                    <div class="banner-modal-icon">
+                        <i class="fa-solid fa-circle-info"></i>
+                    </div>
+
+                    <div class="banner-modal-title-group">
+                        <span>Informativo CASEG Protege</span>
+                        <h2 class="banner-modal-title" id="bannerModalTitle">Título do Banner</h2>
+                    </div>
+                </div>
 
                 <button
                     type="button"
@@ -604,12 +2022,120 @@
         </div>
     </div>
 
-    <footer>
-        <p>© CASEG Protege</p>
-        <p>
-            <a href="termos-de-uso.html">Termos de Uso</a> —
+    <div class="service-modal-overlay" id="serviceModalOverlay">
+        <div class="service-modal" id="serviceModal">
+            <div class="service-modal-header">
+                <div class="service-modal-heading">
+                    <div class="service-modal-icon" id="serviceModalIcon">
+                        <i class="fa-solid fa-shield-halved"></i>
+                    </div>
+
+                    <div class="service-modal-title-group">
+                        <span>Serviço CASEG Protege</span>
+                        <h2 id="serviceModalTitle">Gestão de SST</h2>
+                    </div>
+                </div>
+
+                <button
+                    type="button"
+                    class="service-modal-close"
+                    id="serviceModalClose"
+                    aria-label="Fechar detalhes do serviço"
+                >
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="service-modal-body">
+                <p class="service-modal-description" id="serviceModalDescription"></p>
+                <ul class="service-modal-list" id="serviceModalList"></ul>
+            </div>
+
+            <div class="service-modal-footer">
+                <a href="contato.html" class="btn-primary">
+                    <i class="fa-brands fa-whatsapp"></i>
+                    Fale Conosco
+                </a>
+
+                <a href="servicos.html" class="btn-secondary">
+                    <i class="fa-solid fa-list-check"></i>
+                    Ver Serviços
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <footer class="caseg-footer">
+        <div class="caseg-footer-container">
+            <div>
+                <img
+                    src="../assets/img/logo_footer.png"
+                    alt="Logo CASEG Protege"
+                    class="caseg-footer-logo"
+                />
+
+                <p>
+                    Segurança do trabalho e saúde do colaborador com soluções
+                    completas para sua empresa.
+                </p>
+
+                <div class="caseg-footer-social">
+                    <a href="contato.html" aria-label="WhatsApp">
+                        <i class="fa-brands fa-whatsapp"></i>
+                    </a>
+
+                    <a href="contato.html" aria-label="E-mail">
+                        <i class="fa-regular fa-envelope"></i>
+                    </a>
+
+                    <a href="contato.html" aria-label="Instagram">
+                        <i class="fa-brands fa-instagram"></i>
+                    </a>
+                </div>
+            </div>
+
+            <div>
+                <h3>Navegação</h3>
+                <a href="servicos.html">Serviços</a>
+                <a href="avisos.html">Sobre</a>
+                <a href="contato.html">Contato</a>
+            </div>
+
+            <div>
+                <h3>Atendimento</h3>
+                <a href="contato.html">
+                    <i class="fa-brands fa-whatsapp"></i>
+                    WhatsApp
+                </a>
+
+                <a href="contato.html">
+                    <i class="fa-regular fa-envelope"></i>
+                    E-mail
+                </a>
+
+                <a href="login.html">
+                    <i class="fa-regular fa-user"></i>
+                    Área do Cliente
+                </a>
+            </div>
+
+            <div>
+                <h3>Horário de Atendimento</h3>
+                <p>
+                    <i class="fa-regular fa-clock"></i>
+                    Segunda a Sexta<br />
+                    08h às 18h
+                </p>
+            </div>
+        </div>
+
+        <div class="caseg-footer-bottom">
+            <span>© CASEG Protege</span>
+            <span>•</span>
+            <a href="termos-de-uso.html">Termos de Uso</a>
+            <span>•</span>
             <a href="politica-privacidade.html">Política de Privacidade</a>
-        </p>
+        </div>
     </footer>
 
     <script>
@@ -625,6 +2151,14 @@
             const bannerModalText = document.getElementById("bannerModalText");
             const bannerModalClose = document.getElementById("bannerModalClose");
 
+            const serviceModalOverlay = document.getElementById("serviceModalOverlay");
+            const serviceModalClose = document.getElementById("serviceModalClose");
+            const serviceModalIcon = document.getElementById("serviceModalIcon");
+            const serviceModalTitle = document.getElementById("serviceModalTitle");
+            const serviceModalDescription = document.getElementById("serviceModalDescription");
+            const serviceModalList = document.getElementById("serviceModalList");
+            const serviceButtons = document.querySelectorAll(".home-service-more");
+
             let banners = [];
             let currentSlide = 0;
             let autoplayInterval = null;
@@ -636,6 +2170,124 @@
             let touchEndY = 0;
             const autoplayDelay = 5000;
             const swipeThreshold = 50;
+
+            const serviceDetails = {
+                "gestao-sst": {
+                    title: "Gestão de SST",
+                    icon: "fa-solid fa-shield-halved",
+                    colorClass: "green",
+                    description:
+                        "A CASEG Protege auxilia sua empresa na organização, implantação e acompanhamento das rotinas de Segurança e Saúde do Trabalho, contribuindo para ambientes mais seguros, redução de riscos e maior controle das obrigações legais.",
+                    items: [
+                        "Apoio na gestão de documentos e rotinas de SST.",
+                        "Organização de informações para facilitar o acompanhamento.",
+                        "Suporte para melhoria dos processos de segurança.",
+                        "Foco em prevenção, conformidade e proteção dos colaboradores."
+                    ]
+                },
+                "laudos-documentos": {
+                    title: "Laudos e Documentos",
+                    icon: "fa-solid fa-clipboard-list",
+                    colorClass: "yellow",
+                    description:
+                        "A CASEG Protege oferece suporte na elaboração, controle e organização de laudos técnicos e documentos obrigatórios, ajudando sua empresa a manter informações acessíveis, atualizadas e alinhadas às exigências aplicáveis.",
+                    items: [
+                        "Organização documental de forma clara e segura.",
+                        "Apoio no controle de prazos e validade dos documentos.",
+                        "Centralização das informações para facilitar consultas.",
+                        "Mais praticidade para auditorias, fiscalizações e rotina interna."
+                    ]
+                },
+                "treinamentos": {
+                    title: "Treinamentos",
+                    icon: "fa-solid fa-graduation-cap",
+                    colorClass: "green",
+                    description:
+                        "Os treinamentos ajudam empresas e colaboradores a compreenderem práticas seguras, procedimentos internos e exigências relacionadas às Normas Regulamentadoras, fortalecendo a prevenção e a cultura de segurança.",
+                    items: [
+                        "Treinamentos presenciais e online conforme a necessidade.",
+                        "Conteúdos voltados à rotina real da empresa.",
+                        "Apoio na organização das capacitações obrigatórias.",
+                        "Mais consciência, prevenção e segurança para a equipe."
+                    ]
+                },
+                "exames-ocupacionais": {
+                    title: "Exames Ocupacionais",
+                    icon: "fa-solid fa-stethoscope",
+                    colorClass: "red",
+                    description:
+                        "A CASEG Protege apoia a gestão dos exames ocupacionais, contribuindo para o acompanhamento da saúde dos colaboradores e para uma rotina mais organizada em admissões, periódicos, retornos, mudanças de função e demissões.",
+                    items: [
+                        "Apoio na organização dos exames ocupacionais.",
+                        "Mais controle para admissões, periódicos e demissionais.",
+                        "Facilidade na comunicação e acompanhamento dos processos.",
+                        "Agilidade e segurança no atendimento às demandas da empresa."
+                    ]
+                },
+                "esocial-sst": {
+                    title: "eSocial SST",
+                    icon: "fa-solid fa-file-lines",
+                    colorClass: "yellow",
+                    description:
+                        "A CASEG Protege auxilia sua empresa na organização das informações relacionadas aos eventos de SST no eSocial, buscando mais segurança, precisão e controle no envio e acompanhamento das obrigações.",
+                    items: [
+                        "Organização das informações relacionadas ao eSocial SST.",
+                        "Apoio no controle de eventos, prazos e documentos.",
+                        "Mais segurança na rotina de obrigações trabalhistas.",
+                        "Redução de falhas por falta de organização documental."
+                    ]
+                }
+            };
+
+            function openServiceModal(serviceKey) {
+                const service = serviceDetails[serviceKey];
+                if (!service) return;
+
+                serviceModalIcon.className = "service-modal-icon";
+
+                if (service.colorClass === "yellow") {
+                    serviceModalIcon.classList.add("yellow");
+                }
+
+                if (service.colorClass === "red") {
+                    serviceModalIcon.classList.add("red");
+                }
+
+                serviceModalIcon.innerHTML = `<i class="${service.icon}"></i>`;
+                serviceModalTitle.textContent = service.title;
+                serviceModalDescription.textContent = service.description;
+
+                serviceModalList.innerHTML = service.items.map((item) => {
+                    return `
+                        <li>
+                            <i class="fa-solid fa-check"></i>
+                            <span>${item}</span>
+                        </li>
+                    `;
+                }).join("");
+
+                serviceModalOverlay.classList.add("active");
+                document.body.classList.add("modal-open");
+            }
+
+            function closeServiceModal() {
+                serviceModalOverlay.classList.remove("active");
+                document.body.classList.remove("modal-open");
+            }
+
+            serviceButtons.forEach((button) => {
+                button.addEventListener("click", function () {
+                    openServiceModal(button.dataset.service);
+                });
+            });
+
+            serviceModalClose.addEventListener("click", closeServiceModal);
+
+            serviceModalOverlay.addEventListener("click", function (event) {
+                if (event.target === serviceModalOverlay) {
+                    closeServiceModal();
+                }
+            });
 
             function openBannerModal(title, description) {
                 bannerModalTitle.textContent = title || "Informativo";
@@ -653,21 +2305,10 @@
                 const linkTarget = String(banner.link_target || "").trim();
                 const customLink = String(banner.link || "").trim();
 
-                if (linkTarget === "contato") {
-                    return "contato.html";
-                }
-
-                if (linkTarget === "servicos") {
-                    return "servicos.html";
-                }
-
-                if (linkTarget === "whatsapp") {
-                    return customLink || "contato.html";
-                }
-
-                if (linkTarget === "custom") {
-                    return customLink || "";
-                }
+                if (linkTarget === "contato") return "contato.html";
+                if (linkTarget === "servicos") return "servicos.html";
+                if (linkTarget === "whatsapp") return customLink || "contato.html";
+                if (linkTarget === "custom") return customLink || "";
 
                 return customLink || "";
             }
@@ -682,9 +2323,7 @@
             }
 
             function goToSlide(index) {
-                if (!banners.length) {
-                    return;
-                }
+                if (!banners.length) return;
 
                 if (index < 0) {
                     currentSlide = banners.length - 1;
@@ -732,10 +2371,7 @@
 
             function handleBannerAction(index) {
                 const banner = banners[index];
-
-                if (!banner) {
-                    return;
-                }
+                if (!banner) return;
 
                 const actionType = String(banner.action_type || "link").trim();
                 const resolvedLink = getResolvedLink(banner);
@@ -746,7 +2382,9 @@
                 }
 
                 if (actionType === "link" && resolvedLink) {
-                    const isExternal = resolvedLink.startsWith("http://") || resolvedLink.startsWith("https://");
+                    const isExternal =
+                        resolvedLink.startsWith("http://") ||
+                        resolvedLink.startsWith("https://");
 
                     if (isExternal) {
                         window.open(resolvedLink, "_blank", "noopener,noreferrer");
@@ -760,7 +2398,10 @@
                 const deltaX = touchEndX - touchStartX;
                 const deltaY = touchEndY - touchStartY;
 
-                if (Math.abs(deltaX) < swipeThreshold || Math.abs(deltaX) < Math.abs(deltaY)) {
+                if (
+                    Math.abs(deltaX) < swipeThreshold ||
+                    Math.abs(deltaX) < Math.abs(deltaY)
+                ) {
                     return;
                 }
 
@@ -774,7 +2415,9 @@
             }
 
             function renderCarousel(data) {
-                banners = Array.isArray(data) ? data.filter((banner) => banner.image_url) : [];
+                banners = Array.isArray(data)
+                    ? data.filter((banner) => banner.image_url)
+                    : [];
                 currentSlide = 0;
 
                 if (!banners.length) {
@@ -782,11 +2425,11 @@
                         <div class="home-carousel-slide">
                             <div class="home-carousel-placeholder">
                                 <div class="home-carousel-placeholder-content">
-                                    <i class="fa-solid fa-images"></i>
-                                    <h2>Nenhum banner disponível no momento</h2>
+                                    <i class="fa-solid fa-helmet-safety"></i>
+                                    <h2>Sobre a <span>CASEG</span> Protege</h2>
                                     <p>
                                         Assim que o administrador cadastrar banners ativos,
-                                        eles aparecerão aqui automaticamente.
+                                        eles aparecerão aqui automaticamente no carrossel da Home.
                                     </p>
                                 </div>
                             </div>
@@ -800,32 +2443,43 @@
                     return;
                 }
 
-                homeCarouselTrack.innerHTML = banners.map((banner, index) => {
-                    const title = String(banner.title || "Banner CASEG Protege").replace(/"/g, "&quot;");
-                    const imageUrl = String(banner.image_url || "").replace(/"/g, "&quot;");
+                homeCarouselTrack.innerHTML = banners
+                    .map((banner, index) => {
+                        const title = String(
+                            banner.title || "Banner CASEG Protege"
+                        ).replace(/"/g, "&quot;");
+                        const imageUrl = String(banner.image_url || "").replace(
+                            /"/g,
+                            "&quot;"
+                        );
 
-                    return `
-                        <div class="home-carousel-slide">
-                            <button
-                                type="button"
-                                class="home-carousel-slide-button"
-                                data-slide-index="${index}"
-                                aria-label="${title}"
-                            >
-                                <img src="${imageUrl}" alt="${title}" />
-                            </button>
-                        </div>
-                    `;
-                }).join("");
+                        return `
+                            <div class="home-carousel-slide">
+                                <button
+                                    type="button"
+                                    class="home-carousel-slide-button"
+                                    data-slide-index="${index}"
+                                    aria-label="${title}"
+                                >
+                                    <img src="${imageUrl}" alt="${title}" />
+                                </button>
+                            </div>
+                        `;
+                    })
+                    .join("");
 
-                homeCarouselDots.innerHTML = banners.map((_, index) => `
+                homeCarouselDots.innerHTML = banners
+                    .map(
+                        (_, index) => `
                     <button
                         type="button"
                         class="home-carousel-dot ${index === 0 ? "active" : ""}"
                         data-dot-index="${index}"
                         aria-label="Ir para o banner ${index + 1}"
                     ></button>
-                `).join("");
+                `
+                    )
+                    .join("");
 
                 homeCarouselPrev.classList.toggle("hidden", banners.length <= 1);
                 homeCarouselNext.classList.toggle("hidden", banners.length <= 1);
@@ -860,8 +2514,8 @@
                     const response = await fetch("http://localhost:3000/notices", {
                         method: "GET",
                         headers: {
-                            "Content-Type": "application/json"
-                        }
+                            "Content-Type": "application/json",
+                        },
                     });
 
                     const data = await response.json();
@@ -898,28 +2552,32 @@
                 startAutoplay();
             });
 
-            homeCarousel.addEventListener("touchstart", function (event) {
-                if (!event.touches || !event.touches.length) {
-                    return;
-                }
+            homeCarousel.addEventListener(
+                "touchstart",
+                function (event) {
+                    if (!event.touches || !event.touches.length) return;
 
-                isTouchInteracting = true;
-                stopAutoplay();
+                    isTouchInteracting = true;
+                    stopAutoplay();
 
-                touchStartX = event.touches[0].clientX;
-                touchStartY = event.touches[0].clientY;
-                touchEndX = touchStartX;
-                touchEndY = touchStartY;
-            }, { passive: true });
+                    touchStartX = event.touches[0].clientX;
+                    touchStartY = event.touches[0].clientY;
+                    touchEndX = touchStartX;
+                    touchEndY = touchStartY;
+                },
+                { passive: true }
+            );
 
-            homeCarousel.addEventListener("touchmove", function (event) {
-                if (!event.touches || !event.touches.length) {
-                    return;
-                }
+            homeCarousel.addEventListener(
+                "touchmove",
+                function (event) {
+                    if (!event.touches || !event.touches.length) return;
 
-                touchEndX = event.touches[0].clientX;
-                touchEndY = event.touches[0].clientY;
-            }, { passive: true });
+                    touchEndX = event.touches[0].clientX;
+                    touchEndY = event.touches[0].clientY;
+                },
+                { passive: true }
+            );
 
             homeCarousel.addEventListener("touchend", function () {
                 handleSwipeGesture();
@@ -936,7 +2594,18 @@
             });
 
             document.addEventListener("keydown", function (event) {
-                if (event.key === "Escape" && bannerModalOverlay.classList.contains("active")) {
+                if (
+                    event.key === "Escape" &&
+                    serviceModalOverlay.classList.contains("active")
+                ) {
+                    closeServiceModal();
+                    return;
+                }
+
+                if (
+                    event.key === "Escape" &&
+                    bannerModalOverlay.classList.contains("active")
+                ) {
                     closeBannerModal();
                 }
             });

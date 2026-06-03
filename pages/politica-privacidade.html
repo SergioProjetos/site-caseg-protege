@@ -10,14 +10,710 @@
         rel="stylesheet"
         href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
     />
+
+    <style>
+        .legal-public-page {
+            --legal-green: #176d2c;
+            --legal-green-light: #1f8f3a;
+            --legal-lime: #9fd117;
+            --legal-text: #1a1a1a;
+            --legal-muted: #59616d;
+            --legal-bg: #f5f6f4;
+            --legal-white: #ffffff;
+            --legal-border: #e2e5e1;
+            --legal-soft-green: #eaf5e5;
+            --legal-shadow: 0 14px 34px rgba(0, 0, 0, 0.08);
+            --legal-shadow-soft: 0 10px 22px rgba(0, 0, 0, 0.08);
+
+            background: var(--legal-bg);
+            color: var(--legal-text);
+        }
+
+        .legal-public-page * {
+            box-sizing: border-box;
+        }
+
+        .legal-public-page .site-header {
+            background: var(--legal-white);
+            border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+            box-shadow: 0 6px 22px rgba(0, 0, 0, 0.04);
+        }
+
+        .legal-public-page .header-container {
+            max-width: 1500px;
+            margin: 0 auto;
+            padding: 14px 28px;
+            display: grid;
+            grid-template-columns: 260px 1fr 140px;
+            align-items: center;
+            gap: 24px;
+        }
+
+        .legal-public-page .logo-link {
+            display: inline-flex;
+            align-items: center;
+            text-decoration: none;
+        }
+
+        .legal-public-page .site-logo {
+            width: 190px;
+            height: auto;
+        }
+
+        .legal-public-page .main-nav {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 46px;
+        }
+
+        .legal-public-page .main-nav a {
+            color: #111111;
+            text-decoration: none;
+            font-size: 17px;
+            font-weight: 800;
+            padding: 10px 0;
+            transition: color 0.2s ease;
+            background: transparent;
+            border: none;
+        }
+
+        .legal-public-page .main-nav a::before,
+        .legal-public-page .main-nav a::after {
+            content: none !important;
+            display: none !important;
+        }
+
+        .legal-public-page .main-nav a:hover {
+            color: var(--legal-green);
+        }
+
+        .legal-public-page .header-login-button {
+            height: 44px;
+            padding: 0 20px;
+            border-radius: 8px;
+            background: var(--legal-green);
+            color: #ffffff;
+            text-decoration: none;
+            font-weight: 800;
+            font-size: 15px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 9px;
+            box-shadow: 0 10px 20px rgba(23, 109, 44, 0.20);
+            transition: transform 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .legal-public-page .header-login-button:hover {
+            background: var(--legal-green-light);
+            transform: translateY(-2px);
+            box-shadow: 0 14px 26px rgba(23, 109, 44, 0.26);
+        }
+
+        .legal-public-page .header-login-button i {
+            font-size: 17px;
+        }
+
+        .legal-main {
+            max-width: 1500px;
+            margin: 0 auto;
+            padding: 0 28px 28px;
+        }
+
+        .legal-hero {
+            position: relative;
+            overflow: hidden;
+            border-radius: 18px;
+            background:
+                linear-gradient(
+                    90deg,
+                    rgba(0, 22, 14, 0.92) 0%,
+                    rgba(0, 38, 20, 0.76) 50%,
+                    rgba(0, 22, 14, 0.88) 100%
+                ),
+                url("../assets/img/fundo-industrial-caseg.png") center center / cover no-repeat;
+            color: #ffffff;
+            box-shadow: var(--legal-shadow);
+        }
+
+        .legal-hero-content {
+            min-height: 250px;
+            padding: 48px 72px;
+            display: grid;
+            grid-template-columns: 1fr auto;
+            align-items: center;
+            gap: 30px;
+        }
+
+        .legal-hero-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            width: fit-content;
+            margin-bottom: 18px;
+            padding: 8px 14px;
+            border-radius: 999px;
+            background: rgba(31, 143, 58, 0.92);
+            color: #ffffff;
+            font-size: 13px;
+            font-weight: 900;
+        }
+
+        .legal-hero-text h1 {
+            margin: 0 0 14px;
+            color: #ffffff;
+            font-size: 42px;
+            line-height: 1.12;
+            font-weight: 900;
+            letter-spacing: -0.6px;
+        }
+
+        .legal-hero-text h1 span {
+            color: var(--legal-lime);
+        }
+
+        .legal-hero-text p {
+            margin: 0;
+            max-width: 760px;
+            color: rgba(255, 255, 255, 0.88);
+            font-size: 16px;
+            line-height: 1.75;
+            font-weight: 500;
+        }
+
+        .legal-hero-icon {
+            width: 132px;
+            height: 132px;
+            border-radius: 32px;
+            background: rgba(255, 255, 255, 0.10);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            color: var(--legal-lime);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 58px;
+            backdrop-filter: blur(4px);
+        }
+
+        .privacy-updated-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 18px;
+            padding: 8px 14px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.12);
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            color: rgba(255, 255, 255, 0.92);
+            font-size: 13px;
+            font-weight: 800;
+        }
+
+        .legal-content-card {
+            background: #ffffff;
+            border-radius: 0 0 18px 18px;
+            box-shadow: var(--legal-shadow);
+            padding: 30px 42px 38px;
+        }
+
+        .legal-layout {
+            display: grid;
+            grid-template-columns: 290px 1fr;
+            gap: 28px;
+            align-items: flex-start;
+        }
+
+        .legal-summary-card {
+            position: sticky;
+            top: 22px;
+            border: 1px solid var(--legal-border);
+            border-radius: 18px;
+            background: #ffffff;
+            box-shadow: var(--legal-shadow-soft);
+            overflow: hidden;
+        }
+
+        .legal-summary-header {
+            padding: 20px 22px;
+            color: #ffffff;
+            background:
+                linear-gradient(
+                    135deg,
+                    rgba(0, 28, 17, 0.92),
+                    rgba(23, 109, 44, 0.86)
+                ),
+                url("../assets/img/fundo-industrial-caseg.png") center center / cover no-repeat;
+        }
+
+        .legal-summary-header h2 {
+            margin: 0 0 8px;
+            color: #ffffff;
+            font-size: 19px;
+            font-weight: 900;
+            line-height: 1.25;
+        }
+
+        .legal-summary-header p {
+            margin: 0;
+            color: rgba(255, 255, 255, 0.86);
+            font-size: 13px;
+            line-height: 1.55;
+        }
+
+        .legal-summary-list {
+            display: grid;
+            gap: 0;
+            padding: 10px 18px 16px;
+        }
+
+        .legal-summary-list a {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 11px 0;
+            color: #2e3742;
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 800;
+            border-bottom: 1px solid #edf0ed;
+            transition: color 0.2s ease, transform 0.2s ease;
+        }
+
+        .legal-summary-list a:last-child {
+            border-bottom: none;
+        }
+
+        .legal-summary-list a i {
+            color: var(--legal-green);
+            font-size: 13px;
+        }
+
+        .legal-summary-list a:hover {
+            color: var(--legal-green);
+            transform: translateX(3px);
+        }
+
+        .legal-document {
+            border: 1px solid var(--legal-border);
+            border-radius: 18px;
+            background: #ffffff;
+            padding: 34px 38px;
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.04);
+        }
+
+        .legal-document-intro {
+            margin-bottom: 26px;
+            padding: 20px 22px;
+            border-radius: 16px;
+            background: var(--legal-soft-green);
+            border: 1px solid rgba(23, 109, 44, 0.12);
+        }
+
+        .legal-document-intro p {
+            margin: 0 0 14px;
+            color: #34404b;
+            font-size: 15px;
+            line-height: 1.75;
+            font-weight: 600;
+        }
+
+        .legal-document-intro p:last-child {
+            margin-bottom: 0;
+        }
+
+        .legal-section {
+            padding: 22px 0;
+            border-bottom: 1px solid #edf0ed;
+        }
+
+        .legal-section:last-child {
+            border-bottom: none;
+            padding-bottom: 0;
+        }
+
+        .legal-section h3 {
+            margin: 0 0 12px;
+            color: var(--legal-green);
+            font-size: 21px;
+            line-height: 1.25;
+            font-weight: 900;
+        }
+
+        .legal-section p {
+            margin: 0 0 14px;
+            color: #3f4854;
+            font-size: 15px;
+            line-height: 1.8;
+            font-weight: 500;
+        }
+
+        .legal-section p:last-child {
+            margin-bottom: 0;
+        }
+
+        .legal-section ul {
+            margin: 14px 0 0;
+            padding: 0;
+            list-style: none;
+            display: grid;
+            gap: 10px;
+        }
+
+        .legal-section li {
+            position: relative;
+            padding-left: 28px;
+            color: #3f4854;
+            font-size: 15px;
+            line-height: 1.65;
+            font-weight: 500;
+        }
+
+        .legal-section li::before {
+            content: "\f00c";
+            font-family: "Font Awesome 6 Free";
+            font-weight: 900;
+            position: absolute;
+            left: 0;
+            top: 2px;
+            color: var(--legal-green);
+            font-size: 13px;
+        }
+
+        .privacy-highlight {
+            margin-top: 18px;
+            padding: 18px 20px;
+            border-radius: 16px;
+            background: #fbfdfb;
+            border: 1px solid var(--legal-border);
+            color: #34404b;
+            font-size: 15px;
+            line-height: 1.75;
+            font-weight: 700;
+        }
+
+        .privacy-highlight i {
+            color: var(--legal-green);
+            margin-right: 8px;
+        }
+
+        .legal-section a,
+        .legal-document-intro a {
+            color: var(--legal-green);
+            text-decoration: none;
+            font-weight: 900;
+        }
+
+        .legal-section a:hover,
+        .legal-document-intro a:hover {
+            color: var(--legal-green-light);
+            text-decoration: underline;
+        }
+
+        .legal-contact-box {
+            margin-top: 22px;
+            padding: 18px 20px;
+            border-radius: 16px;
+            background: #fbfdfb;
+            border: 1px solid var(--legal-border);
+            display: flex;
+            gap: 14px;
+            align-items: flex-start;
+        }
+
+        .legal-contact-box i {
+            width: 42px;
+            height: 42px;
+            min-width: 42px;
+            border-radius: 14px;
+            background: var(--legal-soft-green);
+            color: var(--legal-green);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+        }
+
+        .legal-contact-box strong {
+            display: block;
+            margin-bottom: 5px;
+            color: #202832;
+            font-size: 15px;
+            font-weight: 900;
+        }
+
+        .legal-contact-box p {
+            margin: 0;
+            color: #4e5865;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .legal-public-page .site-footer {
+            position: relative;
+            overflow: hidden;
+            background:
+                linear-gradient(
+                    90deg,
+                    rgba(0, 15, 10, 0.74) 0%,
+                    rgba(0, 18, 12, 0.60) 45%,
+                    rgba(0, 15, 10, 0.74) 100%
+                ),
+                url("../assets/img/fundo-industrial-caseg.png") center center / cover no-repeat;
+            color: #ffffff;
+            border-top: none;
+            margin: 0;
+            padding: 14px 28px;
+            box-shadow: 0 -4px 18px rgba(0, 0, 0, 0.18);
+            border-radius: 0;
+        }
+
+        .legal-public-page .footer-container {
+            position: relative;
+            z-index: 2;
+            max-width: 1500px;
+            margin: 0 auto;
+            min-height: 68px;
+            display: grid;
+            grid-template-columns: 215px 1fr auto;
+            align-items: center;
+            gap: 22px;
+        }
+
+        .legal-public-page .footer-logo {
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+        }
+
+        .legal-public-page .footer-logo img {
+            width: 152px;
+            height: auto;
+            filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.35));
+        }
+
+        .legal-public-page .site-footer p {
+            margin: 0;
+            color: rgba(255, 255, 255, 0.95);
+            font-size: 13px;
+            text-align: center;
+            font-weight: 600;
+            line-height: 1.45;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+        }
+
+        .legal-public-page .footer-links {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 16px;
+            font-size: 13px;
+        }
+
+        .legal-public-page .site-footer a {
+            color: rgba(255, 255, 255, 0.95);
+            text-decoration: none;
+            font-weight: 600;
+            transition: color 0.2s ease;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+        }
+
+        .legal-public-page .site-footer a:hover {
+            color: var(--legal-lime);
+            text-decoration: none;
+        }
+
+        .legal-public-page .footer-links span {
+            color: rgba(255, 255, 255, 0.45);
+        }
+
+        @media (max-width: 1200px) {
+            .legal-public-page .header-container {
+                grid-template-columns: 210px 1fr 120px;
+            }
+
+            .legal-public-page .main-nav {
+                gap: 30px;
+            }
+
+            .legal-hero-content {
+                padding: 44px;
+            }
+
+            .legal-content-card {
+                padding: 28px 28px 34px;
+            }
+
+            .legal-layout {
+                grid-template-columns: 260px 1fr;
+            }
+        }
+
+        @media (max-width: 1024px) {
+            .legal-hero-content {
+                grid-template-columns: 1fr;
+            }
+
+            .legal-hero-icon {
+                display: none;
+            }
+
+            .legal-layout {
+                grid-template-columns: 1fr;
+            }
+
+            .legal-summary-card {
+                position: static;
+            }
+
+            .legal-summary-list {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 0 18px;
+            }
+        }
+
+        @media (max-width: 900px) {
+            .legal-public-page .header-container {
+                grid-template-columns: 1fr auto;
+                gap: 16px;
+                padding: 12px 20px;
+            }
+
+            .legal-public-page .site-logo {
+                width: 155px;
+            }
+
+            .legal-public-page .main-nav {
+                grid-column: 1 / -1;
+                order: 3;
+                width: 100%;
+                justify-content: center;
+                gap: 24px;
+            }
+
+            .legal-public-page .main-nav a {
+                font-size: 15px;
+            }
+
+            .legal-public-page .header-login-button {
+                height: 40px;
+                padding: 0 15px;
+                font-size: 13px;
+            }
+
+            .legal-public-page .footer-container {
+                grid-template-columns: 1fr;
+                text-align: center;
+                justify-items: center;
+                gap: 8px;
+                min-height: auto;
+            }
+
+            .legal-public-page .footer-logo {
+                justify-content: center;
+            }
+
+            .legal-public-page .footer-logo img {
+                width: 136px;
+            }
+
+            .legal-public-page .footer-links {
+                justify-content: center;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .legal-main {
+                padding: 0 12px 24px;
+            }
+
+            .legal-hero {
+                border-radius: 12px;
+            }
+
+            .legal-hero-content {
+                min-height: auto;
+                padding: 34px 22px;
+            }
+
+            .legal-hero-text h1 {
+                font-size: 32px;
+            }
+
+            .legal-hero-text p {
+                font-size: 15px;
+            }
+
+            .legal-content-card {
+                padding: 22px 16px 24px;
+                border-radius: 0 0 14px 14px;
+            }
+
+            .legal-document {
+                padding: 24px 20px;
+            }
+
+            .legal-summary-list {
+                grid-template-columns: 1fr;
+            }
+
+            .legal-section h3 {
+                font-size: 19px;
+            }
+
+            .legal-public-page .site-footer p,
+            .legal-public-page .footer-links,
+            .legal-public-page .site-footer a {
+                font-size: 12.2px;
+            }
+        }
+
+        @media (max-width: 520px) {
+            .legal-public-page .header-container {
+                grid-template-columns: 1fr;
+                justify-items: center;
+            }
+
+            .legal-public-page .main-nav {
+                gap: 16px;
+                flex-wrap: wrap;
+            }
+
+            .legal-public-page .header-login-button {
+                width: 100%;
+            }
+
+            .legal-hero-text h1 {
+                font-size: 28px;
+            }
+
+            .legal-contact-box {
+                flex-direction: column;
+            }
+
+            .legal-public-page .footer-links {
+                flex-direction: column;
+                gap: 5px;
+            }
+
+            .legal-public-page .footer-links span {
+                display: none;
+            }
+
+            .legal-public-page .footer-logo img {
+                width: 130px;
+            }
+        }
+    </style>
 </head>
-<body>
+
+<body class="legal-public-page">
 
     <header class="site-header">
         <div class="header-container">
             <a href="home.html" class="logo-link reveal-on-load delay-1">
                 <img
-                    src="/site-caseg-protege/logo_transparente.png"
+                    src="../assets/img/logo_transparente.png"
                     alt="Logo CASEG Protege"
                     class="site-logo"
                 />
@@ -28,179 +724,295 @@
                 <a href="servicos.html">Serviços</a>
                 <a href="avisos.html">Sobre</a>
                 <a href="contato.html">Contato</a>
-                <a href="login.html" class="nav-login">
-                    <i class="fa-regular fa-user"></i>
-                    Entrar
-                </a>
             </nav>
+
+            <a href="login.html" class="header-login-button reveal-on-load delay-3">
+                <i class="fa-regular fa-user"></i>
+                Entrar
+            </a>
         </div>
     </header>
 
-    <main class="privacy-page">
-        <h1 class="reveal-on-load delay-3">Política de Privacidade</h1>
-        <p class="privacy-updated reveal-on-load delay-4">Última atualização: 25/03/2026</p>
+    <main class="legal-main">
+        <section class="legal-hero reveal-on-load delay-2">
+            <div class="legal-hero-content">
+                <div class="legal-hero-text">
+                    <div class="legal-hero-badge">
+                        <i class="fa-solid fa-shield-halved"></i>
+                        Proteção de dados
+                    </div>
 
-        <section class="reveal-on-load delay-3">
-            <h2>1. Apresentação</h2>
-            <p>
-                A CASEG Protege valoriza a privacidade, a segurança e o tratamento responsável dos dados
-                pessoais de seus clientes e usuários. Esta Política de Privacidade explica, de forma clara,
-                como os dados são coletados, utilizados, armazenados e protegidos no uso do sistema e da
-                Área do Cliente.
-            </p>
-            <p>
-                Ao acessar e utilizar nossos serviços, o usuário declara estar ciente desta Política de
-                Privacidade.
-            </p>
-        </section>
+                    <h1>
+                        Política de <span>Privacidade</span>
+                    </h1>
 
-        <section class="reveal-on-load delay-4">
-            <h2>2. Quais dados tratamos</h2>
-            <p>
-                Para a prestação dos serviços e funcionamento da Área do Cliente, podemos tratar dados como:
-            </p>
-            <ul>
-                <li>nome do responsável ou cliente;</li>
-                <li>nome da empresa;</li>
-                <li>CPF ou CNPJ;</li>
-                <li>e-mail de acesso;</li>
-                <li>dados de autenticação e sessão;</li>
-                <li>documentos disponibilizados na Área do Cliente;</li>
-                <li>avisos e comunicações exibidos no painel.</li>
-            </ul>
+                    <p>
+                        Informações sobre coleta, uso, armazenamento e proteção dos dados pessoais
+                        tratados no sistema e na Área do Cliente CASEG Protege.
+                    </p>
 
-            <p>
-                Além disso, alguns documentos vinculados ao cliente podem conter dados pessoais de
-                funcionários ou terceiros relacionados à atividade da empresa atendida, tais como:
-            </p>
-            <ul>
-                <li>nome;</li>
-                <li>CPF;</li>
-                <li>RG;</li>
-                <li>endereço;</li>
-                <li>estado civil;</li>
-                <li>data de nascimento;</li>
-                <li>nome da mãe e do pai;</li>
-                <li>cargo;</li>
-                <li>CBO;</li>
-                <li>matrícula;</li>
-                <li>data de admissão;</li>
-                <li>PIS;</li>
-                <li>horário de expediente;</li>
-                <li>salário, quando constar em documento específico;</li>
-                <li>nome do cônjuge, quando aplicável.</li>
-            </ul>
+                    <div class="privacy-updated-pill">
+                        <i class="fa-regular fa-calendar-check"></i>
+                        Última atualização: 25/03/2026
+                    </div>
+                </div>
 
-            <div class="privacy-highlight">
-                Esses dados são tratados exclusivamente para a prestação dos serviços contratados, para a
-                organização documental e para disponibilização segura das informações ao cliente responsável.
+                <div class="legal-hero-icon">
+                    <i class="fa-solid fa-user-shield"></i>
+                </div>
             </div>
         </section>
 
-        <section class="reveal-on-load delay-5">
-            <h2>3. Finalidade do tratamento dos dados</h2>
-            <p>Os dados pessoais tratados pela CASEG Protege são utilizados para finalidades legítimas, tais como:</p>
-            <ul>
-                <li>permitir o acesso seguro à Área do Cliente;</li>
-                <li>identificar corretamente o usuário autenticado;</li>
-                <li>disponibilizar documentos vinculados ao cliente;</li>
-                <li>manter comunicações, avisos e orientações dentro do painel;</li>
-                <li>executar os serviços contratados;</li>
-                <li>garantir segurança, rastreabilidade e integridade do sistema;</li>
-                <li>cumprir obrigações legais, regulatórias ou contratuais, quando aplicável.</li>
-            </ul>
-        </section>
+        <section class="legal-content-card reveal-on-load delay-3">
+            <div class="legal-layout">
+                <aside class="legal-summary-card reveal-on-load delay-3">
+                    <div class="legal-summary-header">
+                        <h2>Navegue pela política</h2>
+                        <p>
+                            Acesse rapidamente os principais pontos sobre privacidade e proteção de dados.
+                        </p>
+                    </div>
 
-        <section class="reveal-on-load delay-3">
-            <h2>4. Base de uso e responsabilidade sobre os dados</h2>
-            <p>
-                Os dados tratados pela CASEG Protege são utilizados dentro dos limites necessários à prestação
-                dos serviços contratados e ao funcionamento da plataforma.
-            </p>
-            <p>
-                Em relação aos documentos enviados, organizados ou disponibilizados no sistema, o cliente é
-                responsável pelas informações inseridas e pela legitimidade do compartilhamento desses dados.
-            </p>
-            <p>
-                A CASEG Protege atua com medidas de segurança e tratamento adequado das informações,
-                utilizando os dados para execução dos serviços, proteção da plataforma e atendimento ao cliente.
-            </p>
-        </section>
+                    <nav class="legal-summary-list">
+                        <a href="#apresentacao"><i class="fa-solid fa-angle-right"></i> Apresentação</a>
+                        <a href="#dados"><i class="fa-solid fa-angle-right"></i> Dados tratados</a>
+                        <a href="#finalidade"><i class="fa-solid fa-angle-right"></i> Finalidade</a>
+                        <a href="#responsabilidade"><i class="fa-solid fa-angle-right"></i> Responsabilidade</a>
+                        <a href="#seguranca"><i class="fa-solid fa-angle-right"></i> Segurança</a>
+                        <a href="#compartilhamento"><i class="fa-solid fa-angle-right"></i> Compartilhamento</a>
+                        <a href="#retencao"><i class="fa-solid fa-angle-right"></i> Retenção</a>
+                        <a href="#direitos"><i class="fa-solid fa-angle-right"></i> Direitos</a>
+                        <a href="#cookies"><i class="fa-solid fa-angle-right"></i> Cookies</a>
+                        <a href="#usuario"><i class="fa-solid fa-angle-right"></i> Usuário</a>
+                        <a href="#alteracoes"><i class="fa-solid fa-angle-right"></i> Alterações</a>
+                        <a href="#contato"><i class="fa-solid fa-angle-right"></i> Contato</a>
+                    </nav>
+                </aside>
 
-        <section class="reveal-on-load delay-4">
-            <h2>5. Como os dados são armazenados e protegidos</h2>
-            <p>
-                A CASEG Protege adota medidas técnicas e organizacionais para proteger os dados pessoais
-                contra acessos não autorizados, vazamentos, alteração, perda ou destruição indevida.
-            </p>
-            <p>Entre as medidas atualmente aplicadas no sistema, destacam-se:</p>
-            <ul>
-                <li>autenticação de acesso por usuário e senha;</li>
-                <li>controle de sessão para acesso à Área do Cliente;</li>
-                <li>área privada com restrição de acesso;</li>
-                <li>armazenamento de documentos em ambiente não público;</li>
-                <li>geração de links temporários e controlados para download de documentos;</li>
-                <li>vinculação de documentos ao cliente correto;</li>
-                <li>validação de acesso no backend antes da liberação de arquivos.</li>
-            </ul>
-            <p>
-                Embora sejam adotadas boas práticas de segurança, nenhum sistema é completamente isento de riscos.
-            </p>
-        </section>
+                <article class="legal-document reveal-on-load delay-4">
+                    <div class="legal-document-intro">
+                        <p>
+                            A CASEG Protege valoriza a privacidade, a segurança e o tratamento responsável
+                            dos dados pessoais de seus clientes e usuários.
+                        </p>
 
-        <section class="reveal-on-load delay-5">
-            <h2>6. Compartilhamento de dados</h2>
-            <p>A CASEG Protege não comercializa dados pessoais.</p>
-        </section>
+                        <p>
+                            Esta Política de Privacidade explica, de forma clara, como os dados são coletados,
+                            utilizados, armazenados e protegidos no uso do sistema e da Área do Cliente.
+                        </p>
+                    </div>
 
-        <section class="reveal-on-load delay-3">
-            <h2>7. Tempo de retenção</h2>
-            <p>Os dados serão mantidos conforme necessidade legal e operacional.</p>
-        </section>
+                    <section class="legal-section" id="apresentacao">
+                        <h3>1. Apresentação</h3>
+                        <p>
+                            A CASEG Protege valoriza a privacidade, a segurança e o tratamento responsável dos dados
+                            pessoais de seus clientes e usuários. Esta Política de Privacidade explica, de forma clara,
+                            como os dados são coletados, utilizados, armazenados e protegidos no uso do sistema e da
+                            Área do Cliente.
+                        </p>
 
-        <section class="reveal-on-load delay-4">
-            <h2>8. Direitos do titular dos dados</h2>
-            <ul>
-                <li>acesso aos dados;</li>
-                <li>correção;</li>
-                <li>eliminação;</li>
-                <li>informações sobre uso.</li>
-            </ul>
-        </section>
+                        <p>
+                            Ao acessar e utilizar nossos serviços, o usuário declara estar ciente desta Política de
+                            Privacidade.
+                        </p>
+                    </section>
 
-        <section class="reveal-on-load delay-5">
-            <h2>9. Cookies</h2>
-            <p>Utilizamos apenas para funcionamento e segurança do sistema.</p>
-        </section>
+                    <section class="legal-section" id="dados">
+                        <h3>2. Quais dados tratamos</h3>
+                        <p>
+                            Para a prestação dos serviços e funcionamento da Área do Cliente, podemos tratar dados como:
+                        </p>
 
-        <section class="reveal-on-load delay-3">
-            <h2>10. Responsabilidades do usuário</h2>
-            <ul>
-                <li>manter credenciais seguras;</li>
-                <li>não compartilhar acesso;</li>
-            </ul>
-        </section>
+                        <ul>
+                            <li>nome do responsável ou cliente;</li>
+                            <li>nome da empresa;</li>
+                            <li>CPF ou CNPJ;</li>
+                            <li>e-mail de acesso;</li>
+                            <li>dados de autenticação e sessão;</li>
+                            <li>documentos disponibilizados na Área do Cliente;</li>
+                            <li>avisos e comunicações exibidos no painel.</li>
+                        </ul>
 
-        <section class="reveal-on-load delay-4">
-            <h2>11. Alterações</h2>
-            <p>Esta política pode ser atualizada a qualquer momento.</p>
-        </section>
+                        <p>
+                            Além disso, alguns documentos vinculados ao cliente podem conter dados pessoais de
+                            funcionários ou terceiros relacionados à atividade da empresa atendida, tais como:
+                        </p>
 
-        <section class="reveal-on-load delay-5">
-            <h2>12. Contato</h2>
-            <p>
-                E-mail:
-                <a href="mailto:casegprotege@hotmail.com">casegprotege@hotmail.com</a>
-            </p>
+                        <ul>
+                            <li>nome;</li>
+                            <li>CPF;</li>
+                            <li>RG;</li>
+                            <li>endereço;</li>
+                            <li>estado civil;</li>
+                            <li>data de nascimento;</li>
+                            <li>nome da mãe e do pai;</li>
+                            <li>cargo;</li>
+                            <li>CBO;</li>
+                            <li>matrícula;</li>
+                            <li>data de admissão;</li>
+                            <li>PIS;</li>
+                            <li>horário de expediente;</li>
+                            <li>salário, quando constar em documento específico;</li>
+                            <li>nome do cônjuge, quando aplicável.</li>
+                        </ul>
+
+                        <div class="privacy-highlight">
+                            <i class="fa-solid fa-circle-info"></i>
+                            Esses dados são tratados exclusivamente para a prestação dos serviços contratados,
+                            para a organização documental e para disponibilização segura das informações ao
+                            cliente responsável.
+                        </div>
+                    </section>
+
+                    <section class="legal-section" id="finalidade">
+                        <h3>3. Finalidade do tratamento dos dados</h3>
+                        <p>
+                            Os dados pessoais tratados pela CASEG Protege são utilizados para finalidades legítimas,
+                            tais como:
+                        </p>
+
+                        <ul>
+                            <li>permitir o acesso seguro à Área do Cliente;</li>
+                            <li>identificar corretamente o usuário autenticado;</li>
+                            <li>disponibilizar documentos vinculados ao cliente;</li>
+                            <li>manter comunicações, avisos e orientações dentro do painel;</li>
+                            <li>executar os serviços contratados;</li>
+                            <li>garantir segurança, rastreabilidade e integridade do sistema;</li>
+                            <li>cumprir obrigações legais, regulatórias ou contratuais, quando aplicável.</li>
+                        </ul>
+                    </section>
+
+                    <section class="legal-section" id="responsabilidade">
+                        <h3>4. Base de uso e responsabilidade sobre os dados</h3>
+                        <p>
+                            Os dados tratados pela CASEG Protege são utilizados dentro dos limites necessários à
+                            prestação dos serviços contratados e ao funcionamento da plataforma.
+                        </p>
+
+                        <p>
+                            Em relação aos documentos enviados, organizados ou disponibilizados no sistema, o cliente
+                            é responsável pelas informações inseridas e pela legitimidade do compartilhamento desses dados.
+                        </p>
+
+                        <p>
+                            A CASEG Protege atua com medidas de segurança e tratamento adequado das informações,
+                            utilizando os dados para execução dos serviços, proteção da plataforma e atendimento ao cliente.
+                        </p>
+                    </section>
+
+                    <section class="legal-section" id="seguranca">
+                        <h3>5. Como os dados são armazenados e protegidos</h3>
+                        <p>
+                            A CASEG Protege adota medidas técnicas e organizacionais para proteger os dados pessoais
+                            contra acessos não autorizados, vazamentos, alteração, perda ou destruição indevida.
+                        </p>
+
+                        <p>
+                            Entre as medidas atualmente aplicadas no sistema, destacam-se:
+                        </p>
+
+                        <ul>
+                            <li>autenticação de acesso por usuário e senha;</li>
+                            <li>controle de sessão para acesso à Área do Cliente;</li>
+                            <li>área privada com restrição de acesso;</li>
+                            <li>armazenamento de documentos em ambiente não público;</li>
+                            <li>geração de links temporários e controlados para download de documentos;</li>
+                            <li>vinculação de documentos ao cliente correto;</li>
+                            <li>validação de acesso no backend antes da liberação de arquivos.</li>
+                        </ul>
+
+                        <p>
+                            Embora sejam adotadas boas práticas de segurança, nenhum sistema é completamente isento de riscos.
+                        </p>
+                    </section>
+
+                    <section class="legal-section" id="compartilhamento">
+                        <h3>6. Compartilhamento de dados</h3>
+                        <p>
+                            A CASEG Protege não comercializa dados pessoais.
+                        </p>
+                    </section>
+
+                    <section class="legal-section" id="retencao">
+                        <h3>7. Tempo de retenção</h3>
+                        <p>
+                            Os dados serão mantidos conforme necessidade legal e operacional.
+                        </p>
+                    </section>
+
+                    <section class="legal-section" id="direitos">
+                        <h3>8. Direitos do titular dos dados</h3>
+                        <ul>
+                            <li>acesso aos dados;</li>
+                            <li>correção;</li>
+                            <li>eliminação;</li>
+                            <li>informações sobre uso.</li>
+                        </ul>
+                    </section>
+
+                    <section class="legal-section" id="cookies">
+                        <h3>9. Cookies</h3>
+                        <p>
+                            Utilizamos apenas para funcionamento e segurança do sistema.
+                        </p>
+                    </section>
+
+                    <section class="legal-section" id="usuario">
+                        <h3>10. Responsabilidades do usuário</h3>
+                        <ul>
+                            <li>manter credenciais seguras;</li>
+                            <li>não compartilhar acesso;</li>
+                        </ul>
+                    </section>
+
+                    <section class="legal-section" id="alteracoes">
+                        <h3>11. Alterações</h3>
+                        <p>
+                            Esta política pode ser atualizada a qualquer momento.
+                        </p>
+                    </section>
+
+                    <section class="legal-section" id="contato">
+                        <h3>12. Contato</h3>
+                        <p>
+                            E-mail:
+                            <a href="mailto:casegprotege@hotmail.com">casegprotege@hotmail.com</a>
+                        </p>
+
+                        <div class="legal-contact-box">
+                            <i class="fa-regular fa-envelope"></i>
+
+                            <div>
+                                <strong>Canal de atendimento</strong>
+                                <p>
+                                    Para dúvidas sobre privacidade, tratamento de dados ou solicitações relacionadas
+                                    à Área do Cliente, utilize o e-mail institucional da CASEG Protege.
+                                </p>
+                            </div>
+                        </div>
+                    </section>
+                </article>
+            </div>
         </section>
     </main>
 
     <footer class="site-footer">
-        <p>© CASEG Protege</p>
-        <p>
-            <a href="termos-de-uso.html">Termos de Uso</a> —
-            <a href="politica-privacidade.html">Política de Privacidade</a>
-        </p>
+        <div class="footer-container">
+            <div class="footer-logo">
+                <img
+                    src="../assets/img/logo_footer.png"
+                    alt="Logo CASEG Protege"
+                />
+            </div>
+
+            <p>© 2025 CASEG Protege. Todos os direitos reservados.</p>
+
+            <div class="footer-links">
+                <a href="termos-de-uso.html">Termos de Uso</a>
+                <span>|</span>
+                <a href="politica-privacidade.html">Política de Privacidade</a>
+            </div>
+        </div>
     </footer>
 
     <script src="../assets/js/site-animations.js"></script>

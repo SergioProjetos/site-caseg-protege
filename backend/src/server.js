@@ -37,6 +37,7 @@ app.use((req, res, next) => {
 });
 
 const PORT = 3000;
+const ONE_DAY_IN_MS = 24 * 60 * 60 * 1000;
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -44,6 +45,147 @@ const upload = multer({
     fileSize: 15 * 1024 * 1024
   }
 });
+
+const ALLOWED_BANNER_SIZES = [
+  { width: 1920, height: 600 },
+  { width: 1600, height: 500 }
+];
+
+function isAllowedBannerSize(width, height) {
+  return ALLOWED_BANNER_SIZES.some((size) => {
+    return size.width === width && size.height === height;
+  });
+}
+
+function getBannerSizeErrorMessage() {
+  return "A imagem do banner precisa estar exatamente em 1920x600px ou 1600x500px.";
+}
+
+function getImageDimensionsFromBuffer(buffer) {
+  if (!buffer || buffer.length < 24) {
+    return null;
+  }
+
+  const isPng =
+    buffer[0] === 0x89 &&
+    buffer[1] === 0x50 &&
+    buffer[2] === 0x4e &&
+    buffer[3] === 0x47 &&
+    buffer[4] === 0x0d &&
+    buffer[5] === 0x0a &&
+    buffer[6] === 0x1a &&
+    buffer[7] === 0x0a;
+
+  if (isPng) {
+    return {
+      width: buffer.readUInt32BE(16),
+      height: buffer.readUInt32BE(20)
+    };
+  }
+
+  const isJpeg = buffer[0] === 0xff && buffer[1] === 0xd8;
+
+  if (isJpeg) {
+    let offset = 2;
+
+    while (offset < buffer.length) {
+      if (buffer[offset] !== 0xff) {
+        offset++;
+        continue;
+      }
+
+      const marker = buffer[offset + 1];
+      const length = buffer.readUInt16BE(offset + 2);
+
+      if (
+        marker === 0xc0 ||
+        marker === 0xc1 ||
+        marker === 0xc2 ||
+        marker === 0xc3 ||
+        marker === 0xc5 ||
+        marker === 0xc6 ||
+        marker === 0xc7 ||
+        marker === 0xc9 ||
+        marker === 0xca ||
+        marker === 0xcb ||
+        marker === 0xcd ||
+        marker === 0xce ||
+        marker === 0xcf
+      ) {
+        return {
+          height: buffer.readUInt16BE(offset + 5),
+          width: buffer.readUInt16BE(offset + 7)
+        };
+      }
+
+      offset += 2 + length;
+    }
+  }
+
+  const isWebp =
+    buffer.toString("ascii", 0, 4) === "RIFF" &&
+    buffer.toString("ascii", 8, 12) === "WEBP";
+
+  if (isWebp) {
+    const chunkType = buffer.toString("ascii", 12, 16);
+
+    if (chunkType === "VP8X" && buffer.length >= 30) {
+      const width = 1 + buffer.readUIntLE(24, 3);
+      const height = 1 + buffer.readUIntLE(27, 3);
+
+      return { width, height };
+    }
+
+    if (chunkType === "VP8 " && buffer.length >= 30) {
+      const width = buffer.readUInt16LE(26) & 0x3fff;
+      const height = buffer.readUInt16LE(28) & 0x3fff;
+
+      return { width, height };
+    }
+
+    if (chunkType === "VP8L" && buffer.length >= 25) {
+      const bits = buffer.readUInt32LE(21);
+      const width = (bits & 0x3fff) + 1;
+      const height = ((bits >> 14) & 0x3fff) + 1;
+
+      return { width, height };
+    }
+  }
+
+  return null;
+}
+
+function validateBannerImageDimensions(image) {
+  const dimensions = getImageDimensionsFromBuffer(image?.buffer);
+
+  if (!dimensions) {
+    return {
+      valid: false,
+      error: "Não foi possível identificar a resolução da imagem. Use PNG, JPG, JPEG ou WEBP em 1920x600px ou 1600x500px."
+    };
+  }
+
+  if (!isAllowedBannerSize(dimensions.width, dimensions.height)) {
+    return {
+      valid: false,
+      error: `${getBannerSizeErrorMessage()} Resolução enviada: ${dimensions.width}x${dimensions.height}px.`
+    };
+  }
+
+  return {
+    valid: true,
+    dimensions
+  };
+}
+
+function extractBannerStoragePathFromUrl(imageUrl) {
+  if (!imageUrl) return null;
+
+  const marker = "/storage/v1/object/public/banners/";
+  const splitPath = String(imageUrl).split(marker);
+
+  return splitPath.length > 1 ? splitPath[1] : null;
+}
 
 async function getAuthenticatedUser(req) {
   try {
@@ -178,6 +320,166 @@ function normalizeOptionalText(value) {
   return normalized || null;
 }
 
+function normalizeGroupText(value) {
+  return String(value || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim();
+}
+
+function createLocalDateFromDateOnly(value) {
+  const normalized = String(value || "").trim().slice(0, 10);
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(normalized)) {
+    return null;
+  }
+
+  const [year, month, day] = normalized.split("-").map(Number);
+  const date = new Date(year, month - 1, day);
+
+  if (
+    Number.isNaN(date.getTime()) ||
+    date.getFullYear() !== year ||
+    date.getMonth() !== month - 1 ||
+    date.getDate() !== day
+  ) {
+    return null;
+  }
+
+  return date;
+}
+
+function normalizeDateInput(value) {
+  const normalized = normalizeText(value);
+
+  if (!normalized) {
+    return null;
+  }
+
+  const date = createLocalDateFromDateOnly(normalized);
+
+  if (!date) {
+    return null;
+  }
+
+  return normalized.slice(0, 10);
+}
+
+function isExpirationDateBeforeReleaseDate(releaseDate, expirationDate) {
+  if (!releaseDate || !expirationDate) {
+    return false;
+  }
+
+  const release = createLocalDateFromDateOnly(releaseDate);
+  const expiration = createLocalDateFromDateOnly(expirationDate);
+
+  if (!release || !expiration) {
+    return false;
+  }
+
+  return expiration < release;
+}
+
+function getStartOfTodayLocal() {
+  const today = new Date();
+
+  return new Date(
+    today.getFullYear(),
+    today.getMonth(),
+    today.getDate()
+  );
+}
+
+function getDaysUntilExpiration(expirationDateValue) {
+  const expirationDate = createLocalDateFromDateOnly(expirationDateValue);
+
+  if (!expirationDate) {
+    return null;
+  }
+
+  const today = getStartOfTodayLocal();
+
+  return Math.round((expirationDate.getTime() - today.getTime()) / ONE_DAY_IN_MS);
+}
+
+function getRenewalStatusInfo(expirationDateValue) {
+  const daysUntilExpiration = getDaysUntilExpiration(expirationDateValue);
+
+  if (daysUntilExpiration === null) {
+    return null;
+  }
+
+  if (daysUntilExpiration < 0) {
+    const overdueDays = Math.abs(daysUntilExpiration);
+
+    return {
+      status: "expired",
+      days_until_expiration: daysUntilExpiration,
+      deadline_label: overdueDays === 1 ? "Vencido há 1 dia" : `Vencido há ${overdueDays} dias`,
+      observation: "Renovação urgente"
+    };
+  }
+
+  if (daysUntilExpiration === 0) {
+    return {
+      status: "due_today",
+      days_until_expiration: daysUntilExpiration,
+      deadline_label: "Vence hoje",
+      observation: "Renovar hoje"
+    };
+  }
+
+  return {
+    status: "due_soon",
+    days_until_expiration: daysUntilExpiration,
+    deadline_label: daysUntilExpiration === 1 ? "Vence em 1 dia" : `Vence em ${daysUntilExpiration} dias`,
+    observation: daysUntilExpiration <= 15 ? "Renovação próxima" : "Programar renovação"
+  };
+}
+
+function getDocumentGroupKey(documentItem) {
+  const clientId = String(documentItem?.client_id || "").trim();
+  const category = normalizeGroupText(documentItem?.category || "");
+  const subcategory = normalizeGroupText(documentItem?.subcategory || "__sem_subcategoria__");
+
+  return `${clientId}|${category}|${subcategory}`;
+}
+
+function getDateTimestampForComparison(value) {
+  const date = createLocalDateFromDateOnly(value);
+
+  return date ? date.getTime() : 0;
+}
+
+function compareDocumentsByLatest(nextDocument, currentDocument) {
+  const nextExpiration = getDateTimestampForComparison(nextDocument?.expiration_date);
+  const currentExpiration = getDateTimestampForComparison(currentDocument?.expiration_date);
+
+  if (nextExpiration !== currentExpiration) {
+    return nextExpiration - currentExpiration;
+  }
+
+  const nextRelease = getDateTimestampForComparison(nextDocument?.release_date);
+  const currentRelease = getDateTimestampForComparison(currentDocument?.release_date);
+
+  if (nextRelease !== currentRelease) {
+    return nextRelease - currentRelease;
+  }
+
+  const nextYear = Number(nextDocument?.year || 0);
+  const currentYear = Number(currentDocument?.year || 0);
+
+  if (nextYear !== currentYear) {
+    return nextYear - currentYear;
+  }
+
+  const nextCreatedAt = new Date(nextDocument?.created_at || 0).getTime();
+  const currentCreatedAt = new Date(currentDocument?.created_at || 0).getTime();
+
+  return nextCreatedAt - currentCreatedAt;
+}
+
 function validateStrongPassword(password) {
   const normalizedPassword = String(password || "").trim();
 
@@ -200,7 +502,6 @@ function isValidBannerActionType(value) {
 function isValidBannerLinkTarget(value) {
   return ["contato", "servicos", "whatsapp", "custom"].includes(String(value || "").trim());
 }
-
 async function findDuplicateDocument({ clientId, category, subcategory, year, fileName }) {
   let query = adminSupabase
     .from("documents")
@@ -233,6 +534,21 @@ async function removeStorageFiles(bucketName, filePaths) {
     .remove(cleanedPaths);
 
   return error || null;
+}
+
+async function getNextNoticeDisplayOrder() {
+  const { data, error } = await adminSupabase
+    .from("notices")
+    .select("display_order")
+    .order("display_order", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return Number(data?.display_order || 0) + 1;
 }
 
 app.get("/", (req, res) => {
@@ -296,6 +612,77 @@ app.post("/login", async (req, res) => {
   } catch (error) {
     console.error("ERRO EM /login:", error);
     res.status(500).json({ error: "Erro interno do servidor" });
+  }
+});
+
+app.post("/admin/refresh-session", async (req, res) => {
+  try {
+    const { refresh_token } = req.body;
+
+    if (!refresh_token) {
+      return res.status(400).json({
+        error: "refresh_token é obrigatório."
+      });
+    }
+
+    const sessionSupabase = createClient(
+      process.env.SUPABASE_URL,
+      process.env.SUPABASE_ANON_KEY,
+      {
+        auth: {
+          persistSession: false,
+          autoRefreshToken: false,
+          detectSessionInUrl: false
+        }
+      }
+    );
+
+    const { data, error } = await sessionSupabase.auth.refreshSession({
+      refresh_token
+    });
+
+    if (error || !data || !data.session || !data.user) {
+      return res.status(401).json({
+        error: "Sessão expirada. Faça login novamente."
+      });
+    }
+
+    const profileResult = await getUserProfile(data.user.id);
+
+    if (profileResult.error) {
+      return res.status(profileResult.status).json({
+        error: profileResult.error
+      });
+    }
+
+    const profile = profileResult.profile;
+
+    if (profile.role !== "admin") {
+      return res.status(403).json({
+        error: "A renovação automática é permitida apenas para administradores."
+      });
+    }
+
+    return res.status(200).json({
+      message: "Sessão administrativa renovada com sucesso.",
+      profile: {
+        user_id: profile.user_id,
+        cpf_cnpj: profile.cpf_cnpj,
+        role: profile.role,
+        full_name: profile.full_name,
+        company_name: profile.company_name,
+        email: profile.email,
+        must_change_password: profile.must_change_password,
+        is_active: profile.is_active
+      },
+      session: data.session
+    });
+  } catch (error) {
+    console.error("ERRO EM POST /admin/refresh-session:", error);
+
+    return res.status(500).json({
+      error: "Erro interno ao renovar sessão administrativa."
+    });
   }
 });
 
@@ -609,7 +996,6 @@ app.put("/admin/clients/:clientId/status", async (req, res) => {
     res.status(500).json({ error: "Erro interno do servidor" });
   }
 });
-
 app.delete("/admin/clients/:clientId", async (req, res) => {
   try {
     const adminAccess = await validateAdminAccess(req, res);
@@ -649,12 +1035,20 @@ app.delete("/admin/clients/:clientId", async (req, res) => {
       });
     }
 
-    const documentFilePaths = (clientDocuments || []).map((doc) => doc.file_path).filter(Boolean);
-    const storageRemoveError = await removeStorageFiles("documents", documentFilePaths);
+    const documentFilePaths = (clientDocuments || [])
+      .map((doc) => doc.file_path)
+      .filter(Boolean);
+
+    const storageRemoveError = await removeStorageFiles(
+      "documents",
+      documentFilePaths
+    );
 
     if (storageRemoveError) {
       return res.status(500).json({
-        error: storageRemoveError.message || "Erro ao excluir arquivos do cliente no storage."
+        error:
+          storageRemoveError.message ||
+          "Erro ao excluir arquivos do cliente no storage."
       });
     }
 
@@ -665,7 +1059,9 @@ app.delete("/admin/clients/:clientId", async (req, res) => {
 
     if (deleteDocumentsError) {
       return res.status(500).json({
-        error: deleteDocumentsError.message || "Erro ao excluir documentos do cliente."
+        error:
+          deleteDocumentsError.message ||
+          "Erro ao excluir documentos do cliente."
       });
     }
 
@@ -676,15 +1072,20 @@ app.delete("/admin/clients/:clientId", async (req, res) => {
 
     if (deleteProfileError) {
       return res.status(500).json({
-        error: deleteProfileError.message || "Erro ao excluir perfil do cliente."
+        error:
+          deleteProfileError.message ||
+          "Erro ao excluir perfil do cliente."
       });
     }
 
-    const { error: deleteAuthError } = await adminSupabase.auth.admin.deleteUser(clientId);
+    const { error: deleteAuthError } =
+      await adminSupabase.auth.admin.deleteUser(clientId);
 
     if (deleteAuthError) {
       return res.status(500).json({
-        error: deleteAuthError.message || "Erro ao excluir usuário do Auth."
+        error:
+          deleteAuthError.message ||
+          "Erro ao excluir usuário do Auth."
       });
     }
 
@@ -721,6 +1122,8 @@ app.get("/clients/:clientId/documents", async (req, res) => {
         category,
         subcategory,
         year,
+        release_date,
+        expiration_date,
         created_at
       `)
       .eq("client_id", clientId)
@@ -736,6 +1139,156 @@ app.get("/clients/:clientId/documents", async (req, res) => {
   } catch (error) {
     console.error("ERRO EM GET /clients/:clientId/documents:", error);
     res.status(500).json({ error: "Erro interno do servidor" });
+  }
+});
+
+app.get("/admin/documents/renewal-alerts", async (req, res) => {
+  try {
+    const adminAccess = await validateAdminAccess(req, res);
+
+    if (!adminAccess) {
+      return;
+    }
+
+    const warningDays = 30;
+
+    const { data: documents, error: documentsError } = await adminSupabase
+      .from("documents")
+      .select(`
+        id,
+        client_id,
+        file_name,
+        category,
+        subcategory,
+        year,
+        release_date,
+        expiration_date,
+        created_at
+      `)
+      .not("expiration_date", "is", null)
+      .order("expiration_date", { ascending: true })
+      .order("created_at", { ascending: false });
+
+    if (documentsError) {
+      return res.status(500).json({
+        error:
+          documentsError.message ||
+          "Erro ao buscar documentos para avisos de renovação."
+      });
+    }
+
+    const safeDocuments = Array.isArray(documents) ? documents : [];
+
+    const clientIds = [
+      ...new Set(
+        safeDocuments
+          .map((documentItem) => documentItem.client_id)
+          .filter(Boolean)
+      )
+    ];
+
+    let clientsMap = new Map();
+
+    if (clientIds.length) {
+      const { data: clients, error: clientsError } = await adminSupabase
+        .from("profiles")
+        .select("user_id, full_name, company_name, role, is_active")
+        .in("user_id", clientIds);
+
+      if (clientsError) {
+        return res.status(500).json({
+          error:
+            clientsError.message ||
+            "Erro ao buscar clientes dos avisos de renovação."
+        });
+      }
+
+      clientsMap = new Map(
+        (clients || []).map((client) => {
+          return [client.user_id, client];
+        })
+      );
+    }
+
+    const latestDocumentsMap = new Map();
+
+    safeDocuments.forEach((documentItem) => {
+      if (!documentItem.client_id || !documentItem.expiration_date) {
+        return;
+      }
+
+      const groupKey = getDocumentGroupKey(documentItem);
+      const currentDocument = latestDocumentsMap.get(groupKey);
+
+      if (!currentDocument) {
+        latestDocumentsMap.set(groupKey, documentItem);
+        return;
+      }
+
+      const comparison = compareDocumentsByLatest(documentItem, currentDocument);
+
+      if (comparison > 0) {
+        latestDocumentsMap.set(groupKey, documentItem);
+      }
+    });
+
+    const alerts = Array.from(latestDocumentsMap.values())
+      .map((documentItem) => {
+        const renewalInfo = getRenewalStatusInfo(documentItem.expiration_date);
+
+        if (!renewalInfo) {
+          return null;
+        }
+
+        if (renewalInfo.days_until_expiration > warningDays) {
+          return null;
+        }
+
+        const client = clientsMap.get(documentItem.client_id) || {};
+
+        return {
+          id: documentItem.id,
+          document_id: documentItem.id,
+          client_id: documentItem.client_id,
+          client_name: client.full_name || "-",
+          company_name: client.company_name || "-",
+          client_is_active: client.is_active !== false,
+          file_name: documentItem.file_name,
+          category: documentItem.category,
+          subcategory: documentItem.subcategory,
+          year: documentItem.year,
+          release_date: documentItem.release_date,
+          expiration_date: documentItem.expiration_date,
+          created_at: documentItem.created_at,
+          status: renewalInfo.status,
+          days_until_expiration: renewalInfo.days_until_expiration,
+          deadline_label: renewalInfo.deadline_label,
+          observation: renewalInfo.observation
+        };
+      })
+      .filter(Boolean)
+      .sort((a, b) => {
+        if (a.days_until_expiration !== b.days_until_expiration) {
+          return a.days_until_expiration - b.days_until_expiration;
+        }
+
+        return String(a.company_name || "").localeCompare(
+          String(b.company_name || ""),
+          "pt-BR"
+        );
+      });
+
+    return res.status(200).json({
+      warning_days: warningDays,
+      total: alerts.length,
+      alerts
+    });
+  } catch (error) {
+    console.error("ERRO EM GET /admin/documents/renewal-alerts:", error);
+
+    res.status(500).json({
+      error: "Erro interno ao buscar avisos de renovação."
+    });
   }
 });
 
@@ -760,6 +1313,7 @@ app.post("/admin/documents/upload", (req, res, next) => {
 }, async (req, res) => {
   try {
     const adminAccess = await validateAdminAccess(req, res);
+
     if (!adminAccess) {
       return;
     }
@@ -768,20 +1322,42 @@ app.post("/admin/documents/upload", (req, res, next) => {
     const category = normalizeText(req.body.category);
     const subcategory = normalizeOptionalText(req.body.subcategory);
     const year = normalizeText(req.body.year);
+    const releaseDate = normalizeDateInput(req.body.release_date);
+    const expirationDate = normalizeDateInput(req.body.expiration_date);
     const file = req.file;
 
-    if (!clientId || !category || !year || !file) {
+    if (!clientId || !category || !year || !releaseDate || !expirationDate || !file) {
       return res.status(400).json({
-        error: "Campos obrigatórios: client_id, category, year e file."
+        error:
+          "Campos obrigatórios: client_id, category, year, release_date, expiration_date e file."
       });
     }
 
-    const { data: clientProfile, error: clientProfileError } = await adminSupabase
-      .from("profiles")
-      .select("user_id, full_name, company_name, role")
-      .eq("user_id", clientId)
-      .eq("role", "client")
-      .single();
+    if (req.body.release_date && !releaseDate) {
+      return res.status(400).json({
+        error: "A data de lançamento deve estar no formato válido."
+      });
+    }
+
+    if (req.body.expiration_date && !expirationDate) {
+      return res.status(400).json({
+        error: "A data de validade deve estar no formato válido."
+      });
+    }
+
+    if (isExpirationDateBeforeReleaseDate(releaseDate, expirationDate)) {
+      return res.status(400).json({
+        error: "A data de validade não pode ser menor que a data de lançamento."
+      });
+    }
+
+    const { data: clientProfile, error: clientProfileError } =
+      await adminSupabase
+        .from("profiles")
+        .select("user_id, full_name, company_name, role")
+        .eq("user_id", clientId)
+        .eq("role", "client")
+        .single();
 
     if (clientProfileError || !clientProfile) {
       return res.status(404).json({
@@ -789,7 +1365,10 @@ app.post("/admin/documents/upload", (req, res, next) => {
       });
     }
 
-    const { data: duplicateDocument, error: duplicateError } = await findDuplicateDocument({
+    const {
+      data: duplicateDocument,
+      error: duplicateError
+    } = await findDuplicateDocument({
       clientId,
       category,
       subcategory,
@@ -805,12 +1384,14 @@ app.post("/admin/documents/upload", (req, res, next) => {
 
     if (duplicateDocument) {
       return res.status(400).json({
-        error: "Já existe um documento com o mesmo nome do arquivo, categoria, subcategoria e ano para este cliente."
+        error:
+          "Já existe um documento com o mesmo nome do arquivo, categoria, subcategoria e ano para este cliente."
       });
     }
 
     const sanitizedFileName = sanitizeFileName(file.originalname);
     const timestamp = Date.now();
+
     const storagePath = `${clientId}/${year}/${timestamp}_${sanitizedFileName}`;
 
     const { error: uploadError } = await adminSupabase.storage
@@ -822,28 +1403,39 @@ app.post("/admin/documents/upload", (req, res, next) => {
 
     if (uploadError) {
       return res.status(500).json({
-        error: uploadError.message || "Erro ao enviar arquivo para o storage."
+        error:
+          uploadError.message ||
+          "Erro ao enviar arquivo para o storage."
       });
     }
 
-    const { data: insertedDocument, error: insertError } = await adminSupabase
-      .from("documents")
-      .insert({
-        client_id: clientId,
-        file_name: file.originalname,
-        file_path: storagePath,
-        category,
-        subcategory,
-        year
-      })
-      .select("id, client_id, file_name, category, subcategory, year, created_at")
-      .single();
+    const { data: insertedDocument, error: insertError } =
+      await adminSupabase
+        .from("documents")
+        .insert({
+          client_id: clientId,
+          file_name: file.originalname,
+          file_path: storagePath,
+          category,
+          subcategory,
+          year,
+          release_date: releaseDate,
+          expiration_date: expirationDate
+        })
+        .select(
+          "id, client_id, file_name, category, subcategory, year, release_date, expiration_date, created_at"
+        )
+        .single();
 
     if (insertError) {
-      await adminSupabase.storage.from("documents").remove([storagePath]);
+      await adminSupabase.storage
+        .from("documents")
+        .remove([storagePath]);
 
       return res.status(500).json({
-        error: insertError.message || "Erro ao salvar documento no banco."
+        error:
+          insertError.message ||
+          "Erro ao salvar documento no banco."
       });
     }
 
@@ -853,7 +1445,10 @@ app.post("/admin/documents/upload", (req, res, next) => {
     });
   } catch (error) {
     console.error("ERRO EM POST /admin/documents/upload:", error);
-    res.status(500).json({ error: "Erro interno do servidor" });
+
+    res.status(500).json({
+      error: "Erro interno do servidor"
+    });
   }
 });
 
@@ -878,6 +1473,7 @@ app.put("/admin/documents/:documentId/replace", (req, res, next) => {
 }, async (req, res) => {
   try {
     const adminAccess = await validateAdminAccess(req, res);
+
     if (!adminAccess) {
       return;
     }
@@ -897,19 +1493,22 @@ app.put("/admin/documents/:documentId/replace", (req, res, next) => {
       });
     }
 
-    const { data: currentDocument, error: currentDocumentError } = await adminSupabase
-      .from("documents")
-      .select(`
-        id,
-        client_id,
-        file_name,
-        file_path,
-        category,
-        subcategory,
-        year
-      `)
-      .eq("id", documentId)
-      .single();
+    const { data: currentDocument, error: currentDocumentError } =
+      await adminSupabase
+        .from("documents")
+        .select(`
+          id,
+          client_id,
+          file_name,
+          file_path,
+          category,
+          subcategory,
+          year,
+          release_date,
+          expiration_date
+        `)
+        .eq("id", documentId)
+        .single();
 
     if (currentDocumentError || !currentDocument) {
       return res.status(404).json({
@@ -919,6 +1518,7 @@ app.put("/admin/documents/:documentId/replace", (req, res, next) => {
 
     const sanitizedFileName = sanitizeFileName(file.originalname);
     const timestamp = Date.now();
+
     const storagePath = `${currentDocument.client_id}/${currentDocument.year}/${timestamp}_${sanitizedFileName}`;
 
     const { error: uploadError } = await adminSupabase.storage
@@ -930,32 +1530,42 @@ app.put("/admin/documents/:documentId/replace", (req, res, next) => {
 
     if (uploadError) {
       return res.status(500).json({
-        error: uploadError.message || "Erro ao enviar o novo arquivo para o storage."
+        error:
+          uploadError.message ||
+          "Erro ao enviar o novo arquivo para o storage."
       });
     }
 
-    const { data: updatedDocument, error: updateError } = await adminSupabase
-      .from("documents")
-      .update({
-        file_name: file.originalname,
-        file_path: storagePath
-      })
-      .eq("id", documentId)
-      .select("id, client_id, file_name, category, subcategory, year, created_at")
-      .single();
+    const { data: updatedDocument, error: updateError } =
+      await adminSupabase
+        .from("documents")
+        .update({
+          file_name: file.originalname,
+          file_path: storagePath
+        })
+        .eq("id", documentId)
+        .select(
+          "id, client_id, file_name, category, subcategory, year, release_date, expiration_date, created_at"
+        )
+        .single();
 
     if (updateError || !updatedDocument) {
-      await adminSupabase.storage.from("documents").remove([storagePath]);
+      await adminSupabase.storage
+        .from("documents")
+        .remove([storagePath]);
 
       return res.status(500).json({
-        error: updateError?.message || "Erro ao atualizar documento no banco."
+        error:
+          updateError?.message ||
+          "Erro ao atualizar documento no banco."
       });
     }
 
     if (currentDocument.file_path) {
-      const { error: removeOldFileError } = await adminSupabase.storage
-        .from("documents")
-        .remove([currentDocument.file_path.trim()]);
+      const { error: removeOldFileError } =
+        await adminSupabase.storage
+          .from("documents")
+          .remove([currentDocument.file_path.trim()]);
 
       if (removeOldFileError) {
         console.error("ERRO AO REMOVER ARQUIVO ANTIGO:", removeOldFileError);
@@ -968,7 +1578,10 @@ app.put("/admin/documents/:documentId/replace", (req, res, next) => {
     });
   } catch (error) {
     console.error("ERRO EM PUT /admin/documents/:documentId/replace:", error);
-    res.status(500).json({ error: "Erro interno do servidor" });
+
+    res.status(500).json({
+      error: "Erro interno do servidor"
+    });
   }
 });
 
@@ -986,9 +1599,18 @@ app.get("/documents", async (req, res) => {
 
     const { data, error } = await adminSupabase
       .from("documents")
-      .select("*")
+      .select(`
+        id,
+        client_id,
+        file_name,
+        category,
+        subcategory,
+        year,
+        created_at
+      `)
       .eq("client_id", userId)
-      .order("year", { ascending: false });
+      .order("year", { ascending: false })
+      .order("created_at", { ascending: false });
 
     if (error) {
       return res.status(500).json({
@@ -996,7 +1618,7 @@ app.get("/documents", async (req, res) => {
       });
     }
 
-    res.json(data);
+    res.json(data || []);
   } catch (err) {
     console.error("ERRO AO BUSCAR DOCUMENTOS:", err);
 
@@ -1005,7 +1627,6 @@ app.get("/documents", async (req, res) => {
     });
   }
 });
-
 app.post("/documents/download", async (req, res) => {
   try {
     const authResult = await getAuthenticatedUser(req);
@@ -1025,11 +1646,12 @@ app.post("/documents/download", async (req, res) => {
       });
     }
 
-    const { data: documentData, error: documentError } = await adminSupabase
-      .from("documents")
-      .select("id, client_id, file_path, file_name")
-      .eq("id", document_id)
-      .single();
+    const { data: documentData, error: documentError } =
+      await adminSupabase
+        .from("documents")
+        .select("id, client_id, file_path, file_name")
+        .eq("id", document_id)
+        .single();
 
     if (documentError || !documentData) {
       return res.status(404).json({
@@ -1068,6 +1690,7 @@ app.post("/documents/download", async (req, res) => {
 app.post("/admin/documents/download", async (req, res) => {
   try {
     const adminAccess = await validateAdminAccess(req, res);
+
     if (!adminAccess) {
       return;
     }
@@ -1080,11 +1703,12 @@ app.post("/admin/documents/download", async (req, res) => {
       });
     }
 
-    const { data: documentData, error: documentError } = await adminSupabase
-      .from("documents")
-      .select("id, client_id, file_path, file_name")
-      .eq("id", document_id)
-      .single();
+    const { data: documentData, error: documentError } =
+      await adminSupabase
+        .from("documents")
+        .select("id, client_id, file_path, file_name")
+        .eq("id", document_id)
+        .single();
 
     if (documentError || !documentData) {
       return res.status(404).json({
@@ -1104,7 +1728,9 @@ app.post("/admin/documents/download", async (req, res) => {
 
     if (error) {
       return res.status(500).json({
-        error: error.message || "Erro ao gerar link temporário do documento."
+        error:
+          error.message ||
+          "Erro ao gerar link temporário do documento."
       });
     }
 
@@ -1113,13 +1739,17 @@ app.post("/admin/documents/download", async (req, res) => {
     });
   } catch (error) {
     console.error("ERRO EM POST /admin/documents/download:", error);
-    res.status(500).json({ error: "Erro interno do servidor" });
+
+    res.status(500).json({
+      error: "Erro interno do servidor"
+    });
   }
 });
 
 app.delete("/admin/documents/:documentId", async (req, res) => {
   try {
     const adminAccess = await validateAdminAccess(req, res);
+
     if (!adminAccess) {
       return;
     }
@@ -1132,11 +1762,12 @@ app.delete("/admin/documents/:documentId", async (req, res) => {
       });
     }
 
-    const { data: documentData, error: documentError } = await adminSupabase
-      .from("documents")
-      .select("id, file_path, file_name")
-      .eq("id", documentId)
-      .single();
+    const { data: documentData, error: documentError } =
+      await adminSupabase
+        .from("documents")
+        .select("id, file_path, file_name")
+        .eq("id", documentId)
+        .single();
 
     if (documentError || !documentData) {
       return res.status(404).json({
@@ -1145,13 +1776,16 @@ app.delete("/admin/documents/:documentId", async (req, res) => {
     }
 
     if (documentData.file_path) {
-      const { error: storageError } = await adminSupabase.storage
-        .from("documents")
-        .remove([documentData.file_path.trim()]);
+      const { error: storageError } =
+        await adminSupabase.storage
+          .from("documents")
+          .remove([documentData.file_path.trim()]);
 
       if (storageError) {
         return res.status(500).json({
-          error: storageError.message || "Erro ao excluir arquivo do storage."
+          error:
+            storageError.message ||
+            "Erro ao excluir arquivo do storage."
         });
       }
     }
@@ -1163,7 +1797,9 @@ app.delete("/admin/documents/:documentId", async (req, res) => {
 
     if (deleteDbError) {
       return res.status(500).json({
-        error: deleteDbError.message || "Erro ao excluir documento do banco."
+        error:
+          deleteDbError.message ||
+          "Erro ao excluir documento do banco."
       });
     }
 
@@ -1172,7 +1808,10 @@ app.delete("/admin/documents/:documentId", async (req, res) => {
     });
   } catch (error) {
     console.error("ERRO EM DELETE /admin/documents/:documentId:", error);
-    res.status(500).json({ error: "Erro interno do servidor" });
+
+    res.status(500).json({
+      error: "Erro interno do servidor"
+    });
   }
 });
 
@@ -1183,25 +1822,32 @@ app.delete("/admin/documents/:documentId", async (req, res) => {
 app.get("/admin/notices", async (req, res) => {
   try {
     const adminAccess = await validateAdminAccess(req, res);
+
     if (!adminAccess) {
       return;
     }
 
     const { data, error } = await adminSupabase
       .from("notices")
-      .select("id, title, image_url, link, description, action_type, link_target, is_active, created_at")
+      .select("id, title, image_url, link, description, action_type, link_target, is_active, created_at, display_order")
+      .order("display_order", { ascending: true })
       .order("created_at", { ascending: false });
 
     if (error) {
       return res.status(500).json({
-        error: error.message || "Erro ao buscar banners da Home."
+        error:
+          error.message ||
+          "Erro ao buscar banners da Home."
       });
     }
 
     return res.status(200).json(data || []);
   } catch (error) {
     console.error("ERRO EM GET /admin/notices:", error);
-    res.status(500).json({ error: "Erro interno do servidor" });
+
+    res.status(500).json({
+      error: "Erro interno do servidor"
+    });
   }
 });
 
@@ -1226,6 +1872,7 @@ app.post("/admin/notices/upload", (req, res, next) => {
 }, async (req, res) => {
   try {
     const adminAccess = await validateAdminAccess(req, res);
+
     if (!adminAccess) {
       return;
     }
@@ -1261,13 +1908,15 @@ app.post("/admin/notices/upload", (req, res, next) => {
     if (actionType === "link") {
       if (!linkTarget || !isValidBannerLinkTarget(linkTarget)) {
         return res.status(400).json({
-          error: "link_target inválido. Use 'contato', 'servicos', 'whatsapp' ou 'custom'."
+          error:
+            "link_target inválido. Use 'contato', 'servicos', 'whatsapp' ou 'custom'."
         });
       }
 
       if (linkTarget === "custom" && !link) {
         return res.status(400).json({
-          error: "Para link personalizado, o campo link é obrigatório."
+          error:
+            "Para link personalizado, o campo link é obrigatório."
         });
       }
     }
@@ -1278,8 +1927,17 @@ app.post("/admin/notices/upload", (req, res, next) => {
       });
     }
 
+    const imageValidation = validateBannerImageDimensions(image);
+
+    if (!imageValidation.valid) {
+      return res.status(400).json({
+        error: imageValidation.error
+      });
+    }
+
     const sanitizedFileName = sanitizeFileName(image.originalname);
     const timestamp = Date.now();
+
     const storagePath = `home-banners/${timestamp}_${sanitizedFileName}`;
 
     const { error: uploadError } = await adminSupabase.storage
@@ -1291,7 +1949,9 @@ app.post("/admin/notices/upload", (req, res, next) => {
 
     if (uploadError) {
       return res.status(500).json({
-        error: uploadError.message || "Erro ao enviar imagem do banner para o storage."
+        error:
+          uploadError.message ||
+          "Erro ao enviar imagem do banner para o storage."
       });
     }
 
@@ -1302,32 +1962,57 @@ app.post("/admin/notices/upload", (req, res, next) => {
     const imageUrl = publicUrlData?.publicUrl || null;
 
     if (!imageUrl) {
-      await adminSupabase.storage.from("banners").remove([storagePath]);
+      await adminSupabase.storage
+        .from("banners")
+        .remove([storagePath]);
 
       return res.status(500).json({
-        error: "Não foi possível gerar a URL pública da imagem do banner."
+        error:
+          "Não foi possível gerar a URL pública da imagem do banner."
       });
     }
 
-    const { data: insertedNotice, error: insertError } = await adminSupabase
-      .from("notices")
-      .insert({
-        title,
-        image_url: imageUrl,
-        link: actionType === "link" ? link : null,
-        description: actionType === "modal" ? description : null,
-        action_type: actionType,
-        link_target: actionType === "link" ? linkTarget : null,
-        is_active: isActive
-      })
-      .select("id, title, image_url, link, description, action_type, link_target, is_active, created_at")
-      .single();
+    let displayOrder = 1;
 
-    if (insertError) {
-      await adminSupabase.storage.from("banners").remove([storagePath]);
+    try {
+      displayOrder = await getNextNoticeDisplayOrder();
+    } catch (orderError) {
+      await adminSupabase.storage
+        .from("banners")
+        .remove([storagePath]);
 
       return res.status(500).json({
-        error: insertError.message || "Erro ao salvar banner no banco."
+        error:
+          orderError.message ||
+          "Erro ao calcular ordem do banner."
+      });
+    }
+
+    const { data: insertedNotice, error: insertError } =
+      await adminSupabase
+        .from("notices")
+        .insert({
+          title,
+          image_url: imageUrl,
+          link: actionType === "link" ? link : null,
+          description: actionType === "modal" ? description : null,
+          action_type: actionType,
+          link_target: actionType === "link" ? linkTarget : null,
+          is_active: isActive,
+          display_order: displayOrder
+        })
+        .select("id, title, image_url, link, description, action_type, link_target, is_active, created_at, display_order")
+        .single();
+
+    if (insertError) {
+      await adminSupabase.storage
+        .from("banners")
+        .remove([storagePath]);
+
+      return res.status(500).json({
+        error:
+          insertError.message ||
+          "Erro ao salvar banner no banco."
       });
     }
 
@@ -1337,13 +2022,303 @@ app.post("/admin/notices/upload", (req, res, next) => {
     });
   } catch (error) {
     console.error("ERRO EM POST /admin/notices/upload:", error);
-    res.status(500).json({ error: "Erro interno do servidor" });
+
+    res.status(500).json({
+      error: "Erro interno do servidor"
+    });
+  }
+});
+
+/*
+  IMPORTANTE:
+  Esta rota específica precisa ficar ANTES da rota dinâmica:
+  PUT /admin/notices/:noticeId
+
+  Caso contrário, o Express interpreta "reorder" como se fosse um noticeId.
+*/
+app.put("/admin/notices/reorder", async (req, res) => {
+  try {
+    const adminAccess = await validateAdminAccess(req, res);
+
+    if (!adminAccess) {
+      return;
+    }
+
+    const { orderedIds } = req.body;
+
+    if (!Array.isArray(orderedIds) || orderedIds.length === 0) {
+      return res.status(400).json({
+        error: "Lista de ordenação inválida."
+      });
+    }
+
+    const uniqueIds = [
+      ...new Set(
+        orderedIds
+          .map((id) => String(id || "").trim())
+          .filter(Boolean)
+      )
+    ];
+
+    if (uniqueIds.length !== orderedIds.length) {
+      return res.status(400).json({
+        error: "A lista de banners possui IDs duplicados ou inválidos."
+      });
+    }
+
+    for (let index = 0; index < uniqueIds.length; index++) {
+      const noticeId = uniqueIds[index];
+
+      const { error } = await adminSupabase
+        .from("notices")
+        .update({
+          display_order: index + 1
+        })
+        .eq("id", noticeId);
+
+      if (error) {
+        return res.status(500).json({
+          error:
+            error.message ||
+            "Erro ao atualizar ordem dos banners."
+        });
+      }
+    }
+
+    const { data, error: fetchError } = await adminSupabase
+      .from("notices")
+      .select("id, title, image_url, link, description, action_type, link_target, is_active, created_at, display_order")
+      .order("display_order", { ascending: true })
+      .order("created_at", { ascending: false });
+
+    if (fetchError) {
+      return res.status(500).json({
+        error:
+          fetchError.message ||
+          "Ordem atualizada, mas houve erro ao recarregar banners."
+      });
+    }
+
+    return res.status(200).json({
+      message: "Ordem dos banners atualizada com sucesso.",
+      notices: data || []
+    });
+  } catch (error) {
+    console.error("ERRO EM PUT /admin/notices/reorder:", error);
+
+    res.status(500).json({
+      error: "Erro interno do servidor"
+    });
+  }
+});
+
+app.put("/admin/notices/:noticeId", (req, res, next) => {
+  upload.single("image")(req, res, function (err) {
+    if (err) {
+      console.error("ERRO NO MULTER (EDITAR BANNER):", err);
+
+      if (err instanceof multer.MulterError) {
+        return res.status(400).json({
+          error: `Erro no upload: ${err.message}`
+        });
+      }
+
+      return res.status(500).json({
+        error: "Erro ao processar a imagem enviada."
+      });
+    }
+
+    next();
+  });
+}, async (req, res) => {
+  try {
+    const adminAccess = await validateAdminAccess(req, res);
+
+    if (!adminAccess) {
+      return;
+    }
+
+    const { noticeId } = req.params;
+
+    if (!noticeId) {
+      return res.status(400).json({
+        error: "noticeId é obrigatório."
+      });
+    }
+
+    const title = normalizeText(req.body.title);
+    const link = normalizeOptionalText(req.body.link);
+    const description = normalizeOptionalText(req.body.description);
+    const actionType = normalizeText(req.body.action_type);
+    const linkTarget = normalizeOptionalText(req.body.link_target);
+    const isActive = String(req.body.is_active).toLowerCase() === "true";
+    const image = req.file;
+
+    if (!title) {
+      return res.status(400).json({
+        error: "O título do banner é obrigatório."
+      });
+    }
+
+    if (!actionType || !isValidBannerActionType(actionType)) {
+      return res.status(400).json({
+        error: "action_type inválido. Use 'modal' ou 'link'."
+      });
+    }
+
+    if (actionType === "modal" && !description) {
+      return res.status(400).json({
+        error: "Para banners do tipo modal, a descrição é obrigatória."
+      });
+    }
+
+    if (actionType === "link") {
+      if (!linkTarget || !isValidBannerLinkTarget(linkTarget)) {
+        return res.status(400).json({
+          error:
+            "link_target inválido. Use 'contato', 'servicos', 'whatsapp' ou 'custom'."
+        });
+      }
+
+      if (linkTarget === "custom" && !link) {
+        return res.status(400).json({
+          error:
+            "Para link personalizado, o campo link é obrigatório."
+        });
+      }
+    }
+
+    const { data: currentNotice, error: currentError } =
+      await adminSupabase
+        .from("notices")
+        .select("id, title, image_url, display_order")
+        .eq("id", noticeId)
+        .single();
+
+    if (currentError || !currentNotice) {
+      return res.status(404).json({
+        error: "Banner não encontrado."
+      });
+    }
+
+    let nextImageUrl = currentNotice.image_url;
+    let newStoragePath = null;
+
+    if (image) {
+      if (!image.mimetype.startsWith("image/")) {
+        return res.status(400).json({
+          error: "O arquivo enviado deve ser uma imagem válida."
+        });
+      }
+
+      const imageValidation = validateBannerImageDimensions(image);
+
+      if (!imageValidation.valid) {
+        return res.status(400).json({
+          error: imageValidation.error
+        });
+      }
+
+      const sanitizedFileName = sanitizeFileName(image.originalname);
+      const timestamp = Date.now();
+
+      newStoragePath = `home-banners/${timestamp}_${sanitizedFileName}`;
+
+      const { error: uploadError } = await adminSupabase.storage
+        .from("banners")
+        .upload(newStoragePath, image.buffer, {
+          contentType: image.mimetype,
+          upsert: false
+        });
+
+      if (uploadError) {
+        return res.status(500).json({
+          error:
+            uploadError.message ||
+            "Erro ao enviar nova imagem do banner para o storage."
+        });
+      }
+
+      const { data: publicUrlData } = adminSupabase.storage
+        .from("banners")
+        .getPublicUrl(newStoragePath);
+
+      nextImageUrl = publicUrlData?.publicUrl || null;
+
+      if (!nextImageUrl) {
+        await adminSupabase.storage
+          .from("banners")
+          .remove([newStoragePath]);
+
+        return res.status(500).json({
+          error:
+            "Não foi possível gerar a URL pública da nova imagem do banner."
+        });
+      }
+    }
+
+    const { data: updatedNotice, error: updateError } =
+      await adminSupabase
+        .from("notices")
+        .update({
+          title,
+          image_url: nextImageUrl,
+          link: actionType === "link" ? link : null,
+          description: actionType === "modal" ? description : null,
+          action_type: actionType,
+          link_target: actionType === "link" ? linkTarget : null,
+          is_active: isActive
+        })
+        .eq("id", noticeId)
+        .select("id, title, image_url, link, description, action_type, link_target, is_active, created_at, display_order")
+        .single();
+
+    if (updateError || !updatedNotice) {
+      if (newStoragePath) {
+        await adminSupabase.storage
+          .from("banners")
+          .remove([newStoragePath]);
+      }
+
+      return res.status(500).json({
+        error:
+          updateError?.message ||
+          "Erro ao atualizar banner no banco."
+      });
+    }
+
+    if (image && currentNotice.image_url) {
+      const oldFilePath = extractBannerStoragePathFromUrl(currentNotice.image_url);
+
+      if (oldFilePath) {
+        const { error: removeOldImageError } =
+          await adminSupabase.storage
+            .from("banners")
+            .remove([oldFilePath]);
+
+        if (removeOldImageError) {
+          console.error("ERRO AO REMOVER IMAGEM ANTIGA DO BANNER:", removeOldImageError);
+        }
+      }
+    }
+
+    return res.status(200).json({
+      message: "Banner atualizado com sucesso.",
+      notice: updatedNotice
+    });
+  } catch (error) {
+    console.error("ERRO EM PUT /admin/notices/:noticeId:", error);
+
+    res.status(500).json({
+      error: "Erro interno do servidor"
+    });
   }
 });
 
 app.put("/admin/notices/:noticeId/toggle", async (req, res) => {
   try {
     const adminAccess = await validateAdminAccess(req, res);
+
     if (!adminAccess) {
       return;
     }
@@ -1363,11 +2338,12 @@ app.put("/admin/notices/:noticeId/toggle", async (req, res) => {
       });
     }
 
-    const { data: currentNotice, error: currentError } = await adminSupabase
-      .from("notices")
-      .select("id, title, is_active")
-      .eq("id", noticeId)
-      .single();
+    const { data: currentNotice, error: currentError } =
+      await adminSupabase
+        .from("notices")
+        .select("id, title, is_active")
+        .eq("id", noticeId)
+        .single();
 
     if (currentError || !currentNotice) {
       return res.status(404).json({
@@ -1375,18 +2351,21 @@ app.put("/admin/notices/:noticeId/toggle", async (req, res) => {
       });
     }
 
-    const { data: updatedNotice, error: updateError } = await adminSupabase
-      .from("notices")
-      .update({
-        is_active: isActive
-      })
-      .eq("id", noticeId)
-      .select("id, title, image_url, link, description, action_type, link_target, is_active, created_at")
-      .single();
+    const { data: updatedNotice, error: updateError } =
+      await adminSupabase
+        .from("notices")
+        .update({
+          is_active: isActive
+        })
+        .eq("id", noticeId)
+        .select("id, title, image_url, link, description, action_type, link_target, is_active, created_at, display_order")
+        .single();
 
     if (updateError || !updatedNotice) {
       return res.status(500).json({
-        error: updateError?.message || "Erro ao atualizar status do banner."
+        error:
+          updateError?.message ||
+          "Erro ao atualizar status do banner."
       });
     }
 
@@ -1396,13 +2375,17 @@ app.put("/admin/notices/:noticeId/toggle", async (req, res) => {
     });
   } catch (error) {
     console.error("ERRO EM PUT /admin/notices/:noticeId/toggle:", error);
-    res.status(500).json({ error: "Erro interno do servidor" });
+
+    res.status(500).json({
+      error: "Erro interno do servidor"
+    });
   }
 });
 
 app.delete("/admin/notices/:noticeId", async (req, res) => {
   try {
     const adminAccess = await validateAdminAccess(req, res);
+
     if (!adminAccess) {
       return;
     }
@@ -1415,11 +2398,12 @@ app.delete("/admin/notices/:noticeId", async (req, res) => {
       });
     }
 
-    const { data: currentNotice, error: currentError } = await adminSupabase
-      .from("notices")
-      .select("id, title, image_url")
-      .eq("id", noticeId)
-      .single();
+    const { data: currentNotice, error: currentError } =
+      await adminSupabase
+        .from("notices")
+        .select("id, title, image_url")
+        .eq("id", noticeId)
+        .single();
 
     if (currentError || !currentNotice) {
       return res.status(404).json({
@@ -1428,14 +2412,13 @@ app.delete("/admin/notices/:noticeId", async (req, res) => {
     }
 
     if (currentNotice.image_url) {
-      const marker = "/storage/v1/object/public/banners/";
-      const splitPath = currentNotice.image_url.split(marker);
-      const filePath = splitPath.length > 1 ? splitPath[1] : null;
+      const filePath = extractBannerStoragePathFromUrl(currentNotice.image_url);
 
       if (filePath) {
-        const { error: removeImageError } = await adminSupabase.storage
-          .from("banners")
-          .remove([filePath]);
+        const { error: removeImageError } =
+          await adminSupabase.storage
+            .from("banners")
+            .remove([filePath]);
 
         if (removeImageError) {
           console.error("ERRO AO REMOVER IMAGEM DO BANNER:", removeImageError);
@@ -1450,7 +2433,9 @@ app.delete("/admin/notices/:noticeId", async (req, res) => {
 
     if (deleteError) {
       return res.status(500).json({
-        error: deleteError.message || "Erro ao excluir banner."
+        error:
+          deleteError.message ||
+          "Erro ao excluir banner."
       });
     }
 
@@ -1459,7 +2444,10 @@ app.delete("/admin/notices/:noticeId", async (req, res) => {
     });
   } catch (error) {
     console.error("ERRO EM DELETE /admin/notices/:noticeId:", error);
-    res.status(500).json({ error: "Erro interno do servidor" });
+
+    res.status(500).json({
+      error: "Erro interno do servidor"
+    });
   }
 });
 
@@ -1467,8 +2455,9 @@ app.get("/notices", async (req, res) => {
   try {
     const { data, error } = await adminSupabase
       .from("notices")
-      .select("id, title, image_url, link, description, action_type, link_target, is_active, created_at")
+      .select("id, title, image_url, link, description, action_type, link_target, is_active, created_at, display_order")
       .eq("is_active", true)
+      .order("display_order", { ascending: true })
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -1490,12 +2479,14 @@ app.get("/notices", async (req, res) => {
 console.log("Rotas configuradas:");
 console.log("GET /");
 console.log("POST /login");
+console.log("POST /admin/refresh-session");
 console.log("PUT /update-password");
 console.log("POST /clients");
 console.log("GET /clients");
 console.log("PUT /admin/clients/:clientId/status");
 console.log("DELETE /admin/clients/:clientId");
 console.log("GET /clients/:clientId/documents");
+console.log("GET /admin/documents/renewal-alerts");
 console.log("POST /admin/documents/upload");
 console.log("PUT /admin/documents/:documentId/replace");
 console.log("GET /documents");
@@ -1504,6 +2495,8 @@ console.log("POST /admin/documents/download");
 console.log("DELETE /admin/documents/:documentId");
 console.log("GET /admin/notices");
 console.log("POST /admin/notices/upload");
+console.log("PUT /admin/notices/reorder");
+console.log("PUT /admin/notices/:noticeId");
 console.log("PUT /admin/notices/:noticeId/toggle");
 console.log("DELETE /admin/notices/:noticeId");
 console.log("GET /notices");

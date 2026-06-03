@@ -1,82 +1,324 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Painel do Cliente - CASEG Protege</title>
 
-    <link rel="stylesheet" href="../assets/css/style.css">
+    <link rel="stylesheet" href="../assets/css/style.css" />
+    <link rel="stylesheet" href="../assets/css/cliente.css" />
+
+    <link
+        rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
+    />
 
     <script>
-        const token = localStorage.getItem("access_token");
-        const profile = JSON.parse(localStorage.getItem("profile"));
+        let token = localStorage.getItem("access_token");
+        let profile = null;
+
+        try {
+            profile = JSON.parse(localStorage.getItem("profile"));
+        } catch (error) {
+            profile = null;
+        }
 
         if (!token || !profile) {
             alert("Você precisa fazer login.");
             window.location.href = "login.html";
         }
 
-        if (profile.role !== "client") {
+        if (profile && profile.role !== "client") {
             alert("Acesso restrito.");
             window.location.href = "login.html";
         }
 
-        if (profile.must_change_password === true) {
+        if (profile && profile.must_change_password === true) {
             window.location.href = "primeiro-acesso.html";
         }
     </script>
 </head>
 
-<body>
+<body class="client-panel-page">
+    <div class="client-app-shell">
 
-<header class="site-header">
-    <div class="header-container">
+        <aside class="client-sidebar">
+            <div class="client-sidebar-inner">
 
-        <a href="home.html" class="logo-link reveal-on-load delay-1">
-            <img
-                src="/site-caseg-protege/logo_transparente.png"
-                alt="Logo CASEG Protege"
-                class="site-logo"
-            />
-        </a>
+                <a href="#painel" class="client-sidebar-brand" aria-label="CASEG Protege - Painel do Cliente">
+                    <img
+                        src="../assets/img/logo_footer.png"
+                        alt="Logo CASEG Protege"
+                        class="client-sidebar-logo"
+                    />
+                </a>
 
-        <nav class="main-nav reveal-on-load delay-2">
-            <a href="home.html">Home</a>
-            <a href="avisos.html">Sobre</a>
-            <a href="contato.html">Contato</a>
-        </nav>
+                <nav class="client-sidebar-nav" aria-label="Menu do cliente">
+                    <div class="client-sidebar-group">
 
+                        <a href="#painel" class="client-sidebar-link active">
+                            <span class="client-sidebar-link-icon">
+                                <i class="fa-solid fa-house" aria-hidden="true"></i>
+                            </span>
+                            <span>Painel</span>
+                        </a>
+
+                        <a href="#documentos" class="client-sidebar-link">
+                            <span class="client-sidebar-link-icon">
+                                <i class="fa-regular fa-folder-open" aria-hidden="true"></i>
+                            </span>
+                            <span>Meus Documentos</span>
+                        </a>
+
+                        <a href="servicos.html" class="client-sidebar-link">
+                            <span class="client-sidebar-link-icon">
+                                <i class="fa-solid fa-chalkboard-user" aria-hidden="true"></i>
+                            </span>
+                            <span>Treinamentos</span>
+                        </a>
+
+                        <a href="contato.html" class="client-sidebar-link">
+                            <span class="client-sidebar-link-icon">
+                                <i class="fa-solid fa-headset" aria-hidden="true"></i>
+                            </span>
+                            <span>Suporte</span>
+                        </a>
+
+                    </div>
+
+                    <div class="client-sidebar-divider"></div>
+
+                    <div class="client-sidebar-group client-sidebar-group-bottom">
+                        <button type="button" id="logoutBtn" class="client-sidebar-link client-sidebar-link-logout">
+                            <span class="client-sidebar-link-icon">
+                                <i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i>
+                            </span>
+                            <span>Sair da conta</span>
+                        </button>
+                    </div>
+                </nav>
+
+            </div>
+        </aside>
+
+        <div class="client-workspace">
+            <main class="client-container">
+
+                <header id="painel" class="client-topbar reveal-on-load delay-1">
+                    <div class="client-page-heading">
+                        <h1>Painel do Cliente</h1>
+                    </div>
+                </header>
+
+                <section class="client-welcome-panel reveal-on-load delay-2">
+                    <div class="client-welcome-content">
+                        <h2 id="welcomeMessage">Bem-vindo</h2>
+
+                        <p id="companyName" class="client-company-name">Empresa: carregando...</p>
+
+                        <p class="client-welcome-description">
+                            Aqui você tem acesso aos documentos técnicos, certificados, relatórios
+                            e arquivos liberados pela equipe CASEG Protege de forma segura e organizada.
+                            Os downloads são protegidos por autenticação, links temporários e acesso
+                            controlado, garantindo mais segurança para os documentos da sua empresa.
+                        </p>
+                    </div>
+                </section>
+
+                <section class="client-dashboard-cards reveal-on-load delay-3" aria-label="Resumo do painel do cliente">
+                    <article class="client-stat-card">
+                        <div class="client-stat-icon">
+                            <i class="fa-regular fa-file-lines" aria-hidden="true"></i>
+                        </div>
+
+                        <div class="client-stat-content">
+                            <strong id="clientTotalDocuments">0</strong>
+                            <span>Documentos</span>
+                            <small>Arquivos disponíveis</small>
+                        </div>
+                    </article>
+
+                    <article class="client-stat-card">
+                        <div class="client-stat-icon">
+                            <i class="fa-regular fa-folder" aria-hidden="true"></i>
+                        </div>
+
+                        <div class="client-stat-content">
+                            <strong id="clientTotalCategories">0</strong>
+                            <span>Categorias</span>
+                            <small>Grupos disponíveis</small>
+                        </div>
+                    </article>
+
+                    <article class="client-stat-card">
+                        <div class="client-stat-icon">
+                            <i class="fa-solid fa-tags" aria-hidden="true"></i>
+                        </div>
+
+                        <div class="client-stat-content">
+                            <strong id="clientTotalSubcategories">0</strong>
+                            <span>Subcategorias</span>
+                            <small>Divisões cadastradas</small>
+                        </div>
+                    </article>
+
+                    <article class="client-stat-card">
+                        <div class="client-stat-icon">
+                            <i class="fa-regular fa-clock" aria-hidden="true"></i>
+                        </div>
+
+                        <div class="client-stat-content">
+                            <strong id="clientRecentDocuments">0</strong>
+                            <span>Arquivos recentes</span>
+                            <small>Liberados recentemente</small>
+                        </div>
+                    </article>
+                </section>
+
+                <section class="client-content-grid reveal-on-load delay-4">
+
+                    <div class="client-main-column">
+
+                        <section id="recentes" class="client-dashboard-block client-recent-block">
+                            <div class="client-recent-header">
+                                <div class="client-block-title-group">
+                                    <div class="client-block-icon">
+                                        <i class="fa-regular fa-file-lines" aria-hidden="true"></i>
+                                    </div>
+
+                                    <div>
+                                        <span class="client-section-kicker">Recentes</span>
+                                        <h2>Últimos documentos liberados</h2>
+                                        <p>
+                                            Veja rapidamente os arquivos mais recentes disponíveis para sua empresa.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div id="recentDocumentsList" class="client-recent-list">
+                                <p class="loading-message">Carregando documentos recentes...</p>
+                            </div>
+                        </section>
+
+                        <section id="documentos" class="client-dashboard-block client-documents-block">
+                            <div class="client-block-header">
+                                <div class="client-block-title-group">
+                                    <div class="client-block-icon">
+                                        <i class="fa-regular fa-folder-open" aria-hidden="true"></i>
+                                    </div>
+
+                                    <div>
+                                        <span class="client-section-kicker">Documentos</span>
+                                        <h2>Meus Documentos</h2>
+                                        <p>
+                                            Consulte e baixe os documentos organizados por categoria,
+                                            subcategoria e ano.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="client-documents-tools">
+                                <label class="client-search-box" for="documentSearchInput">
+                                    <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+                                    <input
+                                        type="search"
+                                        id="documentSearchInput"
+                                        placeholder="Buscar documento, categoria, subcategoria ou ano..."
+                                        autocomplete="off"
+                                    />
+                                </label>
+
+                                <button type="button" id="clearDocumentSearchBtn" class="client-search-clear" hidden>
+                                    Limpar
+                                </button>
+                            </div>
+
+                            <div class="client-documents-wrapper">
+                                <div id="documentsList" class="client-documents-list"></div>
+                            </div>
+                        </section>
+                    </div>
+
+                    <aside class="client-side-column">
+
+                        <section id="conta" class="client-dashboard-block client-account-block">
+                            <div class="client-side-block-header">
+                                <div class="client-side-icon">
+                                    <i class="fa-regular fa-circle-user" aria-hidden="true"></i>
+                                </div>
+
+                                <div>
+                                    <span class="client-section-kicker">Conta</span>
+                                    <h2>Informações da Conta</h2>
+                                </div>
+                            </div>
+
+                            <div class="client-account-list">
+                                <div class="client-account-item">
+                                    <small>Cliente</small>
+                                    <strong id="clientAccountName">Carregando...</strong>
+                                </div>
+
+                                <div class="client-account-item">
+                                    <small>Empresa</small>
+                                    <strong id="clientAccountCompany">Carregando...</strong>
+                                </div>
+
+                                <div class="client-account-item">
+                                    <small>E-mail</small>
+                                    <strong id="clientAccountEmail">Carregando...</strong>
+                                </div>
+
+                                <div class="client-account-item">
+                                    <small>Tipo de acesso</small>
+                                    <span>Cliente</span>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section class="client-dashboard-block client-secure-side-card">
+                            <div class="client-secure-side-icon">
+                                <i class="fa-solid fa-shield-halved" aria-hidden="true"></i>
+                            </div>
+
+                            <div>
+                                <span class="client-section-kicker">Segurança</span>
+                                <h2>Acesso Seguro</h2>
+
+                                <p>
+                                    Seus dados e documentos são protegidos por autenticação
+                                    e acesso controlado.
+                                </p>
+
+                                <span class="client-secure-badge">
+                                    <i class="fa-solid fa-lock" aria-hidden="true"></i>
+                                    Portal protegido
+                                </span>
+                            </div>
+                        </section>
+
+                    </aside>
+                </section>
+
+                <footer class="client-footer">
+                    <p>© 2025 CASEG Protege. Todos os direitos reservados.</p>
+
+                    <div class="client-footer-links">
+                        <a href="termos-de-uso.html">Termos de Uso</a>
+                        <span>|</span>
+                        <a href="politica-privacidade.html">Política de Privacidade</a>
+                    </div>
+
+                    <span>Versão 1.0.0</span>
+                </footer>
+
+            </main>
+        </div>
     </div>
-</header>
 
-<main class="login-page">
-    <div class="client-info reveal-on-load delay-3">
-        <h2 id="welcomeMessage"></h2>
-        <p id="companyName"></p>
-        <p>Bem-vindo ao painel do cliente da CASEG Protege.</p>
-    </div>
-
-    <div class="client-cards reveal-on-load delay-4">
-        <section class="client-card reveal-on-load delay-4">
-            <h3>Documentos</h3>
-
-            <div id="documentsList"></div>
-        </section>
-    </div>
-
-    <button id="logoutBtn" class="reveal-on-load delay-5">Sair da conta</button>
-</main>
-
-<footer class="site-footer">
-    <p>© CASEG Protege</p>
-    <p>
-        <a href="termos-de-uso.html">Termos de Uso</a> —
-        <a href="politica-privacidade.html">Política de Privacidade</a>
-    </p>
-</footer>
-
-<script src="../assets/js/client-panel.js"></script>
-<script src="../assets/js/site-animations.js"></script>
-
+    <script src="../assets/js/client-panel.js"></script>
+    <script src="../assets/js/site-animations.js"></script>
 </body>
 </html>

@@ -10,150 +10,1343 @@
         rel="stylesheet"
         href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
     />
+
+    <style>
+        .servicos-page {
+            --servicos-green: #176d2c;
+            --servicos-green-light: #1f8f3a;
+            --servicos-lime: #a7c814;
+            --servicos-text: #191919;
+            --servicos-muted: #4d5560;
+            --servicos-bg: #f6f7f6;
+            --servicos-white: #ffffff;
+            --servicos-border: #e2e6e2;
+            --servicos-soft-green: #eaf5e5;
+            --servicos-shadow: 0 14px 35px rgba(0, 0, 0, 0.08);
+            --servicos-shadow-soft: 0 10px 24px rgba(0, 0, 0, 0.10);
+
+            background: var(--servicos-bg);
+            color: var(--servicos-text);
+        }
+
+        .servicos-page * {
+            box-sizing: border-box;
+        }
+
+        .servicos-page .site-header {
+            background: var(--servicos-white);
+            border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+            box-shadow: 0 6px 22px rgba(0, 0, 0, 0.04);
+        }
+
+        .servicos-page .header-container {
+            max-width: 1500px;
+            margin: 0 auto;
+            padding: 14px 28px;
+            display: grid;
+            grid-template-columns: 260px 1fr 140px;
+            align-items: center;
+            gap: 24px;
+        }
+
+        .servicos-page .logo-link {
+            display: inline-flex;
+            align-items: center;
+            text-decoration: none;
+        }
+
+        .servicos-page .site-logo {
+            width: 190px;
+            height: auto;
+        }
+
+        .servicos-page .main-nav {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 46px;
+        }
+
+        .servicos-page .main-nav a {
+            position: relative;
+            color: #111111;
+            text-decoration: none;
+            font-size: 17px;
+            font-weight: 800;
+            padding: 10px 0;
+            transition: color 0.2s ease;
+            background: transparent;
+            border: none;
+        }
+
+        .servicos-page .main-nav a::before,
+        .servicos-page .main-nav a::after {
+            content: none !important;
+            display: none !important;
+        }
+
+        .servicos-page .main-nav a:hover,
+        .servicos-page .main-nav a.active {
+            color: var(--servicos-green);
+        }
+
+        .servicos-page .header-login-button {
+            height: 44px;
+            padding: 0 20px;
+            border-radius: 8px;
+            background: var(--servicos-green);
+            color: #ffffff;
+            text-decoration: none;
+            font-weight: 800;
+            font-size: 15px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 9px;
+            box-shadow: 0 10px 20px rgba(23, 109, 44, 0.20);
+            transition: transform 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .servicos-page .header-login-button:hover {
+            background: var(--servicos-green-light);
+            transform: translateY(-2px);
+            box-shadow: 0 14px 26px rgba(23, 109, 44, 0.26);
+        }
+
+        .servicos-page .header-login-button i {
+            font-size: 17px;
+        }
+
+        .servicos-main {
+            max-width: 1500px;
+            margin: 0 auto;
+            padding: 0 28px 28px;
+        }
+
+        .servicos-hero {
+            width: 100%;
+            margin: 0 auto;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: var(--servicos-shadow);
+            background: #061f13;
+        }
+
+        .servicos-hero img {
+            width: 100%;
+            height: auto;
+            display: block;
+            border-radius: 12px;
+        }
+
+        .servicos-content-card {
+            position: relative;
+            z-index: 4;
+            background: #ffffff;
+            margin: 0 auto;
+            padding: 23px 64px 24px;
+            border-radius: 0 0 18px 18px;
+            box-shadow: var(--servicos-shadow);
+        }
+
+        .servicos-section-heading {
+            display: flex;
+            align-items: flex-start;
+            gap: 18px;
+            margin-bottom: 16px;
+        }
+
+        .servicos-section-icon {
+            width: 53px;
+            height: 53px;
+            border-radius: 16px;
+            background: var(--servicos-soft-green);
+            color: var(--servicos-green);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 25px;
+            flex: 0 0 auto;
+        }
+
+        .servicos-section-heading h2 {
+            margin: 0 0 4px;
+            color: #1c1c1c;
+            font-size: 21px;
+            line-height: 1.25;
+            font-weight: 900;
+        }
+
+        .servicos-section-heading p {
+            margin: 0;
+            color: var(--servicos-muted);
+            font-size: 13px;
+            line-height: 1.55;
+        }
+
+        .servicos-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 9px 12px;
+        }
+
+        .servico-card {
+            width: 100%;
+            min-height: 92px;
+            border: 1px solid var(--servicos-border);
+            background: #ffffff;
+            border-radius: 10px;
+            padding: 13px 18px;
+            display: flex;
+            align-items: center;
+            gap: 21px;
+            text-align: left;
+            font-family: inherit;
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
+        }
+
+        .servico-card:hover {
+            transform: translateY(-3px);
+            border-color: rgba(31, 143, 58, 0.35);
+            background-color: #fbfdfb;
+            box-shadow: 0 14px 30px rgba(0, 0, 0, 0.07);
+        }
+
+        .servico-card:focus-visible {
+            outline: 3px solid rgba(31, 143, 58, 0.22);
+            outline-offset: 3px;
+            border-color: rgba(31, 143, 58, 0.45);
+        }
+
+        .servico-icon {
+            width: 54px;
+            height: 54px;
+            min-width: 54px;
+            border-radius: 18px;
+            background: var(--servicos-soft-green);
+            color: var(--servicos-green);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 25px;
+            transition: background-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
+        }
+
+        .servico-card:hover .servico-icon {
+            background: var(--servicos-green);
+            color: #ffffff;
+            transform: scale(1.04);
+        }
+
+        .servico-card-content h3 {
+            margin: 0 0 4px;
+            color: #191919;
+            font-size: 15px;
+            line-height: 1.22;
+            font-weight: 900;
+        }
+
+        .servico-card-content p {
+            margin: 0;
+            color: #404854;
+            font-size: 12.5px;
+            line-height: 1.45;
+            font-weight: 500;
+        }
+
+        .servicos-cta {
+            position: relative;
+            overflow: hidden;
+            margin: 8px -10px 0;
+            border-radius: 12px;
+            background: #061f13;
+            box-shadow: var(--servicos-shadow-soft);
+        }
+
+        .servicos-cta-bg {
+            width: 100%;
+            height: auto;
+            display: block;
+            border-radius: 12px;
+        }
+
+        .servicos-cta-button {
+            position: absolute;
+            left: 34.5%;
+            bottom: 8px;
+            height: 32px;
+            min-width: 165px;
+            padding: 0 16px;
+            border-radius: 7px;
+            background: var(--servicos-green);
+            color: #ffffff;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            font-weight: 900;
+            font-size: 12.5px;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            box-shadow: 0 10px 18px rgba(0, 0, 0, 0.24);
+            transition: transform 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+            z-index: 3;
+        }
+
+        .servicos-cta-button:hover {
+            background: var(--servicos-green-light);
+            transform: translateY(-2px);
+            box-shadow: 0 14px 22px rgba(0, 0, 0, 0.28);
+        }
+
+        .servicos-cta-button i {
+            font-size: 15px;
+        }
+
+        .servico-modal-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 9999;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            background: rgba(0, 0, 0, 0.58);
+            backdrop-filter: blur(7px);
+        }
+
+        .servico-modal-overlay.is-open {
+            display: flex;
+        }
+
+        .servico-modal {
+            position: relative;
+            width: min(720px, 100%);
+            max-height: 90vh;
+            overflow-y: auto;
+            background: #ffffff;
+            border-radius: 20px;
+            box-shadow: 0 28px 80px rgba(0, 0, 0, 0.32);
+            animation: servicoModalIn 0.22s ease;
+        }
+
+        @keyframes servicoModalIn {
+            from {
+                opacity: 0;
+                transform: translateY(18px) scale(0.97);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        .servico-modal-header {
+            position: relative;
+            padding: 28px 30px 24px;
+            color: #ffffff;
+            background:
+                linear-gradient(
+                    135deg,
+                    rgba(6, 31, 19, 0.98),
+                    rgba(23, 109, 44, 0.95)
+                );
+            border-radius: 20px 20px 0 0;
+            overflow: hidden;
+        }
+
+        .servico-modal-header::after {
+            content: "";
+            position: absolute;
+            right: -60px;
+            top: -70px;
+            width: 190px;
+            height: 190px;
+            border-radius: 50%;
+            background: rgba(167, 200, 20, 0.15);
+        }
+
+        .servico-modal-header-content {
+            position: relative;
+            z-index: 2;
+            display: flex;
+            align-items: flex-start;
+            gap: 16px;
+            padding-right: 48px;
+        }
+
+        .servico-modal-icon {
+            width: 58px;
+            height: 58px;
+            min-width: 58px;
+            border-radius: 18px;
+            background: rgba(255, 255, 255, 0.14);
+            color: var(--servicos-lime);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 27px;
+            border: 1px solid rgba(255, 255, 255, 0.14);
+        }
+
+        .servico-modal-title-area h2 {
+            margin: 0 0 6px;
+            font-size: 25px;
+            line-height: 1.15;
+            font-weight: 900;
+            color: #ffffff;
+        }
+
+        .servico-modal-title-area p {
+            margin: 0;
+            color: rgba(255, 255, 255, 0.86);
+            font-size: 14px;
+            line-height: 1.45;
+        }
+
+        .servico-modal-close {
+            position: absolute;
+            right: 18px;
+            top: 18px;
+            z-index: 4;
+            width: 38px;
+            height: 38px;
+            border-radius: 999px;
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            background: rgba(255, 255, 255, 0.10);
+            color: #ffffff;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            transition: background-color 0.2s ease, transform 0.2s ease;
+        }
+
+        .servico-modal-close:hover {
+            background: rgba(255, 255, 255, 0.18);
+            transform: rotate(90deg);
+        }
+
+        .servico-modal-body {
+            padding: 26px 30px 30px;
+        }
+
+        .servico-modal-body h3 {
+            margin: 0 0 10px;
+            color: var(--servicos-green);
+            font-size: 18px;
+            font-weight: 900;
+        }
+
+        .servico-modal-body p {
+            margin: 0 0 16px;
+            color: #2f3742;
+            font-size: 15px;
+            line-height: 1.65;
+        }
+
+        .servico-modal-list {
+            margin: 16px 0 0;
+            padding: 0;
+            list-style: none;
+            display: grid;
+            gap: 10px;
+        }
+
+        .servico-modal-list li {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            color: #2f3742;
+            font-size: 14px;
+            line-height: 1.45;
+        }
+
+        .servico-modal-list li i {
+            color: var(--servicos-green);
+            margin-top: 3px;
+            flex: 0 0 auto;
+        }
+
+        .servico-modal-footer {
+            margin-top: 24px;
+            padding-top: 18px;
+            border-top: 1px solid #e7ece7;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 14px;
+            flex-wrap: wrap;
+        }
+
+        .servico-modal-note {
+            margin: 0;
+            color: #596370;
+            font-size: 13px;
+            line-height: 1.45;
+            max-width: 410px;
+        }
+
+        .servico-modal-action {
+            min-height: 40px;
+            padding: 0 18px;
+            border-radius: 8px;
+            background: var(--servicos-green);
+            color: #ffffff;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 9px;
+            font-weight: 900;
+            font-size: 14px;
+            transition: background-color 0.2s ease, transform 0.2s ease;
+        }
+
+        .servico-modal-action:hover {
+            background: var(--servicos-green-light);
+            transform: translateY(-2px);
+        }
+
+        /* ===============================
+           RODAPÉ COM IMAGEM CORINGA
+        ================================ */
+
+        .servicos-page .site-footer {
+            position: relative;
+            overflow: hidden;
+            background:
+                linear-gradient(
+                    90deg,
+                    rgba(0, 15, 10, 0.74) 0%,
+                    rgba(0, 18, 12, 0.60) 45%,
+                    rgba(0, 15, 10, 0.74) 100%
+                ),
+                url("../assets/img/fundo-industrial-caseg.png") center center / cover no-repeat;
+            color: #ffffff;
+            border-top: none;
+            margin-top: 0;
+            padding: 14px 28px;
+            box-shadow: 0 -4px 18px rgba(0, 0, 0, 0.18);
+        }
+
+        .servicos-page .footer-container {
+            position: relative;
+            z-index: 2;
+            max-width: 1500px;
+            margin: 0 auto;
+            min-height: 68px;
+            display: grid;
+            grid-template-columns: 215px 1fr auto;
+            align-items: center;
+            gap: 22px;
+        }
+
+        .servicos-page .footer-logo {
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+        }
+
+        .servicos-page .footer-logo img {
+            width: 152px;
+            height: auto;
+            filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.35));
+        }
+
+        .servicos-page .site-footer p {
+            margin: 0;
+            color: rgba(255, 255, 255, 0.95);
+            font-size: 13px;
+            text-align: center;
+            font-weight: 600;
+            line-height: 1.45;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+        }
+
+        .servicos-page .footer-links {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 16px;
+            font-size: 13px;
+        }
+
+        .servicos-page .site-footer a {
+            color: rgba(255, 255, 255, 0.95);
+            text-decoration: none;
+            font-weight: 600;
+            transition: color 0.2s ease;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+        }
+
+        .servicos-page .site-footer a:hover {
+            color: var(--servicos-lime);
+            text-decoration: none;
+        }
+
+        .servicos-page .footer-links span {
+            color: rgba(255, 255, 255, 0.45);
+        }
+
+        @media (max-width: 1200px) {
+            .servicos-page .header-container {
+                grid-template-columns: 210px 1fr 120px;
+            }
+
+            .servicos-page .main-nav {
+                gap: 28px;
+            }
+
+            .servicos-content-card {
+                padding: 24px 34px 24px;
+            }
+
+            .servicos-cta {
+                margin: 10px -6px 0;
+            }
+
+            .servicos-cta-button {
+                left: 34.5%;
+                bottom: 7px;
+                height: 30px;
+                min-width: 152px;
+                font-size: 11.5px;
+                padding: 0 14px;
+            }
+
+            .servicos-cta-button i {
+                font-size: 14px;
+            }
+        }
+
+        @media (max-width: 1024px) {
+            .servicos-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .servicos-cta-button {
+                left: 34.5%;
+                bottom: 6px;
+                height: 27px;
+                min-width: 138px;
+                font-size: 10.8px;
+                padding: 0 12px;
+            }
+
+            .servicos-cta-button i {
+                font-size: 13px;
+            }
+        }
+
+        @media (max-width: 900px) {
+            .servicos-page .header-container {
+                grid-template-columns: 1fr auto;
+                gap: 16px;
+                padding: 12px 20px;
+            }
+
+            .servicos-page .site-logo {
+                width: 155px;
+            }
+
+            .servicos-page .main-nav {
+                grid-column: 1 / -1;
+                order: 3;
+                width: 100%;
+                justify-content: center;
+                gap: 24px;
+            }
+
+            .servicos-page .main-nav a {
+                font-size: 15px;
+            }
+
+            .servicos-page .header-login-button {
+                height: 40px;
+                padding: 0 15px;
+                font-size: 13px;
+            }
+
+            .servicos-main {
+                padding: 0 18px 28px;
+            }
+
+            .servicos-cta {
+                margin: 12px 0 0;
+            }
+
+            .servicos-cta-button {
+                left: 34.5%;
+                bottom: 5px;
+                height: 25px;
+                min-width: 126px;
+                font-size: 10px;
+                border-radius: 6px;
+                padding: 0 10px;
+            }
+
+            .servicos-cta-button i {
+                font-size: 12px;
+            }
+
+            .servicos-page .footer-container {
+                grid-template-columns: 1fr;
+                text-align: center;
+                justify-items: center;
+                gap: 8px;
+                min-height: auto;
+            }
+
+            .servicos-page .footer-logo {
+                justify-content: center;
+            }
+
+            .servicos-page .footer-logo img {
+                width: 136px;
+            }
+
+            .servicos-page .footer-links {
+                justify-content: center;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .servicos-main {
+                padding: 0 12px 24px;
+            }
+
+            .servicos-hero {
+                border-radius: 10px;
+            }
+
+            .servicos-hero img {
+                border-radius: 10px;
+            }
+
+            .servicos-content-card {
+                padding: 22px 18px 22px;
+                border-radius: 0 0 14px 14px;
+            }
+
+            .servicos-section-heading {
+                flex-direction: column;
+                gap: 12px;
+            }
+
+            .servicos-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .servico-card {
+                align-items: flex-start;
+                padding: 16px;
+            }
+
+            .servicos-cta {
+                border-radius: 10px;
+                margin: 12px 0 0;
+            }
+
+            .servicos-cta-bg {
+                border-radius: 10px;
+            }
+
+            .servicos-cta-button {
+                left: 34%;
+                bottom: 4px;
+                height: 22px;
+                min-width: 112px;
+                font-size: 9px;
+                padding: 0 8px;
+                gap: 5px;
+            }
+
+            .servicos-cta-button i {
+                font-size: 11px;
+            }
+
+            .servico-modal-overlay {
+                padding: 16px;
+            }
+
+            .servico-modal-header {
+                padding: 24px 22px 22px;
+            }
+
+            .servico-modal-header-content {
+                gap: 13px;
+                padding-right: 42px;
+            }
+
+            .servico-modal-icon {
+                width: 50px;
+                height: 50px;
+                min-width: 50px;
+                font-size: 23px;
+            }
+
+            .servico-modal-title-area h2 {
+                font-size: 21px;
+            }
+
+            .servico-modal-body {
+                padding: 22px;
+            }
+
+            .servico-modal-footer {
+                align-items: stretch;
+            }
+
+            .servico-modal-action {
+                width: 100%;
+            }
+
+            .servicos-page .site-footer p,
+            .servicos-page .footer-links,
+            .servicos-page .site-footer a {
+                font-size: 12.2px;
+            }
+        }
+
+        @media (max-width: 620px) {
+            .servicos-cta-button {
+                left: 33%;
+                bottom: 4px;
+                height: 20px;
+                min-width: 98px;
+                font-size: 8px;
+                padding: 0 7px;
+            }
+
+            .servicos-cta-button i {
+                font-size: 10px;
+            }
+        }
+
+        @media (max-width: 520px) {
+            .servicos-page .header-container {
+                grid-template-columns: 1fr;
+                justify-items: center;
+            }
+
+            .servicos-page .main-nav {
+                gap: 16px;
+                flex-wrap: wrap;
+            }
+
+            .servicos-page .header-login-button {
+                width: 100%;
+            }
+
+            .servicos-section-heading h2 {
+                font-size: 20px;
+            }
+
+            .servico-card {
+                gap: 14px;
+            }
+
+            .servico-icon {
+                width: 48px;
+                height: 48px;
+                min-width: 48px;
+                font-size: 22px;
+            }
+
+            .servicos-cta-button {
+                left: 32%;
+                bottom: 3px;
+                height: 19px;
+                min-width: 86px;
+                font-size: 7.5px;
+                border-radius: 5px;
+                padding: 0 6px;
+            }
+
+            .servicos-cta-button i {
+                font-size: 8.5px;
+            }
+
+            .servicos-page .footer-links {
+                flex-direction: column;
+                gap: 5px;
+            }
+
+            .servicos-page .footer-links span {
+                display: none;
+            }
+
+            .servicos-page .footer-logo img {
+                width: 130px;
+            }
+        }
+
+        @media (max-width: 420px) {
+            .servicos-cta-button {
+                position: static;
+                width: 100%;
+                height: 36px;
+                margin-top: 10px;
+                font-size: 12px;
+                border-radius: 7px;
+            }
+
+            .servicos-cta-button i {
+                font-size: 14px;
+            }
+
+            .servicos-page .site-footer {
+                padding: 14px 18px;
+            }
+
+            .servicos-page .site-footer p,
+            .servicos-page .footer-links,
+            .servicos-page .site-footer a {
+                font-size: 11.2px;
+            }
+        }
+    </style>
 </head>
-<body>
+
+<body class="servicos-page">
 
     <header class="site-header">
         <div class="header-container">
             <a href="home.html" class="logo-link reveal-on-load delay-1">
                 <img
-                    src="/site-caseg-protege/logo_transparente.png"
+                    src="../assets/img/logo_transparente.png"
                     alt="Logo CASEG Protege"
                     class="site-logo"
                 />
             </a>
 
             <nav class="main-nav reveal-on-load delay-2">
-                <a href="servicos.html">Serviços</a>
+                <a href="home.html">Home</a>
+                <a href="servicos.html" class="active">Serviços</a>
                 <a href="avisos.html">Sobre</a>
                 <a href="contato.html">Contato</a>
-                <a href="login.html" class="nav-login">
-                    <i class="fa-regular fa-user"></i>
-                    Entrar
-                </a>
             </nav>
+
+            <a href="login.html" class="header-login-button reveal-on-load delay-3">
+                <i class="fa-regular fa-user"></i>
+                Entrar
+            </a>
         </div>
     </header>
 
-    <main>
-        <section class="home-hero reveal-on-load delay-2">
-            <div class="home-hero-content">
-                <span class="home-badge">Nossos Serviços</span>
-                <h2>Soluções completas em Segurança do Trabalho</h2>
-                <p>
-                    A CASEG Protege oferece serviços especializados para garantir
-                    segurança, conformidade legal, prevenção de riscos e organização
-                    documental para sua empresa.
-                </p>
-            </div>
+    <main class="servicos-main">
+
+        <section class="servicos-hero reveal-on-load delay-2">
+            <img
+                src="../assets/img/imagem_servico.png"
+                alt="Soluções completas em Segurança do Trabalho - CASEG Protege"
+            />
         </section>
 
-        <section class="home-about reveal-on-load delay-3">
-            <div class="section-title">
-                <h2>Serviços Oferecidos</h2>
-                <p>
-                    Conheça as soluções que a CASEG Protege disponibiliza para apoiar
-                    sua empresa com segurança, técnica e responsabilidade.
-                </p>
-            </div>
-
-            <div class="home-about-cards">
-                <div class="about-card reveal-on-load delay-3">
-                    <h3>Assessoria Mensal</h3>
-                    <p>
-                        Acompanhamento contínuo das demandas de segurança do trabalho,
-                        com suporte técnico e organização preventiva.
-                    </p>
+        <section class="servicos-content-card reveal-on-load delay-3">
+            <div class="servicos-section-heading">
+                <div class="servicos-section-icon">
+                    <i class="fa-solid fa-briefcase"></i>
                 </div>
 
-                <div class="about-card reveal-on-load delay-4">
-                    <h3>Visita Técnica</h3>
+                <div>
+                    <h2>Nossos Serviços</h2>
                     <p>
-                        Avaliação presencial do ambiente de trabalho para identificar
-                        riscos, necessidades e melhorias.
-                    </p>
-                </div>
-
-                <div class="about-card reveal-on-load delay-5">
-                    <h3>Pericial Técnica</h3>
-                    <p>
-                        Elaboração de pareceres e análises técnicas com base em critérios
-                        profissionais e exigências legais.
-                    </p>
-                </div>
-
-                <div class="about-card reveal-on-load delay-3">
-                    <h3>Auditorias</h3>
-                    <p>
-                        Verificação dos processos, documentos e práticas adotadas pela
-                        empresa para reforçar conformidade e prevenção.
-                    </p>
-                </div>
-
-                <div class="about-card reveal-on-load delay-4">
-                    <h3>Elaboração de CIPA / CIPATR e SIPAT</h3>
-                    <p>
-                        Estruturação, organização e suporte na implementação dessas ações
-                        e comissões internas de prevenção.
-                    </p>
-                </div>
-
-                <div class="about-card reveal-on-load delay-5">
-                    <h3>Avaliação Ambiental</h3>
-                    <p>
-                        Análise de agentes químicos, físicos e biológicos presentes no
-                        ambiente de trabalho.
-                    </p>
-                </div>
-
-                <div class="about-card reveal-on-load delay-3">
-                    <h3>Treinamentos NR's</h3>
-                    <p>
-                        Capacitações conforme as Normas Regulamentadoras, com foco em
-                        segurança, prevenção e cumprimento legal.
-                    </p>
-                </div>
-
-                <div class="about-card reveal-on-load delay-4">
-                    <h3>Lançamentos eSocial</h3>
-                    <p>
-                        Envio e acompanhamento dos eventos S-2210, S-2220, S-2221 e
-                        S-2240 com responsabilidade técnica.
-                    </p>
-                </div>
-
-                <div class="about-card reveal-on-load delay-5">
-                    <h3>Palestras Motivacionais</h3>
-                    <p>
-                        Conteúdos voltados ao engajamento das equipes, valorizando
-                        comportamento seguro, cultura preventiva e motivação.
+                        Conheça as soluções que a CASEG Protege disponibiliza para apoiar
+                        sua empresa com segurança, técnica e responsabilidade.
                     </p>
                 </div>
             </div>
+
+            <div class="servicos-grid">
+                <button class="servico-card reveal-on-load delay-3" type="button" data-service="assessoria">
+                    <div class="servico-icon">
+                        <i class="fa-regular fa-clipboard"></i>
+                    </div>
+
+                    <div class="servico-card-content">
+                        <h3>Assessoria Mensal</h3>
+                        <p>
+                            Acompanhamento contínuo das demandas de segurança do trabalho,
+                            com suporte técnico e organização preventiva.
+                        </p>
+                    </div>
+                </button>
+
+                <button class="servico-card reveal-on-load delay-4" type="button" data-service="visita">
+                    <div class="servico-icon">
+                        <i class="fa-solid fa-clipboard-check"></i>
+                    </div>
+
+                    <div class="servico-card-content">
+                        <h3>Visita Técnica</h3>
+                        <p>
+                            Avaliação presencial do ambiente de trabalho para análise de riscos,
+                            conformidades e melhorias.
+                        </p>
+                    </div>
+                </button>
+
+                <button class="servico-card reveal-on-load delay-5" type="button" data-service="pericia">
+                    <div class="servico-icon">
+                        <i class="fa-solid fa-people-group"></i>
+                    </div>
+
+                    <div class="servico-card-content">
+                        <h3>Perícia Técnica</h3>
+                        <p>
+                            Elaboração de pareceres e análises técnicas com base em critérios
+                            profissionais e exigências legais.
+                        </p>
+                    </div>
+                </button>
+
+                <button class="servico-card reveal-on-load delay-3" type="button" data-service="auditorias">
+                    <div class="servico-icon">
+                        <i class="fa-solid fa-scale-balanced"></i>
+                    </div>
+
+                    <div class="servico-card-content">
+                        <h3>Auditorias</h3>
+                        <p>
+                            Verificação dos processos, documentos e práticas adotadas pela empresa
+                            para reforçar conformidade e prevenção.
+                        </p>
+                    </div>
+                </button>
+
+                <button class="servico-card reveal-on-load delay-4" type="button" data-service="pgr">
+                    <div class="servico-icon">
+                        <i class="fa-regular fa-file-lines"></i>
+                    </div>
+
+                    <div class="servico-card-content">
+                        <h3>Elaboração de PGR / GRO e APR / AET</h3>
+                        <p>
+                            Estruturação, organização e suporte na implementação desses registros
+                            e avaliações técnicas de prevenção.
+                        </p>
+                    </div>
+                </button>
+
+                <button class="servico-card reveal-on-load delay-5" type="button" data-service="ambiental">
+                    <div class="servico-icon">
+                        <i class="fa-solid fa-helmet-safety"></i>
+                    </div>
+
+                    <div class="servico-card-content">
+                        <h3>Avaliação Ambiental</h3>
+                        <p>
+                            Análise de agentes químicos, físicos e biológicos presentes no ambiente
+                            de trabalho.
+                        </p>
+                    </div>
+                </button>
+
+                <button class="servico-card reveal-on-load delay-3" type="button" data-service="treinamentos">
+                    <div class="servico-icon">
+                        <i class="fa-solid fa-graduation-cap"></i>
+                    </div>
+
+                    <div class="servico-card-content">
+                        <h3>Treinamentos NR’s</h3>
+                        <p>
+                            Capacitações conforme as Normas Regulamentadoras, com foco em segurança,
+                            prevenção e conformidade legal.
+                        </p>
+                    </div>
+                </button>
+
+                <button class="servico-card reveal-on-load delay-4" type="button" data-service="esocial">
+                    <div class="servico-icon">
+                        <i class="fa-solid fa-chart-simple"></i>
+                    </div>
+
+                    <div class="servico-card-content">
+                        <h3>Lançamentos eSocial</h3>
+                        <p>
+                            Envio e acompanhamento dos eventos S-2210, S-2220, S-2240 e S-2250
+                            com responsabilidade técnica.
+                        </p>
+                    </div>
+                </button>
+
+                <button class="servico-card reveal-on-load delay-5" type="button" data-service="palestra">
+                    <div class="servico-icon">
+                        <i class="fa-solid fa-heart-pulse"></i>
+                    </div>
+
+                    <div class="servico-card-content">
+                        <h3>Palestra Motivacional</h3>
+                        <p>
+                            Conteúdos voltados ao engajamento das equipes, reforçando a importância
+                            da segurança, cultura preventiva e motivação.
+                        </p>
+                    </div>
+                </button>
+            </div>
+
+            <section class="servicos-cta reveal-on-load delay-4">
+                <img
+                    src="../assets/img/servicos-cta.png"
+                    alt="Quer saber mais sobre nossos serviços?"
+                    class="servicos-cta-bg"
+                />
+
+                <a href="contato.html" class="servicos-cta-button">
+                    <i class="fa-brands fa-whatsapp"></i>
+                    Entrar em contato
+                </a>
+            </section>
         </section>
 
-        <section class="home-cta reveal-on-load delay-4">
-            <h2>Quer saber mais sobre nossos serviços?</h2>
-            <p>
-                Entre em contato com nossa equipe e descubra a melhor solução para a sua empresa.
-            </p>
-
-            <div class="home-cta-actions">
-                <a href="contato.html" class="btn-primary">Solicitar Atendimento</a>
-                <a href="login.html" class="btn-secondary">Área do Cliente</a>
-            </div>
-        </section>
     </main>
 
-    <footer>
-        <p>© CASEG Protege</p>
-        <p>
-            <a href="termos-de-uso.html">Termos de Uso</a> —
-            <a href="politica-privacidade.html">Política de Privacidade</a>
-        </p>
+    <div class="servico-modal-overlay" id="servicoModalOverlay" aria-hidden="true">
+        <div class="servico-modal" role="dialog" aria-modal="true" aria-labelledby="servicoModalTitle">
+            <div class="servico-modal-header">
+                <button class="servico-modal-close" type="button" id="servicoModalClose" aria-label="Fechar detalhes do serviço">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+
+                <div class="servico-modal-header-content">
+                    <div class="servico-modal-icon" id="servicoModalIcon">
+                        <i class="fa-solid fa-briefcase"></i>
+                    </div>
+
+                    <div class="servico-modal-title-area">
+                        <h2 id="servicoModalTitle">Serviço</h2>
+                        <p id="servicoModalSubtitle">
+                            Informações detalhadas sobre o serviço selecionado.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="servico-modal-body">
+                <h3>Como esse serviço ajuda sua empresa?</h3>
+                <p id="servicoModalDescription"></p>
+
+                <h3>Principais entregas</h3>
+                <ul class="servico-modal-list" id="servicoModalList"></ul>
+
+                <div class="servico-modal-footer">
+                    <p class="servico-modal-note">
+                        Cada atendimento pode ser ajustado conforme o porte, segmento e necessidade da empresa.
+                    </p>
+
+                    <a href="contato.html" class="servico-modal-action">
+                        <i class="fa-brands fa-whatsapp"></i>
+                        Solicitar atendimento
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="site-footer">
+        <div class="footer-container">
+            <div class="footer-logo">
+                <img
+                    src="../assets/img/logo_footer.png"
+                    alt="Logo CASEG Protege"
+                />
+            </div>
+
+            <p>© 2025 CASEG Protege. Todos os direitos reservados.</p>
+
+            <div class="footer-links">
+                <a href="termos-de-uso.html">Termos de Uso</a>
+                <span>|</span>
+                <a href="politica-privacidade.html">Política de Privacidade</a>
+            </div>
+        </div>
     </footer>
 
     <script src="../assets/js/site-animations.js"></script>
+
+    <script>
+        const servicosDetalhes = {
+            assessoria: {
+                title: "Assessoria Mensal",
+                subtitle: "Acompanhamento técnico contínuo para manter a empresa organizada, segura e em conformidade.",
+                icon: "fa-regular fa-clipboard",
+                description:
+                    "A assessoria mensal oferece suporte recorrente para acompanhar as demandas de segurança do trabalho, organizar documentos, orientar ações preventivas e apoiar a empresa nas rotinas relacionadas às exigências legais.",
+                items: [
+                    "Acompanhamento das demandas de segurança do trabalho.",
+                    "Orientações técnicas para prevenção de riscos.",
+                    "Apoio na organização de documentos e registros.",
+                    "Suporte preventivo para reduzir falhas e não conformidades."
+                ]
+            },
+            visita: {
+                title: "Visita Técnica",
+                subtitle: "Avaliação presencial do ambiente de trabalho para identificar riscos e oportunidades de melhoria.",
+                icon: "fa-solid fa-clipboard-check",
+                description:
+                    "A visita técnica permite analisar o ambiente de trabalho de forma prática e direcionada, observando condições de segurança, possíveis riscos, necessidades de adequação e pontos que exigem atenção preventiva.",
+                items: [
+                    "Inspeção presencial do ambiente de trabalho.",
+                    "Identificação de riscos e situações de atenção.",
+                    "Orientações sobre melhorias e adequações.",
+                    "Apoio técnico para decisões mais seguras."
+                ]
+            },
+            pericia: {
+                title: "Perícia Técnica",
+                subtitle: "Análises técnicas e pareceres com base em critérios profissionais e exigências legais.",
+                icon: "fa-solid fa-people-group",
+                description:
+                    "A perícia técnica auxilia na elaboração de análises, pareceres e avaliações especializadas, contribuindo para decisões mais seguras, embasadas e alinhadas às normas aplicáveis.",
+                items: [
+                    "Elaboração de pareceres técnicos.",
+                    "Análise de condições e documentos relacionados ao trabalho.",
+                    "Avaliação com base em critérios profissionais.",
+                    "Suporte técnico em demandas específicas da empresa."
+                ]
+            },
+            auditorias: {
+                title: "Auditorias",
+                subtitle: "Verificação de processos, documentos e práticas internas de segurança.",
+                icon: "fa-solid fa-scale-balanced",
+                description:
+                    "As auditorias ajudam a empresa a verificar se processos, documentos e práticas internas estão adequados. Esse serviço contribui para encontrar falhas, corrigir pontos críticos e reforçar a cultura de prevenção.",
+                items: [
+                    "Verificação de documentos e procedimentos.",
+                    "Identificação de não conformidades.",
+                    "Orientações para adequação e melhoria.",
+                    "Apoio à organização e controle preventivo."
+                ]
+            },
+            pgr: {
+                title: "Elaboração de PGR / GRO e APR / AET",
+                subtitle: "Estruturação de registros e avaliações técnicas voltadas à gestão de riscos ocupacionais.",
+                icon: "fa-regular fa-file-lines",
+                description:
+                    "Esse serviço contempla a organização e elaboração de documentos e avaliações técnicas essenciais para a gestão de riscos, contribuindo para que a empresa mantenha registros claros, estruturados e alinhados às necessidades preventivas.",
+                items: [
+                    "Elaboração e organização de documentos técnicos.",
+                    "Apoio na gestão de riscos ocupacionais.",
+                    "Estruturação de registros preventivos.",
+                    "Orientação técnica para implementação e acompanhamento."
+                ]
+            },
+            ambiental: {
+                title: "Avaliação Ambiental",
+                subtitle: "Análise de agentes químicos, físicos e biológicos presentes no ambiente de trabalho.",
+                icon: "fa-solid fa-helmet-safety",
+                description:
+                    "A avaliação ambiental identifica agentes presentes no ambiente de trabalho que podem impactar a saúde e segurança dos colaboradores, auxiliando na definição de medidas preventivas e controles adequados.",
+                items: [
+                    "Análise de agentes químicos, físicos e biológicos.",
+                    "Identificação de condições de exposição.",
+                    "Orientações para controle e prevenção.",
+                    "Apoio técnico para decisões de segurança ocupacional."
+                ]
+            },
+            treinamentos: {
+                title: "Treinamentos NR’s",
+                subtitle: "Capacitações conforme Normas Regulamentadoras, com foco em prevenção e conformidade.",
+                icon: "fa-solid fa-graduation-cap",
+                description:
+                    "Os treinamentos NR’s preparam colaboradores e equipes para atuarem com mais segurança, conhecimento e responsabilidade, fortalecendo a prevenção de acidentes e o cumprimento das exigências legais.",
+                items: [
+                    "Capacitações conforme Normas Regulamentadoras.",
+                    "Conteúdo direcionado à realidade da empresa.",
+                    "Fortalecimento da cultura de segurança.",
+                    "Orientações práticas para prevenção de acidentes."
+                ]
+            },
+            esocial: {
+                title: "Lançamentos eSocial",
+                subtitle: "Envio e acompanhamento de eventos relacionados à saúde e segurança do trabalho.",
+                icon: "fa-solid fa-chart-simple",
+                description:
+                    "O serviço de lançamentos eSocial auxilia no envio e acompanhamento de eventos obrigatórios relacionados à segurança e saúde no trabalho, garantindo maior organização e responsabilidade técnica no processo.",
+                items: [
+                    "Envio e acompanhamento dos eventos aplicáveis.",
+                    "Organização das informações necessárias.",
+                    "Suporte técnico no processo de lançamento.",
+                    "Apoio para reduzir inconsistências e falhas."
+                ]
+            },
+            palestra: {
+                title: "Palestra Motivacional",
+                subtitle: "Conteúdos para engajar equipes e reforçar a importância da segurança no dia a dia.",
+                icon: "fa-solid fa-heart-pulse",
+                description:
+                    "As palestras motivacionais são voltadas ao engajamento dos colaboradores, reforçando a importância do comportamento seguro, da prevenção e da responsabilidade individual e coletiva no ambiente de trabalho.",
+                items: [
+                    "Conteúdo voltado ao engajamento da equipe.",
+                    "Reforço da cultura preventiva.",
+                    "Valorização do comportamento seguro.",
+                    "Comunicação clara e alinhada à realidade da empresa."
+                ]
+            }
+        };
+
+        const serviceCards = document.querySelectorAll(".servico-card");
+        const modalOverlay = document.getElementById("servicoModalOverlay");
+        const modalClose = document.getElementById("servicoModalClose");
+        const modalIcon = document.getElementById("servicoModalIcon");
+        const modalTitle = document.getElementById("servicoModalTitle");
+        const modalSubtitle = document.getElementById("servicoModalSubtitle");
+        const modalDescription = document.getElementById("servicoModalDescription");
+        const modalList = document.getElementById("servicoModalList");
+
+        function openServicoModal(serviceKey) {
+            const service = servicosDetalhes[serviceKey];
+
+            if (!service) {
+                return;
+            }
+
+            modalIcon.innerHTML = `<i class="${service.icon}"></i>`;
+            modalTitle.textContent = service.title;
+            modalSubtitle.textContent = service.subtitle;
+            modalDescription.textContent = service.description;
+
+            modalList.innerHTML = service.items
+                .map((item) => `<li><i class="fa-solid fa-check"></i><span>${item}</span></li>`)
+                .join("");
+
+            modalOverlay.classList.add("is-open");
+            modalOverlay.setAttribute("aria-hidden", "false");
+            document.body.style.overflow = "hidden";
+            modalClose.focus();
+        }
+
+        function closeServicoModal() {
+            modalOverlay.classList.remove("is-open");
+            modalOverlay.setAttribute("aria-hidden", "true");
+            document.body.style.overflow = "";
+        }
+
+        serviceCards.forEach((card) => {
+            card.addEventListener("click", () => {
+                openServicoModal(card.dataset.service);
+            });
+        });
+
+        modalClose.addEventListener("click", closeServicoModal);
+
+        modalOverlay.addEventListener("click", (event) => {
+            if (event.target === modalOverlay) {
+                closeServicoModal();
+            }
+        });
+
+        document.addEventListener("keydown", (event) => {
+            if (event.key === "Escape" && modalOverlay.classList.contains("is-open")) {
+                closeServicoModal();
+            }
+        });
+    </script>
 
 </body>
 </html>
