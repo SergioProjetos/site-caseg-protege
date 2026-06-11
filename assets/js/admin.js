@@ -14,20 +14,20 @@ document.addEventListener("DOMContentLoaded", async () => {
     return;
   }
 
-  const ALLOWED_BANNER_SIZES = [
-    { width: 1920, height: 600 },
-    { width: 1600, height: 500 }
-  ];
+  const BANNER_ASPECT_RATIO_WIDTH = 16;
+  const BANNER_ASPECT_RATIO_HEIGHT = 5;
 
   const BANNER_DIMENSION_MESSAGE =
-    "A imagem do banner deve ter exatamente 1920x600px ou 1600x500px.";
+    "A imagem do banner deve estar na proporção 16:5. Exemplos aceitos: 5120x1600, 3200x1000, 2560x800, 1920x600 ou 1600x500.";
 
   const SESSION_REFRESH_MARGIN_SECONDS = 5 * 60;
+  const ADMIN_SESSION_EXPIRES_AT_KEY = "admin_session_expires_at";
 
   const adminNameElement = document.getElementById("adminName");
   const adminRoleElement = document.getElementById("adminRole");
   const adminWelcome = document.getElementById("adminWelcome");
   const logoutBtn = document.getElementById("logoutBtn");
+  const sidebarLogoutBtn = document.getElementById("sidebarLogoutBtn");
 
   const adminFeedback = document.getElementById("adminFeedback");
 
@@ -51,6 +51,16 @@ document.addEventListener("DOMContentLoaded", async () => {
   const dashboardRenewalAlertsBody = document.getElementById("dashboardRenewalAlertsBody");
   const dashboardRenewalStatusFilter = document.getElementById("dashboardRenewalStatusFilter");
   const dashboardRenewalClearFiltersBtn = document.getElementById("dashboardRenewalClearFiltersBtn");
+  const dashboardRecentActivitiesList = document.getElementById("dashboardRecentActivitiesList");
+
+  const dashboardTotalDocuments = document.getElementById("dashboardTotalDocuments");
+  const dashboardDocumentsThisMonth = document.getElementById("dashboardDocumentsThisMonth");
+  const dashboardClientsThisMonth = document.getElementById("dashboardClientsThisMonth");
+  const dashboardInactiveBanners = document.getElementById("dashboardInactiveBanners");
+  const dashboardTotalAccess = document.getElementById("dashboardTotalAccess");
+  const dashboardAccessThisMonth = document.getElementById("dashboardAccessThisMonth");
+  const dashboardTotalDocumentDownloads = document.getElementById("dashboardTotalDocumentDownloads");
+  const dashboardDocumentDownloadsThisMonth = document.getElementById("dashboardDocumentDownloadsThisMonth");
 
   const adminActionModal = document.getElementById("adminActionModal");
   const adminActionModalBackdrop = document.getElementById("adminActionModalBackdrop");
@@ -117,6 +127,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   let allHomeBannersCache = [];
   let clientDocumentsCache = {};
   let renewalAlertsCache = [];
+  let recentActivitiesCache = [];
+  let dashboardSummaryCache = {};
 
   let clientsLoaded = false;
   let homeBannersLoaded = false;
@@ -128,6 +140,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   let adminSessionRefreshTimer = null;
   let adminSessionRefreshingPromise = null;
+  let adminMaxSessionTimer = null;
 
   let adminActionModalResolver = null;
   let adminActionModalBackdropResult = true;
@@ -232,6 +245,29 @@ document.addEventListener("DOMContentLoaded", async () => {
     return date.toLocaleDateString("pt-BR");
   }
 
+  function formatDateTime(value) {
+    if (!value) return "-";
+
+    const date = new Date(value);
+
+    if (Number.isNaN(date.getTime())) {
+      return "-";
+    }
+
+    const datePart = date.toLocaleDateString("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric"
+    });
+
+    const timePart = date.toLocaleTimeString("pt-BR", {
+      hour: "2-digit",
+      minute: "2-digit"
+    });
+
+    return `${datePart} às ${timePart}`;
+  }
+
   function isExpirationBeforeRelease(releaseDate, expirationDate) {
     if (!releaseDate || !expirationDate) {
       return false;
@@ -252,6 +288,20 @@ document.addEventListener("DOMContentLoaded", async () => {
       .toLowerCase()
       .normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "")
+      .trim();
+  }
+
+  function cleanRecentActivityText(value) {
+    const text = String(value || "").trim();
+
+    if (!text) {
+      return "";
+    }
+
+    return text
+      .replace(/\s+(no|do)\s+painel\s+administrativo\.?/gi, "")
+      .replace(/\s{2,}/g, " ")
+      .replace(/\s+\./g, ".")
       .trim();
   }
 
@@ -350,12 +400,79 @@ document.addEventListener("DOMContentLoaded", async () => {
     return documentItem.expiration_date || documentItem.document_expiration_date || null;
   }
 
+  function isCurrentProfileAdmin() {
+    return String(profile?.role || "").toLowerCase() === "admin";
+  }
+
+  function getAdminSessionExpiresAtMs() {
+    const expiresAt = Number(localStorage.getItem(ADMIN_SESSION_EXPIRES_AT_KEY) || 0);
+
+    return Number.isFinite(expiresAt) ? expiresAt : 0;
+  }
+
+  function hasAdminSessionExpired() {
+    if (!isCurrentProfileAdmin()) {
+      return false;
+    }
+
+    const expiresAt = getAdminSessionExpiresAtMs();
+
+    if (!expiresAt) {
+      return true;
+    }
+
+    return Date.now() > expiresAt;
+  }
+
+  function clearAdminMaxSessionTimer() {
+    if (adminMaxSessionTimer) {
+      clearTimeout(adminMaxSessionTimer);
+      adminMaxSessionTimer = null;
+    }
+  }
+
+  function scheduleAdminMaxSessionExpiration() {
+    clearAdminMaxSessionTimer();
+
+    if (!isCurrentProfileAdmin()) {
+      return;
+    }
+
+    const expiresAt = getAdminSessionExpiresAtMs();
+
+    if (!expiresAt) {
+      return;
+    }
+
+    const delay = expiresAt - Date.now();
+
+    if (delay <= 0) {
+      redirectToLoginBecauseSessionExpired();
+      return;
+    }
+
+    adminMaxSessionTimer = setTimeout(() => {
+      redirectToLoginBecauseSessionExpired();
+    }, delay);
+  }
+
+  function enforceAdminSessionLimit() {
+    if (!hasAdminSessionExpired()) {
+      return true;
+    }
+
+    redirectToLoginBecauseSessionExpired();
+    return false;
+  }
+
   function clearAdminSession() {
     localStorage.removeItem("access_token");
     localStorage.removeItem("refresh_token");
     localStorage.removeItem("session_expires_at");
     localStorage.removeItem("session_expires_in");
     localStorage.removeItem("profile");
+    localStorage.removeItem(ADMIN_SESSION_EXPIRES_AT_KEY);
+    clearAdminMaxSessionTimer();
   }
 
   function redirectToLoginBecauseSessionExpired() {
@@ -413,10 +530,15 @@ document.addEventListener("DOMContentLoaded", async () => {
       loadAdminInfo();
     }
 
+    scheduleAdminMaxSessionExpiration();
     scheduleAdminSessionRefresh();
   }
 
   async function refreshAdminSession() {
+    if (!enforceAdminSessionLimit()) {
+      throw new Error("Sessão administrativa expirada. Faça login novamente.");
+    }
+
     if (adminSessionRefreshingPromise) {
       return adminSessionRefreshingPromise;
     }
@@ -457,6 +579,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   async function ensureValidAdminSession() {
+    if (!enforceAdminSessionLimit()) {
+      throw new Error("Sessão administrativa expirada. Faça login novamente.");
+    }
+
     token = localStorage.getItem("access_token");
 
     if (!token && getRefreshToken()) {
@@ -516,6 +642,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function scheduleAdminSessionRefresh() {
+    if (isCurrentProfileAdmin() && hasAdminSessionExpired()) {
+      redirectToLoginBecauseSessionExpired();
+      return;
+    }
+
     if (adminSessionRefreshTimer) {
       clearTimeout(adminSessionRefreshTimer);
       adminSessionRefreshTimer = null;
@@ -537,6 +668,10 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     adminSessionRefreshTimer = setTimeout(async () => {
       try {
+        if (!enforceAdminSessionLimit()) {
+          return;
+        }
+
         await refreshAdminSession();
       } catch (error) {
         console.error("ERRO AO RENOVAR SESSÃO ADMINISTRATIVA:", error);
@@ -637,12 +772,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     const showCancel = Boolean(options.showCancel);
 
     if (!isAdminActionModalAvailable()) {
-      if (showCancel) {
-        return Promise.resolve(confirm(`${title}\n\n${message}`));
-      }
+      showAdminFeedback(message || title, type === "danger" ? "error" : type);
 
-      alert(message);
-      return Promise.resolve(true);
+      return Promise.resolve(showCancel ? false : true);
     }
 
     if (adminActionModalResolver) {
@@ -943,7 +1075,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     scrollToSection(homeBannersWrapper);
   }
-
   async function openClientsFromQuickAction() {
     if (!clientsSectionWrapper) return;
 
@@ -970,6 +1101,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     scrollToSection(clientsSectionWrapper);
   }
+
   async function openBannersFromQuickAction(options = {}) {
     if (!homeBannersWrapper) return;
 
@@ -1037,9 +1169,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function openCreateClientFromQuickAction() {
-    const isAlreadyOpen =
-      isCreateClientModalOpen() ||
-      Boolean(createClientWrapper && !createClientWrapper.classList.contains("hidden"));
+    const isAlreadyOpen = createClientModal
+      ? isCreateClientModalOpen()
+      : Boolean(createClientWrapper && !createClientWrapper.classList.contains("hidden"));
 
     if (isAlreadyOpen) {
       hideCreateClientForm();
@@ -1126,6 +1258,84 @@ document.addEventListener("DOMContentLoaded", async () => {
       ["dashboardActiveBanners", "activeBanners", "bannersActiveCount"],
       activeBanners
     );
+  }
+
+  function formatDashboardSummaryNumber(value) {
+    const number = Number(value || 0);
+
+    if (!Number.isFinite(number)) {
+      return "0";
+    }
+
+    return String(number);
+  }
+
+  function updateDashboardGeneralSummary(summary = {}) {
+    const safeSummary = summary && typeof summary === "object" ? summary : {};
+
+    const values = {
+      totalDocuments: safeSummary.total_documents ?? safeSummary.totalDocuments ?? 0,
+      documentsThisMonth: safeSummary.documents_this_month ?? safeSummary.documentsThisMonth ?? 0,
+      clientsThisMonth: safeSummary.clients_this_month ?? safeSummary.clientsThisMonth ?? 0,
+      inactiveBanners: safeSummary.inactive_banners ?? safeSummary.inactiveBanners ?? 0,
+      totalAccess: safeSummary.total_access ?? safeSummary.totalAccess ?? 0,
+      accessThisMonth: safeSummary.access_this_month ?? safeSummary.accessThisMonth ?? 0,
+      totalDocumentDownloads:
+        safeSummary.total_document_downloads ?? safeSummary.totalDocumentDownloads ?? 0,
+      documentDownloadsThisMonth:
+        safeSummary.document_downloads_this_month ?? safeSummary.documentDownloadsThisMonth ?? 0
+    };
+
+    if (dashboardTotalDocuments) {
+      dashboardTotalDocuments.textContent = formatDashboardSummaryNumber(values.totalDocuments);
+    }
+
+    if (dashboardDocumentsThisMonth) {
+      dashboardDocumentsThisMonth.textContent = formatDashboardSummaryNumber(values.documentsThisMonth);
+    }
+
+    if (dashboardClientsThisMonth) {
+      dashboardClientsThisMonth.textContent = formatDashboardSummaryNumber(values.clientsThisMonth);
+    }
+
+    if (dashboardInactiveBanners) {
+      dashboardInactiveBanners.textContent = formatDashboardSummaryNumber(values.inactiveBanners);
+    }
+
+    if (dashboardTotalAccess) {
+      dashboardTotalAccess.textContent = formatDashboardSummaryNumber(values.totalAccess);
+    }
+
+    if (dashboardAccessThisMonth) {
+      dashboardAccessThisMonth.textContent = formatDashboardSummaryNumber(values.accessThisMonth);
+    }
+
+    if (dashboardTotalDocumentDownloads) {
+      dashboardTotalDocumentDownloads.textContent =
+        formatDashboardSummaryNumber(values.totalDocumentDownloads);
+    }
+
+    if (dashboardDocumentDownloadsThisMonth) {
+      dashboardDocumentDownloadsThisMonth.textContent =
+        formatDashboardSummaryNumber(values.documentDownloadsThisMonth);
+    }
+  }
+
+  async function fetchDashboardSummary() {
+    try {
+      const response = await adminFetch("http://localhost:3000/admin/dashboard/summary");
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Erro ao carregar resumo geral do dashboard.");
+      }
+
+      dashboardSummaryCache = result && typeof result === "object" ? result : {};
+      updateDashboardGeneralSummary(dashboardSummaryCache);
+    } catch (error) {
+      console.error("ERRO AO BUSCAR RESUMO GERAL DO DASHBOARD:", error);
+      updateDashboardGeneralSummary(dashboardSummaryCache);
+    }
   }
 
   function getRenewalAlertStatusClass(alert) {
@@ -1225,15 +1435,15 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     dashboardRenewalAlertsBody.replaceChildren();
 
-    const safeAlerts = filterRenewalAlerts(alerts);
+    const filteredAlerts = filterRenewalAlerts(alerts);
 
-    if (!safeAlerts.length) {
+    if (!filteredAlerts.length) {
       const row = document.createElement("tr");
       row.className = "dashboard-empty-row";
 
       const cell = document.createElement("td");
       cell.colSpan = 4;
-      cell.textContent = "Nenhum aviso de renovação encontrado para o prazo selecionado.";
+      cell.textContent = "Nenhum aviso de renovação encontrado.";
 
       row.appendChild(cell);
       dashboardRenewalAlertsBody.appendChild(row);
@@ -1242,7 +1452,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     const fragment = document.createDocumentFragment();
 
-    safeAlerts.forEach((alert) => {
+    filteredAlerts.forEach((alert) => {
       fragment.appendChild(createRenewalAlertRow(alert));
     });
 
@@ -1270,63 +1480,1114 @@ document.addEventListener("DOMContentLoaded", async () => {
         throw new Error(result.error || "Erro ao carregar avisos de renovação.");
       }
 
-      renewalAlertsCache = Array.isArray(result.alerts) ? result.alerts : [];
+      renewalAlertsCache = Array.isArray(result)
+        ? result
+        : Array.isArray(result.alerts)
+          ? result.alerts
+          : [];
+
       renderRenewalAlerts(renewalAlertsCache);
     } catch (error) {
       console.error("ERRO AO BUSCAR AVISOS DE RENOVAÇÃO:", error);
 
+      const errorRow = document.createElement("tr");
+      errorRow.className = "dashboard-empty-row";
+
+      const errorCell = document.createElement("td");
+      errorCell.colSpan = 4;
+      errorCell.textContent =
+        error.message || "Não foi possível carregar os avisos de renovação.";
+
+      errorRow.appendChild(errorCell);
+      dashboardRenewalAlertsBody.replaceChildren(errorRow);
+    }
+  }
+
+  function createRecentActivityCell(content) {
+    const cell = document.createElement("td");
+
+    if (content instanceof Node) {
+      cell.appendChild(content);
+    } else {
+      cell.textContent = content ?? "-";
+    }
+
+    return cell;
+  }
+
+  function createRecentActivityRow(activity) {
+    const row = document.createElement("tr");
+
+    const activityBox = document.createElement("div");
+    activityBox.className = "dashboard-activity-document";
+
+    const title = document.createElement("strong");
+    title.textContent = cleanRecentActivityText(activity?.title) || "Atividade registrada";
+
+    activityBox.appendChild(title);
+
+    const descriptionBox = document.createElement("div");
+    descriptionBox.className = "dashboard-activity-document";
+
+    const description = document.createElement("strong");
+    description.textContent =
+      cleanRecentActivityText(activity?.description) ||
+      "Movimentação registrada.";
+
+    descriptionBox.appendChild(description);
+
+    const date = document.createElement("span");
+    date.className = "dashboard-activity-date";
+    date.textContent = formatDateTime(activity?.created_at);
+
+    row.appendChild(createRecentActivityCell(activityBox));
+    row.appendChild(createRecentActivityCell(descriptionBox));
+    row.appendChild(createRecentActivityCell(date));
+
+    return row;
+  }
+
+  function renderRecentActivities(activities) {
+    if (!dashboardRecentActivitiesList) return;
+
+    dashboardRecentActivitiesList.replaceChildren();
+
+    const safeActivities = Array.isArray(activities) ? activities : [];
+
+    if (!safeActivities.length) {
       const row = document.createElement("tr");
       row.className = "dashboard-empty-row";
 
       const cell = document.createElement("td");
-      cell.colSpan = 4;
-      cell.textContent = error.message || "Erro ao carregar avisos de renovação.";
+      cell.colSpan = 3;
+      cell.textContent = "Nenhuma atividade registrada. As movimentações recentes aparecerão aqui.";
 
       row.appendChild(cell);
-      dashboardRenewalAlertsBody.replaceChildren(row);
+      dashboardRecentActivitiesList.appendChild(row);
+      return;
+    }
+
+    const fragment = document.createDocumentFragment();
+
+    safeActivities.forEach((activity) => {
+      fragment.appendChild(createRecentActivityRow(activity));
+    });
+
+    dashboardRecentActivitiesList.appendChild(fragment);
+  }
+
+  async function fetchRecentActivities() {
+    if (!dashboardRecentActivitiesList) return;
+
+    try {
+      const loadingRow = document.createElement("tr");
+      loadingRow.className = "dashboard-empty-row";
+
+      const loadingCell = document.createElement("td");
+      loadingCell.colSpan = 3;
+      loadingCell.textContent = "Carregando atividades recentes...";
+
+      loadingRow.appendChild(loadingCell);
+      dashboardRecentActivitiesList.replaceChildren(loadingRow);
+
+      const response = await adminFetch("http://localhost:3000/admin/activities?limit=20");
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Erro ao carregar atividades recentes.");
+      }
+
+      recentActivitiesCache = Array.isArray(result)
+        ? result
+        : Array.isArray(result.activities)
+          ? result.activities
+          : [];
+
+      renderRecentActivities(recentActivitiesCache);
+    } catch (error) {
+      console.error("ERRO AO BUSCAR ATIVIDADES RECENTES:", error);
+
+      const errorRow = document.createElement("tr");
+      errorRow.className = "dashboard-empty-row";
+
+      const errorCell = document.createElement("td");
+      errorCell.colSpan = 3;
+      errorCell.textContent =
+        error.message || "Não foi possível carregar as movimentações recentes.";
+
+      errorRow.appendChild(errorCell);
+      dashboardRecentActivitiesList.replaceChildren(errorRow);
     }
   }
 
-  function filterClients(clients, searchTerm, statusFilter) {
-    const normalizedSearch = normalizeText(searchTerm);
-    const selectedType = clientsTypeFilter?.value || "all";
+  async function refreshRecentActivitiesSilently() {
+    try {
+      const response = await adminFetch("http://localhost:3000/admin/activities?limit=20");
+      const result = await response.json();
 
-    return clients.filter((client) => {
-      const isActive = client.is_active !== false;
+      if (!response.ok) {
+        throw new Error(result.error || "Erro ao atualizar atividades recentes.");
+      }
+
+      recentActivitiesCache = Array.isArray(result)
+        ? result
+        : Array.isArray(result.activities)
+          ? result.activities
+          : [];
+
+      renderRecentActivities(recentActivitiesCache);
+    } catch (error) {
+      console.error("ERRO AO ATUALIZAR ATIVIDADES RECENTES:", error);
+    }
+  }
+
+  async function refreshDashboardDataAfterActivity() {
+    await Promise.allSettled([
+      fetchDashboardSummary(),
+      fetchRenewalAlerts(),
+      refreshRecentActivitiesSilently()
+    ]);
+  }
+
+  function showCreateClientForm() {
+    if (createClientWrapper) {
+      openPanel(createClientWrapper);
+    }
+
+    if (createClientModal) {
+      createClientModal.classList.remove("hidden");
+      createClientModal.setAttribute("aria-hidden", "false");
+
+      setTimeout(() => {
+        document.getElementById("companyName")?.focus();
+      }, 80);
+
+      return;
+    }
+
+    if (!createClientWrapper) return;
+
+    setTimeout(() => {
+      createClientWrapper.scrollIntoView({
+        behavior: "smooth",
+        block: "start"
+      });
+    }, 120);
+  }
+
+  function hideCreateClientForm() {
+    if (createClientModal) {
+      createClientModal.classList.add("hidden");
+      createClientModal.setAttribute("aria-hidden", "true");
+    }
+
+    if (createClientWrapper) {
+      closePanel(createClientWrapper);
+    }
+
+    if (createClientForm) {
+      createClientForm.reset();
+    }
+
+    if (createClientMessage) {
+      createClientMessage.textContent = "";
+      createClientMessage.className = "form-message";
+    }
+
+    if (temporaryPasswordBox) {
+      temporaryPasswordBox.classList.add("hidden");
+    }
+
+    if (temporaryPasswordField) {
+      temporaryPasswordField.value = "";
+    }
+  }
+
+  function isCreateClientModalOpen() {
+    return Boolean(createClientModal && !createClientModal.classList.contains("hidden"));
+  }
+
+  function showClientsList() {
+    if (!clientsSectionWrapper) return;
+
+    openPanel(clientsSectionWrapper);
+
+    if (toggleClientsListBtn) {
+      toggleClientsListBtn.textContent = "Ocultar Clientes";
+    }
+  }
+
+  function hideClientsList() {
+    if (!clientsSectionWrapper) return;
+
+    closePanel(clientsSectionWrapper);
+
+    if (toggleClientsListBtn) {
+      toggleClientsListBtn.textContent = "Exibir Clientes";
+    }
+  }
+
+  function showHomeBanners() {
+    if (!homeBannersWrapper) return;
+
+    openPanel(homeBannersWrapper);
+
+    if (toggleHomeBannersBtn) {
+      toggleHomeBannersBtn.textContent = "Ocultar Banners";
+    }
+  }
+
+  function hideHomeBanners() {
+    if (!homeBannersWrapper) return;
+
+    closePanel(homeBannersWrapper);
+
+    if (toggleHomeBannersBtn) {
+      toggleHomeBannersBtn.textContent = "Exibir Banners";
+    }
+
+    if (homeBannerForm && !homeBannerForm.classList.contains("hidden")) {
+      hideBannerForm();
+    }
+  }
+
+  function showBannerForm() {
+    if (!homeBannerForm) return;
+
+    openPanel(homeBannerForm);
+
+    if (toggleBannerFormBtn) {
+      toggleBannerFormBtn.textContent = "Ocultar formulário";
+    }
+
+    clearBannerMessage();
+    updateBannerActionFieldsVisibility();
+  }
+
+  function hideBannerForm() {
+    if (!homeBannerForm) return;
+
+    closePanel(homeBannerForm);
+
+    if (toggleBannerFormBtn) {
+      toggleBannerFormBtn.textContent = "Criar Banner";
+    }
+
+    clearBannerMessage();
+  }
+
+  function setButtonLoading(button, isLoading, loadingText = "Aguarde...") {
+    if (!button) return;
+
+    if (isLoading) {
+      button.dataset.originalText = button.textContent;
+      button.textContent = loadingText;
+      button.disabled = true;
+      return;
+    }
+
+    button.textContent = button.dataset.originalText || button.textContent;
+    button.disabled = false;
+    delete button.dataset.originalText;
+  }
+
+  function getCreateClientPayload() {
+    return {
+      company_name: document.getElementById("companyName")?.value?.trim() || "",
+      full_name:
+        document.getElementById("fullName")?.value?.trim() ||
+        document.getElementById("responsibleName")?.value?.trim() ||
+        "",
+      cpf_cnpj: onlyDigits(cpfCnpjInput?.value || ""),
+      email:
+        document.getElementById("email")?.value?.trim() ||
+        document.getElementById("clientEmail")?.value?.trim() ||
+        "",
+      address_zip: onlyDigits(document.getElementById("addressZip")?.value || ""),
+      address_street: document.getElementById("addressStreet")?.value?.trim() || "",
+      address_number: document.getElementById("addressNumber")?.value?.trim() || "",
+      address_complement: document.getElementById("addressComplement")?.value?.trim() || "",
+      address_neighborhood: document.getElementById("addressNeighborhood")?.value?.trim() || "",
+      address_city: document.getElementById("addressCity")?.value?.trim() || "",
+      address_state: document.getElementById("addressState")?.value?.trim() || "",
+      phone: onlyDigits(phoneInput?.value || ""),
+      whatsapp: onlyDigits(whatsappInput?.value || "")
+    };
+  }
+
+  function validateCreateClientPayload(payload) {
+    if (!payload.company_name) {
+      return "Informe o nome da empresa.";
+    }
+
+    if (!payload.full_name) {
+      return "Informe o nome do cliente.";
+    }
+
+    if (!payload.cpf_cnpj) {
+      return "Informe o CPF ou CNPJ.";
+    }
+
+    if (![11, 14].includes(payload.cpf_cnpj.length)) {
+      return "Informe um CPF ou CNPJ válido.";
+    }
+
+    if (!payload.email) {
+      return "Informe o e-mail do cliente.";
+    }
+
+    return "";
+  }
+
+  function getTemporaryPasswordFromCreateClientResult(result) {
+    if (!result || typeof result !== "object") {
+      return "";
+    }
+
+    return (
+      result.temporary_password ||
+      result.temporaryPassword ||
+      result.temp_password ||
+      result.tempPassword ||
+      result.initial_password ||
+      result.initialPassword ||
+      result.password ||
+      result.client?.temporary_password ||
+      result.client?.temporaryPassword ||
+      result.client?.temp_password ||
+      result.client?.tempPassword ||
+      result.client?.initial_password ||
+      result.client?.initialPassword ||
+      result.client?.password ||
+      result.data?.temporary_password ||
+      result.data?.temporaryPassword ||
+      result.data?.temp_password ||
+      result.data?.tempPassword ||
+      result.data?.initial_password ||
+      result.data?.initialPassword ||
+      result.data?.password ||
+      ""
+    );
+  }
+
+  async function handleCreateClient(event) {
+    event.preventDefault();
+
+    if (!createClientForm) return;
+
+    const payload = getCreateClientPayload();
+    const validationError = validateCreateClientPayload(payload);
+
+    if (validationError) {
+      if (createClientMessage) {
+        createClientMessage.textContent = validationError;
+        createClientMessage.className = "form-message error";
+      }
+
+      return;
+    }
+
+    const submitButton = createClientForm.querySelector("button[type='submit']");
+
+    try {
+      setButtonLoading(submitButton, true, "Cadastrando...");
+
+      if (createClientMessage) {
+        createClientMessage.textContent = "Cadastrando cliente...";
+        createClientMessage.className = "form-message info";
+      }
+
+      const response = await adminFetch("http://localhost:3000/clients", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Erro ao cadastrar cliente.");
+      }
+
+      const temporaryPassword = getTemporaryPasswordFromCreateClientResult(result);
+
+      createClientForm.reset();
+
+      if (createClientMessage) {
+        createClientMessage.textContent = "Cliente cadastrado com sucesso.";
+        createClientMessage.className = "form-message success";
+      }
+
+      if (temporaryPasswordField) {
+        temporaryPasswordField.value = temporaryPassword;
+      }
+
+      if (temporaryPasswordBox) {
+        temporaryPasswordBox.classList.toggle("hidden", !temporaryPassword);
+      }
+
+      if (!temporaryPassword) {
+        console.warn(
+          "Cliente cadastrado, mas a senha temporária não foi retornada pelo backend.",
+          result
+        );
+      }
+
+      clientsLoaded = false;
+      await fetchClients();
+      await refreshDashboardDataAfterActivity();
+
+      await showAdminActionMessage({
+        type: "success",
+        title: "Cliente cadastrado",
+        message: temporaryPassword
+          ? "O cliente foi cadastrado com sucesso. A senha temporária está disponível no formulário."
+          : "O cliente foi cadastrado com sucesso.",
+        confirmText: "OK"
+      });
+    } catch (error) {
+      console.error("ERRO AO CADASTRAR CLIENTE:", error);
+
+      if (createClientMessage) {
+        createClientMessage.textContent =
+          error.message || "Não foi possível cadastrar o cliente.";
+        createClientMessage.className = "form-message error";
+      }
+    } finally {
+      setButtonLoading(submitButton, false);
+    }
+  }
+  async function copyTemporaryPassword() {
+    const password = temporaryPasswordField?.value || "";
+
+    if (!password) {
+      await showAdminActionMessage({
+        type: "warning",
+        title: "Senha não encontrada",
+        message: "Nenhuma senha temporária foi gerada para copiar.",
+        confirmText: "OK"
+      });
+
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(password);
+
+      await showAdminActionMessage({
+        type: "success",
+        title: "Senha copiada",
+        message: "A senha temporária foi copiada para a área de transferência.",
+        confirmText: "OK"
+      });
+    } catch (error) {
+      console.error("ERRO AO COPIAR SENHA TEMPORÁRIA:", error);
+
+      temporaryPasswordField?.select();
+
+      await showAdminActionMessage({
+        type: "warning",
+        title: "Copie manualmente",
+        message: "Não foi possível copiar automaticamente. Selecione a senha e copie manualmente.",
+        confirmText: "OK"
+      });
+    }
+  }
+
+  function applyClientFilters(clients) {
+    const safeClients = Array.isArray(clients) ? clients : [];
+    const search = normalizeText(clientsSearchInput?.value || "");
+    const searchDigits = onlyDigits(clientsSearchInput?.value || "");
+    const status = clientsStatusFilter?.value || "all";
+    const type = clientsTypeFilter?.value || "all";
+
+    return safeClients.filter((client) => {
+      const clientStatus = client.is_active === false ? "inactive" : "active";
       const clientType = getClientEntityType(client);
 
-      const matchesStatus =
-        statusFilter === "all" ||
-        !statusFilter ||
-        (statusFilter === "active" && isActive) ||
-        (statusFilter === "inactive" && !isActive);
+      const clientDocumentDigits = onlyDigits(client.cpf_cnpj || "");
+      const clientDocumentFormatted = formatCpfCnpj(clientDocumentDigits);
 
-      const matchesType =
-        selectedType === "all" || clientType === selectedType;
-
-      const searchableText = normalizeText(
+      const searchSource = normalizeText(
         [
-          client.full_name,
           client.company_name,
-          client.cpf_cnpj,
+          client.full_name,
           client.email,
+          client.cpf_cnpj,
+          clientDocumentDigits,
+          clientDocumentFormatted,
+          formatCpfCnpj(client.cpf_cnpj),
           client.phone,
-          client.whatsapp
+          client.whatsapp,
+          formatPhone(client.phone),
+          formatPhone(client.whatsapp)
         ].join(" ")
       );
 
-      const matchesSearch =
-        !normalizedSearch || searchableText.includes(normalizedSearch);
+      const matchesTextSearch = !search || searchSource.includes(search);
 
-      return matchesStatus && matchesType && matchesSearch;
+      const matchesDocumentSearch =
+        !searchDigits ||
+        clientDocumentDigits.includes(searchDigits) ||
+        onlyDigits(clientDocumentFormatted).includes(searchDigits);
+
+      const matchesSearch = matchesTextSearch || matchesDocumentSearch;
+      const matchesStatus = status === "all" || clientStatus === status;
+      const matchesType = type === "all" || clientType === type;
+
+      return matchesSearch && matchesStatus && matchesType;
     });
   }
 
-  function updateClientsSummary(filteredClients) {
-    setTextByIds(
-      ["clientsFilteredCount", "clientsListCount"],
-      filteredClients.length
+  function renderClientsMessage(message = "", type = "info") {
+    if (!clientsListMessage) return;
+
+    clientsListMessage.textContent = message;
+    clientsListMessage.className = `list-message ${type}`;
+  }
+
+  function clearClientsList() {
+    if (clientsList) {
+      clientsList.replaceChildren();
+    }
+  }
+
+  function renderClientsList(clients) {
+    if (!clientsList) return;
+
+    const filteredClients = applyClientFilters(clients);
+
+    clearClientsList();
+
+    if (!filteredClients.length) {
+      renderClientsMessage("Nenhum cliente encontrado para os filtros selecionados.", "info");
+      return;
+    }
+
+    renderClientsMessage(`${filteredClients.length} cliente(s) encontrado(s).`, "info");
+
+    const fragment = document.createDocumentFragment();
+
+    filteredClients.forEach((client) => {
+      const card = renderClientCard(client);
+
+      if (card) {
+        fragment.appendChild(card);
+      }
+    });
+
+    clientsList.appendChild(fragment);
+  }
+
+  function renderClientCard(client) {
+    const card = cloneTemplate(clientCardTemplate);
+
+    if (!card) {
+      return null;
+    }
+
+    const clientId = getClientId(client);
+    const isActive = client.is_active !== false;
+
+    card.dataset.clientId = clientId;
+    card.dataset.clientName = client.company_name || client.full_name || "Cliente";
+
+    setElementText(card, "[data-client-avatar]", getClientInitials(client));
+    setElementText(card, ".client-card-avatar", getClientInitials(client));
+
+    setElementText(card, "[data-client-company]", client.company_name || "-");
+    setElementText(card, ".client-company-name", client.company_name || "-");
+
+    setElementText(card, "[data-client-name]", client.full_name || "-");
+    setElementText(card, ".client-responsible-name", client.full_name || "-");
+
+    setElementText(card, "[data-client-document-label]", getClientEntityLabel(client));
+    setElementText(card, ".client-document-label", getClientEntityLabel(client));
+
+    setElementText(card, "[data-client-document]", formatOptionalCpfCnpj(client.cpf_cnpj));
+    setElementText(card, ".client-document-value", formatOptionalCpfCnpj(client.cpf_cnpj));
+
+    setElementText(card, "[data-client-email]", client.email || "-");
+    setElementText(card, ".client-email-value", client.email || "-");
+
+    setElementText(card, "[data-client-phone]", formatOptionalPhone(client.phone));
+    setElementText(card, ".client-phone-value", formatOptionalPhone(client.phone));
+
+    setElementText(card, "[data-client-whatsapp]", formatOptionalPhone(client.whatsapp));
+    setElementText(card, ".client-whatsapp-value", formatOptionalPhone(client.whatsapp));
+
+    const statusBadge = card.querySelector("[data-client-status], .client-status-badge");
+
+    if (statusBadge) {
+      statusBadge.textContent = getClientStatusLabel(isActive);
+      statusBadge.classList.toggle("active", isActive);
+      statusBadge.classList.toggle("inactive", !isActive);
+    }
+
+    const documentsBtn = card.querySelector('[data-action="documents"], .show-documents-btn, .toggle-documents-btn');
+    const uploadBtn = card.querySelector('[data-action="upload"], .show-upload-btn, .toggle-upload-btn');
+    const statusBtn = card.querySelector('[data-action="status"], .toggle-client-status-btn');
+    const deleteBtn = card.querySelector('[data-action="delete"], .delete-client-btn');
+
+    if (documentsBtn) {
+      documentsBtn.dataset.clientId = clientId;
+      documentsBtn.addEventListener("click", () => toggleClientDocuments(card, client));
+    }
+
+    if (uploadBtn) {
+      uploadBtn.dataset.clientId = clientId;
+      uploadBtn.addEventListener("click", () => toggleClientUpload(card, client));
+    }
+
+    if (statusBtn) {
+      statusBtn.dataset.clientId = clientId;
+      statusBtn.dataset.currentStatus = String(isActive);
+      statusBtn.classList.toggle("success", !isActive);
+      statusBtn.classList.toggle("warning", isActive);
+      statusBtn.innerHTML = isActive
+        ? '<i class="fa-solid fa-user-slash" aria-hidden="true"></i><span data-action-label>Inativar</span>'
+        : '<i class="fa-solid fa-user-check" aria-hidden="true"></i><span data-action-label>Ativar</span>';
+
+      statusBtn.addEventListener("click", () => toggleClientStatus(client));
+    }
+
+    if (deleteBtn) {
+      deleteBtn.dataset.clientId = clientId;
+      deleteBtn.dataset.clientName = client.company_name || client.full_name || "Cliente";
+      deleteBtn.addEventListener("click", () => deleteClient(client));
+    }
+
+    return card;
+  }
+
+  async function fetchClients() {
+    if (!clientsList) return;
+
+    try {
+      renderClientsMessage("Carregando clientes...", "info");
+      clearClientsList();
+
+      const response = await adminFetch("http://localhost:3000/clients");
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Erro ao carregar clientes.");
+      }
+
+      allClientsCache = Array.isArray(result)
+        ? result
+        : Array.isArray(result.clients)
+          ? result.clients
+          : [];
+
+      clientsLoaded = true;
+
+      updateDashboardClientsSummary(allClientsCache);
+      renderClientsList(allClientsCache);
+    } catch (error) {
+      console.error("ERRO AO BUSCAR CLIENTES:", error);
+
+      renderClientsMessage(
+        error.message || "Não foi possível carregar os clientes.",
+        "error"
+      );
+
+      updateDashboardClientsSummary([]);
+    }
+  }
+
+  function getClientCardById(clientId) {
+    if (!clientsList || !clientId) return null;
+
+    return clientsList.querySelector(`[data-client-id="${clientId}"]`);
+  }
+
+  function closeClientDocuments(card) {
+    const wrapper = card?.querySelector("[data-client-documents-wrapper], .client-documents-wrapper");
+
+    if (wrapper) {
+      wrapper.classList.add("hidden");
+      wrapper.replaceChildren();
+    }
+  }
+
+  function closeClientUpload(card) {
+    const wrapper = card?.querySelector("[data-client-upload-wrapper], .client-upload-wrapper");
+
+    if (wrapper) {
+      wrapper.classList.add("hidden");
+      wrapper.replaceChildren();
+    }
+  }
+
+  function closeOtherClientPanels(currentCard) {
+    document.querySelectorAll("[data-client-card], .client-card").forEach((card) => {
+      if (card === currentCard) return;
+
+      closeClientDocuments(card);
+      closeClientUpload(card);
+    });
+  }
+
+  async function toggleClientDocuments(card, client) {
+    if (!card || !client) return;
+
+    const wrapper = card.querySelector("[data-client-documents-wrapper], .client-documents-wrapper");
+
+    if (!wrapper) return;
+
+    const isOpen = !wrapper.classList.contains("hidden");
+
+    closeClientUpload(card);
+
+    if (isOpen) {
+      closeClientDocuments(card);
+      return;
+    }
+
+    closeOtherClientPanels(card);
+
+    wrapper.classList.remove("hidden");
+    wrapper.innerHTML = '<p class="documents-loading-message">Carregando documentos...</p>';
+
+    await fetchClientDocuments(client, wrapper);
+  }
+
+  function toggleClientUpload(card, client) {
+    if (!card || !client) return;
+
+    const wrapper = card.querySelector("[data-client-upload-wrapper], .client-upload-wrapper");
+
+    if (!wrapper) return;
+
+    const isOpen = !wrapper.classList.contains("hidden");
+
+    closeClientDocuments(card);
+
+    if (isOpen) {
+      closeClientUpload(card);
+      return;
+    }
+
+    closeOtherClientPanels(card);
+
+    wrapper.classList.remove("hidden");
+    wrapper.replaceChildren();
+
+    const uploadPanel = renderClientUploadPanel(client);
+
+    if (uploadPanel) {
+      wrapper.appendChild(uploadPanel);
+    }
+  }
+
+  async function toggleClientStatus(client) {
+    const clientId = getClientId(client);
+    const isActive = client.is_active !== false;
+    const nextStatus = !isActive;
+
+    if (!clientId) return;
+
+    const confirmed = await showAdminActionConfirm({
+      type: isActive ? "warning" : "success",
+      title: isActive ? "Inativar cliente" : "Ativar cliente",
+      message: isActive
+        ? `Deseja realmente inativar ${client.company_name || "este cliente"}?`
+        : `Deseja realmente ativar ${client.company_name || "este cliente"}?`,
+      confirmText: isActive ? "Inativar" : "Ativar",
+      cancelText: "Cancelar"
+    });
+
+    if (!confirmed) return;
+
+    try {
+      const response = await adminFetch(`http://localhost:3000/admin/clients/${clientId}/status`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          is_active: nextStatus
+        })
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Erro ao atualizar status do cliente.");
+      }
+
+      await showAdminActionMessage({
+        type: "success",
+        title: nextStatus ? "Cliente ativado" : "Cliente inativado",
+        message: nextStatus
+          ? "O cliente foi ativado com sucesso."
+          : "O cliente foi inativado com sucesso.",
+        confirmText: "OK"
+      });
+
+      clientsLoaded = false;
+      await fetchClients();
+      await refreshDashboardDataAfterActivity();
+    } catch (error) {
+      console.error("ERRO AO ATUALIZAR STATUS DO CLIENTE:", error);
+
+      await showAdminActionMessage({
+        type: "danger",
+        title: "Erro ao atualizar status",
+        message: error.message || "Não foi possível atualizar o status do cliente.",
+        confirmText: "OK"
+      });
+    }
+  }
+
+  async function deleteClient(client) {
+    const clientId = getClientId(client);
+
+    if (!clientId) return;
+
+    const confirmed = await showAdminActionConfirm({
+      type: "danger",
+      title: "Excluir cliente",
+      message: `Deseja realmente excluir ${client.company_name || "este cliente"}? Essa ação também removerá os documentos vinculados.`,
+      confirmText: "Excluir",
+      cancelText: "Cancelar"
+    });
+
+    if (!confirmed) return;
+
+    try {
+      const response = await adminFetch(`http://localhost:3000/admin/clients/${clientId}`, {
+        method: "DELETE"
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Erro ao excluir cliente.");
+      }
+
+      await showAdminActionMessage({
+        type: "success",
+        title: "Cliente excluído",
+        message: "O cliente foi excluído com sucesso.",
+        confirmText: "OK"
+      });
+
+      delete clientDocumentsCache[clientId];
+
+      clientsLoaded = false;
+      await fetchClients();
+      await refreshDashboardDataAfterActivity();
+    } catch (error) {
+      console.error("ERRO AO EXCLUIR CLIENTE:", error);
+
+      await showAdminActionMessage({
+        type: "danger",
+        title: "Erro ao excluir cliente",
+        message: error.message || "Não foi possível excluir o cliente.",
+        confirmText: "OK"
+      });
+    }
+  }
+
+  function renderClientUploadPanel(client) {
+    const form = cloneTemplate(clientUploadFormTemplate);
+
+    if (!form) {
+      return null;
+    }
+
+    const clientId = getClientId(client);
+
+    form.dataset.clientId = clientId;
+
+    setInputValue(form, "[data-upload-client-name]", client.full_name || "-");
+    setInputValue(form, "[data-upload-company-name]", client.company_name || "-");
+
+    const yearInput = form.querySelector("[data-upload-year]");
+
+    if (yearInput && !yearInput.value) {
+      yearInput.value = String(new Date().getFullYear());
+    }
+
+    form.addEventListener("submit", (event) => {
+      handleUploadDocument(event, client);
+    });
+
+    return form;
+  }
+
+  async function handleUploadDocument(event, client) {
+    event.preventDefault();
+
+    const form = event.currentTarget;
+    const clientId = getClientId(client);
+
+    const category = form.querySelector("[data-upload-category]")?.value || "";
+    const subcategory = form.querySelector("[data-upload-subcategory]")?.value?.trim() || "";
+    const year = form.querySelector("[data-upload-year]")?.value || "";
+    const releaseDate = form.querySelector("[data-upload-release-date]")?.value || "";
+    const expirationDate = form.querySelector("[data-upload-expiration-date]")?.value || "";
+    const fileInput = form.querySelector("[data-upload-file]");
+    const message = form.querySelector("[data-upload-message]");
+    const submitButton = form.querySelector(".upload-submit-btn");
+
+    if (
+      !clientId ||
+      !category ||
+      !year ||
+      !fileInput?.files?.length ||
+      !submitButton
+    ) {
+      setInlineMessage(message, "Preencha os campos obrigatórios: categoria, ano e arquivo.", "error");
+      return;
+    }
+
+    if (
+      releaseDate &&
+      expirationDate &&
+      isExpirationBeforeRelease(releaseDate, expirationDate)
+    ) {
+      setInlineMessage(
+        message,
+        "A data de validade não pode ser menor que a data de lançamento.",
+        "error"
+      );
+      return;
+    }
+
+    const originalText = submitButton.textContent;
+
+    try {
+      submitButton.disabled = true;
+      submitButton.textContent = "Enviando...";
+
+      setInlineMessage(message, "Enviando documento...", "info");
+
+      const formData = new FormData();
+      formData.append("client_id", clientId);
+      formData.append("category", category);
+      formData.append("subcategory", subcategory);
+      formData.append("year", year);
+      formData.append("release_date", releaseDate);
+      formData.append("expiration_date", expirationDate);
+      formData.append("file", fileInput.files[0]);
+
+      const response = await adminFetch("http://localhost:3000/admin/documents/upload", {
+        method: "POST",
+        body: formData
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Erro ao enviar documento.");
+      }
+
+      setInlineMessage(
+        message,
+        result.message || "Documento enviado com sucesso.",
+        "success"
+      );
+
+      await showAdminActionMessage({
+        type: "success",
+        title: "Documento enviado",
+        message: result.message || "O documento foi enviado com sucesso.",
+        confirmText: "OK"
+      });
+
+      form.reset();
+
+      const yearInput = form.querySelector("[data-upload-year]");
+
+      if (yearInput) {
+        yearInput.value = String(new Date().getFullYear());
+      }
+
+      await fetchClientDocumentsData(clientId);
+
+      const card = getClientCardById(clientId);
+      const documentsWrapper = card?.querySelector("[data-client-documents-wrapper], .client-documents-wrapper");
+      const updatedClient = allClientsCache.find((item) => getClientId(item) === clientId) || client;
+
+      if (updatedClient && documentsWrapper && !documentsWrapper.classList.contains("hidden")) {
+        renderClientDocumentsPanel(
+          updatedClient,
+          documentsWrapper,
+          clientDocumentsCache[clientId] || []
+        );
+      }
+
+      await refreshDashboardDataAfterActivity();
+    } catch (error) {
+      console.error("ERRO AO ENVIAR DOCUMENTO:", error);
+
+      setInlineMessage(
+        message,
+        error.message || "Erro ao enviar documento.",
+        "error"
+      );
+
+      await showAdminActionMessage({
+        type: "danger",
+        title: "Erro ao enviar documento",
+        message: error.message || "Não foi possível enviar o documento.",
+        confirmText: "OK"
+      });
+    } finally {
+      submitButton.disabled = false;
+      submitButton.textContent = originalText;
+    }
+  }
+
+  async function fetchClientDocumentsData(clientId) {
+    if (!clientId) return [];
+
+    const response = await adminFetch(
+      `http://localhost:3000/clients/${clientId}/documents`
     );
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.error || "Erro ao buscar documentos.");
+    }
+
+    clientDocumentsCache[clientId] = Array.isArray(result)
+      ? result
+      : Array.isArray(result.documents)
+        ? result.documents
+        : [];
+
+    return clientDocumentsCache[clientId];
+  }
+
+  async function fetchClientDocuments(client, wrapper) {
+    const clientId = getClientId(client);
+
+    if (!clientId || !wrapper) return;
+
+    try {
+      wrapper.innerHTML = '<p class="documents-loading-message">Carregando documentos...</p>';
+
+      const documents = await fetchClientDocumentsData(clientId);
+
+      renderClientDocumentsPanel(client, wrapper, documents);
+    } catch (error) {
+      console.error("ERRO AO CARREGAR DOCUMENTOS DO CLIENTE:", error);
+
+      wrapper.innerHTML = "";
+
+      const message = document.createElement("p");
+      message.className = "documents-loading-message";
+      message.textContent = error.message || "Não foi possível carregar os documentos.";
+
+      wrapper.appendChild(message);
+    }
   }
 
   function filterDocuments(documents, filters) {
@@ -1372,264 +2633,144 @@ document.addEventListener("DOMContentLoaded", async () => {
     ].sort((a, b) => Number(b) - Number(a));
   }
 
-  function fillSelectOptions(selectElement, values, selectedValue, defaultLabel) {
+  function populateSelectOptions(selectElement, values, defaultLabel) {
     if (!selectElement) return;
 
-    selectElement.innerHTML = "";
+    selectElement.replaceChildren();
 
     const defaultOption = document.createElement("option");
     defaultOption.value = "";
     defaultOption.textContent = defaultLabel;
+
     selectElement.appendChild(defaultOption);
 
     values.forEach((value) => {
       const option = document.createElement("option");
       option.value = value;
       option.textContent = value;
-      option.selected = String(value) === String(selectedValue || "");
+
       selectElement.appendChild(option);
     });
   }
 
-  function createClientUploadFormElement(client) {
-    const form = cloneTemplate(clientUploadFormTemplate);
+  function populateDocumentFilters(panel, documents) {
+    if (!panel) return;
 
-    if (!form) {
-      return document.createElement("div");
-    }
+    const categorySelect = panel.querySelector("[data-document-filter-category]");
+    const yearSelect = panel.querySelector("[data-document-filter-year]");
 
-    const clientId = getClientId(client);
-
-    form.dataset.clientId = clientId;
-    form.id = `uploadForm-${clientId}`;
-
-    setInputValue(form, "[data-upload-client-name]", client.full_name || "-");
-    setInputValue(form, "[data-upload-company-name]", client.company_name || "-");
-
-    return form;
-  }
-
-  function createClientCardElement(client) {
-    const card = cloneTemplate(clientCardTemplate);
-
-    if (!card) {
-      return document.createElement("article");
-    }
-
-    const clientId = getClientId(client);
-    const isActive = client.is_active !== false;
-
-    card.dataset.clientId = clientId;
-
-    setElementText(card, "[data-client-avatar]", getClientInitials(client));
-    setElementText(card, "[data-client-company]", client.company_name || "-");
-    setElementText(card, "[data-client-name]", client.full_name || "-");
-    setElementText(card, "[data-client-document-label]", getClientEntityLabel(client));
-    setElementText(card, "[data-client-document]", formatOptionalCpfCnpj(client.cpf_cnpj));
-    setElementText(card, "[data-client-email]", client.email || "-");
-    setElementText(card, "[data-client-phone]", formatOptionalPhone(client.phone));
-    setElementText(card, "[data-client-whatsapp]", formatOptionalPhone(client.whatsapp));
-
-    const statusBadge = card.querySelector("[data-client-status]");
-
-    if (statusBadge) {
-      statusBadge.textContent = getClientStatusLabel(isActive);
-      statusBadge.classList.toggle("active", isActive);
-      statusBadge.classList.toggle("inactive", !isActive);
-    }
-
-    const documentsButton = card.querySelector("[data-action='documents']");
-    const uploadButton = card.querySelector("[data-action='upload']");
-    const statusButton = card.querySelector("[data-action='status']");
-    const deleteButton = card.querySelector("[data-action='delete']");
-
-    if (documentsButton) {
-      documentsButton.dataset.clientId = clientId;
-    }
-
-    if (uploadButton) {
-      uploadButton.dataset.clientId = clientId;
-    }
-
-    if (statusButton) {
-      statusButton.dataset.clientId = clientId;
-      statusButton.dataset.currentStatus = String(isActive);
-      statusButton.classList.toggle("warning", isActive);
-      statusButton.classList.toggle("success", !isActive);
-
-      const statusButtonLabel = statusButton.querySelector("[data-action-label]");
-      const statusIcon = statusButton.querySelector("i");
-
-      if (statusButtonLabel) {
-        statusButtonLabel.textContent = isActive ? "Inativar" : "Ativar";
-      }
-
-      if (statusIcon) {
-        statusIcon.className = `fa-solid ${isActive ? "fa-user-slash" : "fa-user-check"}`;
-      }
-    }
-
-    if (deleteButton) {
-      deleteButton.dataset.clientId = clientId;
-      deleteButton.dataset.clientName = client.full_name || "Cliente";
-    }
-
-    const documentsWrapper = card.querySelector("[data-client-documents-wrapper]");
-    const documentsLoading = card.querySelector("[data-client-documents-loading]");
-    const documentsContent = card.querySelector("[data-client-documents-content]");
-    const uploadWrapper = card.querySelector("[data-client-upload-wrapper]");
-
-    if (documentsWrapper) {
-      documentsWrapper.id = `documentsWrapper-${clientId}`;
-      documentsWrapper.dataset.clientId = clientId;
-    }
-
-    if (documentsLoading) {
-      documentsLoading.id = `documentsLoading-${clientId}`;
-    }
-
-    if (documentsContent) {
-      documentsContent.id = `documentsContent-${clientId}`;
-    }
-
-    if (uploadWrapper) {
-      uploadWrapper.id = `uploadWrapper-${clientId}`;
-      uploadWrapper.dataset.clientId = clientId;
-      uploadWrapper.appendChild(createClientUploadFormElement(client));
-    }
-
-    return card;
-  }
-
-  function renderClientsList(clients) {
-    if (!clientsList || !clientsListMessage) return;
-
-    const filteredClients = filterClients(
-      Array.isArray(clients) ? clients : [],
-      clientsSearchInput?.value || "",
-      clientsStatusFilter?.value || "all"
+    populateSelectOptions(
+      categorySelect,
+      getUniqueDocumentCategories(documents),
+      "Todas"
     );
 
-    updateClientsSummary(filteredClients);
+    populateSelectOptions(
+      yearSelect,
+      getUniqueDocumentYears(documents),
+      "Todos"
+    );
+  }
 
-    clientsList.replaceChildren();
+  function renderClientDocumentsPanel(client, wrapper, documents) {
+    if (!wrapper) return;
 
-    if (!filteredClients.length) {
-      clientsListMessage.textContent = "Nenhum cliente encontrado.";
+    const panel = cloneTemplate(documentsPanelTemplate);
+    const clientId = getClientId(client);
+
+    wrapper.replaceChildren();
+
+    if (!panel) {
+      const message = document.createElement("p");
+      message.className = "documents-loading-message";
+      message.textContent = "Não foi possível montar a área de documentos.";
+
+      wrapper.appendChild(message);
       return;
     }
 
-    clientsListMessage.textContent = `${filteredClients.length} cliente(s) encontrado(s).`;
+    panel.id = `documentsContent-${clientId}`;
+    panel.dataset.clientId = clientId;
+
+    populateDocumentFilters(panel, documents);
+
+    wrapper.appendChild(panel);
+
+    renderDocumentsForClient(clientId, documents);
+    bindDocumentFilters(clientId);
+  }
+
+  function getDocumentFiltersFromPanel(panel) {
+    if (!panel) {
+      return {
+        name: "",
+        category: "",
+        year: ""
+      };
+    }
+
+    return {
+      name: panel.querySelector("[data-document-filter-name]")?.value || "",
+      category: panel.querySelector("[data-document-filter-category]")?.value || "",
+      year: panel.querySelector("[data-document-filter-year]")?.value || ""
+    };
+  }
+
+  function renderDocumentsForClient(clientId, documents) {
+    const panel = document.getElementById(`documentsContent-${clientId}`);
+
+    if (!panel) return;
+
+    const list = panel.querySelector("[data-documents-list]");
+    const resultsInfo = panel.querySelector("[data-documents-results-info]");
+
+    if (!list) return;
+
+    const safeDocuments = Array.isArray(documents) ? documents : [];
+    const filters = getDocumentFiltersFromPanel(panel);
+    const filteredDocuments = filterDocuments(safeDocuments, filters);
+
+    list.replaceChildren();
+
+    if (resultsInfo) {
+      resultsInfo.textContent = `${filteredDocuments.length} documento(s) encontrado(s).`;
+    }
+
+    if (!filteredDocuments.length) {
+      const empty = cloneTemplate(emptyDocumentsTemplate);
+
+      if (empty) {
+        list.appendChild(empty);
+      } else {
+        const message = document.createElement("p");
+        message.className = "empty-documents-message";
+        message.textContent = "Nenhum documento encontrado para este cliente com os filtros selecionados.";
+        list.appendChild(message);
+      }
+
+      return;
+    }
 
     const fragment = document.createDocumentFragment();
 
-    filteredClients.forEach((client) => {
-      fragment.appendChild(createClientCardElement(client));
+    filteredDocuments.forEach((documentItem) => {
+      const item = renderDocumentItem(clientId, documentItem);
+
+      if (item) {
+        fragment.appendChild(item);
+      }
     });
 
-    clientsList.appendChild(fragment);
-
-    attachClientActionEvents();
+    list.appendChild(fragment);
+    bindDocumentActions();
   }
 
-  function createDocumentsPanelElement(clientId, documents) {
-    const panel = cloneTemplate(documentsPanelTemplate);
-
-    if (!panel) {
-      return document.createElement("div");
-    }
-
-    const safeDocuments = Array.isArray(documents) ? documents : [];
-
-    const nameInput = panel.querySelector("[data-document-filter-name]");
-    const categorySelect = panel.querySelector("[data-document-filter-category]");
-    const yearSelect = panel.querySelector("[data-document-filter-year]");
-    const clearButton = panel.querySelector("[data-document-clear-filters]");
-    const resultsInfo = panel.querySelector("[data-documents-results-info]");
-    const list = panel.querySelector("[data-documents-list]");
-
-    const existingFilters = {
-      name: nameInput?.dataset.currentValue || "",
-      category: categorySelect?.dataset.currentValue || "",
-      year: yearSelect?.dataset.currentValue || ""
-    };
-
-    const currentPanel = document.getElementById(`documentsContent-${clientId}`)?.querySelector("[data-documents-panel]");
-
-    if (currentPanel) {
-      existingFilters.name =
-        currentPanel.querySelector("[data-document-filter-name]")?.value || "";
-      existingFilters.category =
-        currentPanel.querySelector("[data-document-filter-category]")?.value || "";
-      existingFilters.year =
-        currentPanel.querySelector("[data-document-filter-year]")?.value || "";
-    }
-
-    const filteredDocuments = filterDocuments(safeDocuments, existingFilters);
-
-    const categories = getUniqueDocumentCategories(safeDocuments);
-    const years = getUniqueDocumentYears(safeDocuments);
-
-    panel.dataset.clientId = clientId;
-
-    if (nameInput) {
-      nameInput.value = existingFilters.name || "";
-      nameInput.dataset.clientId = clientId;
-    }
-
-    fillSelectOptions(categorySelect, categories, existingFilters.category, "Todas");
-    fillSelectOptions(yearSelect, years, existingFilters.year, "Todos");
-
-    if (categorySelect) {
-      categorySelect.dataset.clientId = clientId;
-    }
-
-    if (yearSelect) {
-      yearSelect.dataset.clientId = clientId;
-    }
-
-    if (clearButton) {
-      clearButton.dataset.clientId = clientId;
-    }
-
-    if (resultsInfo) {
-      if (filteredDocuments.length) {
-        resultsInfo.textContent = `Exibindo ${filteredDocuments.length} de ${safeDocuments.length} documento(s).`;
-      } else {
-        resultsInfo.textContent = `Nenhum documento encontrado. Total cadastrado: ${safeDocuments.length}.`;
-      }
-    }
-
-    if (list) {
-      if (filteredDocuments.length) {
-        const fragment = document.createDocumentFragment();
-
-        filteredDocuments.forEach((documentItem) => {
-          fragment.appendChild(createDocumentItemElement(documentItem, clientId));
-        });
-
-        list.appendChild(fragment);
-      } else {
-        const emptyElement = cloneTemplate(emptyDocumentsTemplate);
-
-        if (emptyElement) {
-          list.appendChild(emptyElement);
-        }
-      }
-    }
-
-    return panel;
-  }
-
-  function createDocumentItemElement(documentItem, fallbackClientId) {
+  function renderDocumentItem(clientId, documentItem) {
     const item = cloneTemplate(documentItemTemplate);
 
-    if (!item) {
-      return document.createElement("div");
-    }
+    if (!item) return null;
 
-    const documentId = documentItem.id || "";
-    const clientId = documentItem.client_id || documentItem.user_id || fallbackClientId || "";
+    const documentId = documentItem.id || documentItem.document_id || "";
     const fileName = getDocumentFileName(documentItem);
 
     item.dataset.documentId = documentId;
@@ -1641,1263 +2782,103 @@ document.addEventListener("DOMContentLoaded", async () => {
     setElementText(item, "[data-document-year]", getDocumentYear(documentItem));
     setElementText(item, "[data-document-release-date]", formatDate(getDocumentReleaseDate(documentItem)));
     setElementText(item, "[data-document-expiration-date]", formatDate(getDocumentExpirationDate(documentItem)));
-    setElementText(item, "[data-document-created-at]", formatDate(getDocumentDate(documentItem)));
 
     setElementDataset(item, "[data-document-menu-toggle]", "documentId", documentId);
-    setElementDataset(item, "[data-document-download]", "documentId", documentId);
 
-    setElementDataset(item, "[data-document-replace]", "documentId", documentId);
-    setElementDataset(item, "[data-document-replace]", "clientId", clientId);
-    setElementDataset(item, "[data-document-replace]", "fileName", fileName);
+    const actions = item.querySelector("[data-document-actions]");
 
-    setElementDataset(item, "[data-document-replace-input]", "documentId", documentId);
-    setElementDataset(item, "[data-document-replace-input]", "clientId", clientId);
+    if (actions) {
+      actions.classList.add("hidden");
+    }
 
-    setElementDataset(item, "[data-document-delete]", "documentId", documentId);
-    setElementDataset(item, "[data-document-delete]", "clientId", clientId);
-    setElementDataset(item, "[data-document-delete]", "fileName", fileName);
+    const downloadBtn = item.querySelector("[data-document-download]");
+    const replaceBtn = item.querySelector("[data-document-replace]");
+    const replaceInput = item.querySelector("[data-document-replace-input]");
+    const deleteBtn = item.querySelector("[data-document-delete]");
+
+    if (downloadBtn) {
+      downloadBtn.dataset.documentId = documentId;
+    }
+
+    if (replaceBtn) {
+      replaceBtn.dataset.documentId = documentId;
+      replaceBtn.dataset.clientId = clientId;
+      replaceBtn.dataset.fileName = fileName;
+    }
+
+    if (replaceInput) {
+      replaceInput.dataset.documentId = documentId;
+      replaceInput.dataset.clientId = clientId;
+    }
+
+    if (deleteBtn) {
+      deleteBtn.dataset.documentId = documentId;
+      deleteBtn.dataset.clientId = clientId;
+      deleteBtn.dataset.fileName = fileName;
+    }
 
     return item;
   }
 
-  function renderDocumentsForClient(clientId, documents) {
-    const content = document.getElementById(`documentsContent-${clientId}`);
-    const loading = document.getElementById(`documentsLoading-${clientId}`);
+  function bindDocumentFilters(clientId) {
+    const documents = clientDocumentsCache[clientId] || [];
+    const panel = document.getElementById(`documentsContent-${clientId}`);
 
-    if (!content) return;
+    if (!panel) return;
 
-    if (loading) {
-      loading.classList.add("hidden");
-    }
+    const nameInput = panel.querySelector("[data-document-filter-name]");
+    const categorySelect = panel.querySelector("[data-document-filter-category]");
+    const yearSelect = panel.querySelector("[data-document-filter-year]");
+    const clearBtn = panel.querySelector("[data-document-clear-filters]");
 
-    content.replaceChildren(createDocumentsPanelElement(clientId, documents));
+    const rerender = () => {
+      renderDocumentsForClient(clientId, documents);
+    };
 
-    bindDocumentFilters(clientId);
-    attachDocumentActionEvents();
-  }
+    if (nameInput && nameInput.dataset.bound !== "true") {
+      nameInput.dataset.bound = "true";
 
-  function getCurrentBannerOrderKey() {
-    if (!homeBannersList) return "";
-
-    return Array.from(homeBannersList.querySelectorAll(".home-banner-card"))
-      .map((card) => card.dataset.bannerId)
-      .filter(Boolean)
-      .join("|");
-  }
-
-  function createBannerCardElement(banner) {
-    const card = cloneTemplate(homeBannerCardTemplate);
-
-    if (!card) {
-      return document.createElement("article");
-    }
-
-    const bannerId = banner.id || "";
-    const isActive = banner.is_active !== false;
-
-    card.dataset.bannerId = bannerId;
-
-    const image = card.querySelector("[data-banner-image]");
-
-    if (image) {
-      image.src = banner.image_url || "";
-      image.alt = banner.title || "Banner";
-    }
-
-    setElementText(card, "[data-banner-title]", banner.title || "-");
-    setElementText(card, "[data-banner-action-type]", getActionTypeLabel(banner.action_type));
-    setElementText(card, "[data-banner-link-target]", getLinkTargetLabel(banner.link_target));
-    setElementText(card, "[data-banner-created-at]", formatDate(banner.created_at));
-
-    const linkRow = card.querySelector("[data-banner-link-row]");
-    const link = card.querySelector("[data-banner-link]");
-
-    if (linkRow && link) {
-      const hasLink = Boolean(banner.link);
-      linkRow.classList.toggle("hidden", !hasLink);
-      link.href = hasLink ? banner.link : "#";
-      link.textContent = hasLink ? banner.link : "";
-    }
-
-    const descriptionBox = card.querySelector("[data-banner-description-box]");
-    const description = card.querySelector("[data-banner-description]");
-
-    if (descriptionBox && description) {
-      const hasDescription = Boolean(banner.description);
-      descriptionBox.classList.toggle("hidden", !hasDescription);
-      description.textContent = hasDescription ? banner.description : "";
-    }
-
-    const status = card.querySelector("[data-banner-status]");
-
-    if (status) {
-      status.textContent = isActive ? "Ativo" : "Inativo";
-      status.classList.toggle("active", isActive);
-      status.classList.toggle("inactive", !isActive);
-    }
-
-    const statusButton = card.querySelector("[data-banner-status-button]");
-    const editButton = card.querySelector("[data-banner-edit]");
-    const deleteButton = card.querySelector("[data-banner-delete]");
-
-    if (statusButton) {
-      statusButton.dataset.bannerId = bannerId;
-      statusButton.dataset.currentStatus = String(isActive);
-      statusButton.textContent = isActive ? "Desativar" : "Ativar";
-      statusButton.classList.toggle("danger", isActive);
-      statusButton.classList.toggle("success", !isActive);
-    }
-
-    if (editButton) {
-      editButton.dataset.bannerId = bannerId;
-    }
-
-    if (deleteButton) {
-      deleteButton.dataset.bannerId = bannerId;
-      deleteButton.dataset.bannerTitle = banner.title || "Banner";
-    }
-
-    return card;
-  }
-  function renderHomeBannersList(banners) {
-    if (!homeBannersList || !homeBannersListMessage) return;
-
-    allHomeBannersCache = Array.isArray(banners) ? [...banners] : [];
-
-    homeBannersList.replaceChildren();
-
-    if (!allHomeBannersCache.length) {
-      homeBannersListMessage.textContent = "Nenhum banner cadastrado.";
-      return;
-    }
-
-    homeBannersListMessage.textContent = `${allHomeBannersCache.length} banner(s) cadastrado(s).`;
-
-    const orderedBanners = [...allHomeBannersCache].sort((a, b) => {
-      const orderA = Number(a.display_order || 0);
-      const orderB = Number(b.display_order || 0);
-
-      if (orderA !== orderB) {
-        return orderA - orderB;
-      }
-
-      return new Date(b.created_at) - new Date(a.created_at);
-    });
-
-    const fragment = document.createDocumentFragment();
-
-    orderedBanners.forEach((banner) => {
-      fragment.appendChild(createBannerCardElement(banner));
-    });
-
-    homeBannersList.appendChild(fragment);
-
-    initializeBannerSortable();
-    attachBannerActionEvents();
-  }
-
-  function attachBannerDescriptionEvents() {
-    document.querySelectorAll(".home-banner-description").forEach((details) => {
-      if (details.dataset.bound === "true") return;
-
-      details.dataset.bound = "true";
-
-      details.addEventListener("toggle", () => {
-        refreshSectionHeight(homeBannersWrapper);
-      });
-    });
-  }
-
-  function initializeBannerSortable() {
-    if (!homeBannersList || typeof Sortable === "undefined") return;
-
-    if (homeBannersSortable) {
-      homeBannersSortable.destroy();
-      homeBannersSortable = null;
-    }
-
-    bannerOrderBeforeDrag = getCurrentBannerOrderKey();
-
-    homeBannersSortable = new Sortable(homeBannersList, {
-      animation: 160,
-      handle: ".home-banner-drag-hint",
-      ghostClass: "sortable-drag",
-      chosenClass: "sortable-chosen",
-      dragClass: "dragging",
-
-      onStart() {
-        bannerOrderBeforeDrag = getCurrentBannerOrderKey();
-      },
-
-      async onEnd() {
-        const currentOrderKey = getCurrentBannerOrderKey();
-
-        if (currentOrderKey === bannerOrderBeforeDrag) {
-          return;
-        }
-
-        await updateHomeBannersOrder();
-      }
-    });
-  }
-
-  async function updateHomeBannersOrder() {
-    if (!homeBannersList) return;
-
-    const orderedIds = Array.from(homeBannersList.querySelectorAll(".home-banner-card"))
-      .map((card) => card.dataset.bannerId)
-      .filter(Boolean);
-
-    if (!orderedIds.length) return;
-
-    showAdminFeedback("Salvando nova ordem dos banners...", "info", false);
-
-    try {
-      const response = await adminFetch("http://localhost:3000/admin/notices/reorder", {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          orderedIds
-        })
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || "Erro ao salvar a ordem dos banners.");
-      }
-
-      showAdminFeedback(
-        result.message || "Ordem dos banners atualizada com sucesso.",
-        "success"
-      );
-
-      await fetchHomeBanners();
-    } catch (error) {
-      console.error("ERRO AO REORDENAR BANNERS:", error);
-
-      showAdminFeedback(
-        error.message || "Erro ao salvar a ordem dos banners.",
-        "error"
-      );
-
-      await fetchHomeBanners();
-    }
-  }
-
-  function hidePasswordBox() {
-    if (!temporaryPasswordBox || !temporaryPasswordField || !copyTemporaryPasswordBtn) return;
-
-    temporaryPasswordBox.classList.add("hidden");
-    temporaryPasswordField.value = "";
-    copyTemporaryPasswordBtn.textContent = "Copiar senha";
-  }
-
-  function showPassword(password) {
-    if (!temporaryPasswordBox || !temporaryPasswordField) return;
-
-    temporaryPasswordBox.classList.remove("hidden");
-    temporaryPasswordField.value = password || "";
-
-    if (copyTemporaryPasswordBtn) {
-      copyTemporaryPasswordBtn.textContent = "Copiar senha";
-    }
-  }
-
-  function isCreateClientModalOpen() {
-    return Boolean(createClientModal && !createClientModal.classList.contains("hidden"));
-  }
-
-  function resetCreateClientFormState() {
-    if (createClientForm) {
-      createClientForm.reset();
-    }
-
-    if (createClientMessage) {
-      createClientMessage.textContent = "";
-      createClientMessage.className = "form-message";
-    }
-
-    hidePasswordBox();
-  }
-
-  function openCreateClientModal() {
-    if (!createClientModal) {
-      openPanel(createClientWrapper);
-      return;
-    }
-
-    createClientModal.classList.remove("hidden");
-    createClientModal.setAttribute("aria-hidden", "false");
-
-    openPanel(createClientWrapper);
-
-    setTimeout(() => {
-      document.getElementById("fullName")?.focus();
-    }, 80);
-  }
-
-  function closeCreateClientModal(options = {}) {
-    const shouldResetForm = Boolean(options.resetForm);
-
-    if (shouldResetForm) {
-      resetCreateClientFormState();
-    }
-
-    if (createClientModal) {
-      createClientModal.classList.add("hidden");
-      createClientModal.setAttribute("aria-hidden", "true");
-    }
-
-    closePanel(createClientWrapper);
-  }
-
-  function hideCreateClientForm(options = {}) {
-    closeCreateClientModal(options);
-
-    if (toggleCreateClientBtn) {
-      toggleCreateClientBtn.textContent = "Novo Cliente";
-    }
-  }
-
-  function showCreateClientForm() {
-    openCreateClientModal();
-
-    if (toggleCreateClientBtn) {
-      toggleCreateClientBtn.textContent = "Fechar Formulário";
-    }
-  }
-
-  function toggleCreateClientForm() {
-    const isHidden = createClientModal
-      ? createClientModal.classList.contains("hidden")
-      : createClientWrapper?.classList.contains("hidden");
-
-    if (isHidden) {
-      showCreateClientForm();
-      setSidebarActive("clients");
-      updateHash("#clientes");
-    } else {
-      hideCreateClientForm();
-    }
-  }
-
-  function hideClientsList() {
-    closePanel(clientsSectionWrapper);
-    closeAllDocumentMenus();
-
-    if (toggleClientsListBtn) {
-      toggleClientsListBtn.textContent = "Exibir Clientes";
-    }
-  }
-
-  function showClientsList() {
-    openPanel(clientsSectionWrapper);
-
-    if (toggleClientsListBtn) {
-      toggleClientsListBtn.textContent = "Ocultar Clientes";
-    }
-  }
-
-  function hideHomeBanners() {
-    closePanel(homeBannersWrapper);
-
-    if (toggleHomeBannersBtn) {
-      toggleHomeBannersBtn.textContent = "Exibir Banners";
-    }
-  }
-
-  function showHomeBanners() {
-    openPanel(homeBannersWrapper);
-
-    if (toggleHomeBannersBtn) {
-      toggleHomeBannersBtn.textContent = "Ocultar Banners";
-    }
-  }
-
-  function hideBannerForm() {
-    if (!homeBannerForm) return;
-
-    closePanel(homeBannerForm);
-
-    if (toggleBannerFormBtn) {
-      toggleBannerFormBtn.textContent = "Criar Banner";
-    }
-  }
-
-  function showBannerForm() {
-    if (!homeBannerForm) return;
-
-    openPanel(homeBannerForm);
-
-    if (toggleBannerFormBtn) {
-      toggleBannerFormBtn.textContent = "Fechar Formulário";
-    }
-  }
-
-  function toggleBannerForm() {
-    if (!homeBannerForm) return;
-
-    const isHidden = homeBannerForm.classList.contains("hidden");
-
-    if (isHidden) {
-      showBannerForm();
-    } else {
-      hideBannerForm();
-    }
-  }
-
-  function isBannerEditMode() {
-    return Boolean(bannerEditId?.value);
-  }
-
-  function updateBannerFormVisibility() {
-    const actionType = bannerActionType?.value || "link";
-    const linkTarget = bannerLinkTarget?.value || "";
-
-    if (bannerLinkTargetGroup) {
-      bannerLinkTargetGroup.classList.toggle("hidden", actionType !== "link");
-    }
-
-    if (bannerCustomLinkGroup) {
-      bannerCustomLinkGroup.classList.toggle(
-        "hidden",
-        actionType !== "link" || linkTarget !== "custom"
-      );
-    }
-
-    if (bannerDescriptionGroup) {
-      bannerDescriptionGroup.classList.toggle("hidden", actionType !== "modal");
-    }
-
-    if (bannerLink) {
-      bannerLink.required = actionType === "link" && linkTarget === "custom";
-    }
-
-    if (bannerDescription) {
-      bannerDescription.required = actionType === "modal";
-    }
-
-    if (bannerLinkTarget) {
-      bannerLinkTarget.required = actionType === "link";
-    }
-  }
-
-  function setBannerFormCreateMode() {
-    if (bannerEditId) {
-      bannerEditId.value = "";
-    }
-
-    if (bannerEditModeBox) {
-      bannerEditModeBox.classList.add("hidden");
-    }
-
-    if (cancelBannerEditBtnBottom) {
-      cancelBannerEditBtnBottom.classList.add("hidden");
-    }
-
-    if (bannerCurrentImageBox) {
-      bannerCurrentImageBox.classList.add("hidden");
-    }
-
-    if (bannerCurrentImage) {
-      bannerCurrentImage.src = "";
-    }
-
-    if (bannerImage) {
-      bannerImage.required = true;
-    }
-
-    if (saveBannerBtn) {
-      saveBannerBtn.textContent = "Salvar Banner";
-    }
-
-    clearBannerMessage();
-    updateBannerFormVisibility();
-  }
-
-  function setBannerFormEditMode(banner) {
-    if (!banner || !homeBannerForm) return;
-
-    if (bannerEditId) {
-      bannerEditId.value = banner.id || "";
-    }
-
-    if (bannerTitle) {
-      bannerTitle.value = banner.title || "";
-    }
-
-    if (bannerActionType) {
-      bannerActionType.value = banner.action_type || "link";
-    }
-
-    if (bannerLinkTarget) {
-      bannerLinkTarget.value = banner.link_target || "";
-    }
-
-    if (bannerLink) {
-      bannerLink.value = banner.link || "";
-    }
-
-    if (bannerDescription) {
-      bannerDescription.value = banner.description || "";
-    }
-
-    if (bannerIsActive) {
-      bannerIsActive.checked = banner.is_active !== false;
-    }
-
-    if (bannerImage) {
-      bannerImage.required = false;
-      bannerImage.value = "";
-    }
-
-    if (bannerCurrentImageBox && bannerCurrentImage) {
-      if (banner.image_url) {
-        bannerCurrentImageBox.classList.remove("hidden");
-        bannerCurrentImage.src = banner.image_url;
-      } else {
-        bannerCurrentImageBox.classList.add("hidden");
-        bannerCurrentImage.src = "";
-      }
-    }
-
-    if (bannerEditModeBox) {
-      bannerEditModeBox.classList.remove("hidden");
-    }
-
-    if (cancelBannerEditBtnBottom) {
-      cancelBannerEditBtnBottom.classList.remove("hidden");
-    }
-
-    if (saveBannerBtn) {
-      saveBannerBtn.textContent = "Atualizar Banner";
-    }
-
-    showBannerForm();
-    updateBannerFormVisibility();
-
-    setTimeout(() => {
-      homeBannerForm.scrollIntoView({
-        behavior: "smooth",
-        block: "start"
-      });
-    }, 180);
-  }
-
-  function getImageDimensions(file) {
-    return new Promise((resolve, reject) => {
-      if (!file) {
-        reject(new Error("Nenhuma imagem selecionada."));
-        return;
-      }
-
-      const image = new Image();
-      const objectUrl = URL.createObjectURL(file);
-
-      image.onload = () => {
-        const dimensions = {
-          width: image.naturalWidth,
-          height: image.naturalHeight
-        };
-
-        URL.revokeObjectURL(objectUrl);
-        resolve(dimensions);
-      };
-
-      image.onerror = () => {
-        URL.revokeObjectURL(objectUrl);
-        reject(new Error("Não foi possível validar as dimensões da imagem."));
-      };
-
-      image.src = objectUrl;
-    });
-  }
-
-  function isAllowedBannerSize(width, height) {
-    return ALLOWED_BANNER_SIZES.some((size) => {
-      return size.width === width && size.height === height;
-    });
-  }
-
-  async function validateBannerImageBeforeSubmit(file) {
-    try {
-      const dimensions = await getImageDimensions(file);
-
-      if (!isAllowedBannerSize(dimensions.width, dimensions.height)) {
-        return {
-          valid: false,
-          error: `${BANNER_DIMENSION_MESSAGE} Imagem selecionada: ${dimensions.width}x${dimensions.height}px.`
-        };
-      }
-
-      return {
-        valid: true,
-        dimensions
-      };
-    } catch (error) {
-      return {
-        valid: false,
-        error: error.message || BANNER_DIMENSION_MESSAGE
-      };
-    }
-  }
-
-  async function fetchClients() {
-    try {
-      if (clientsListMessage) {
-        clientsListMessage.textContent = "Carregando clientes...";
-      }
-
-      const response = await adminFetch("http://localhost:3000/clients");
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || "Erro ao carregar clientes.");
-      }
-
-      allClientsCache = Array.isArray(result) ? result : [];
-      clientsLoaded = true;
-
-      updateDashboardClientsSummary(allClientsCache);
-      renderClientsList(allClientsCache);
-    } catch (error) {
-      console.error("ERRO AO BUSCAR CLIENTES:", error);
-
-      if (clientsListMessage) {
-        clientsListMessage.textContent =
-          error.message || "Erro ao carregar clientes.";
-      }
-
-      showAdminFeedback(
-        error.message || "Erro ao carregar clientes.",
-        "error"
-      );
-    }
-  }
-
-  async function fetchHomeBanners() {
-    try {
-      if (homeBannersListMessage) {
-        homeBannersListMessage.textContent = "Carregando banners...";
-      }
-
-      const response = await adminFetch("http://localhost:3000/admin/notices");
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || "Erro ao carregar banners.");
-      }
-
-      allHomeBannersCache = Array.isArray(result) ? result : [];
-      homeBannersLoaded = true;
-
-      updateDashboardBannersSummary(allHomeBannersCache);
-      renderHomeBannersList(allHomeBannersCache);
-    } catch (error) {
-      console.error("ERRO AO BUSCAR BANNERS:", error);
-
-      if (homeBannersListMessage) {
-        homeBannersListMessage.textContent =
-          error.message || "Erro ao carregar banners.";
-      }
-
-      showAdminFeedback(
-        error.message || "Erro ao carregar banners.",
-        "error"
-      );
-    }
-  }
-
-  async function fetchClientDocuments(clientId) {
-    if (!clientId) return [];
-
-    try {
-      const response = await adminFetch(
-        `http://localhost:3000/clients/${clientId}/documents`
-      );
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || "Erro ao buscar documentos.");
-      }
-
-      clientDocumentsCache[clientId] = Array.isArray(result) ? result : [];
-
-      return clientDocumentsCache[clientId];
-    } catch (error) {
-      console.error("ERRO AO BUSCAR DOCUMENTOS:", error);
-      throw error;
-    }
-  }
-
-  async function createClient(event) {
-    event.preventDefault();
-
-    if (!createClientForm) return;
-
-    const submitButton = document.getElementById("createClientBtn");
-
-    const fullName = document.getElementById("fullName")?.value.trim() || "";
-    const companyName = document.getElementById("companyName")?.value.trim() || "";
-    const cpfCnpj = onlyDigits(document.getElementById("cpfCnpj")?.value || "");
-    const email = document.getElementById("email")?.value.trim() || "";
-    const addressZip = onlyDigits(document.getElementById("addressZip")?.value || "");
-    const addressStreet = document.getElementById("addressStreet")?.value.trim() || "";
-    const addressNumber = document.getElementById("addressNumber")?.value.trim() || "";
-    const addressComplement = document.getElementById("addressComplement")?.value.trim() || "";
-    const addressNeighborhood = document.getElementById("addressNeighborhood")?.value.trim() || "";
-    const addressCity = document.getElementById("addressCity")?.value.trim() || "";
-    const addressState = document.getElementById("addressState")?.value.trim() || "";
-    const phone = onlyDigits(document.getElementById("phone")?.value || "");
-    const whatsapp = onlyDigits(document.getElementById("whatsapp")?.value || "");
-
-    hidePasswordBox();
-
-    if (!fullName || !companyName || !cpfCnpj || !email) {
-      if (createClientMessage) {
-        createClientMessage.textContent = "Preencha nome, empresa, CPF/CNPJ e e-mail.";
-        createClientMessage.className = "form-message error";
-      }
-
-      return;
-    }
-
-    try {
-      if (submitButton) {
-        submitButton.disabled = true;
-        submitButton.textContent = "Cadastrando...";
-      }
-
-      if (createClientMessage) {
-        createClientMessage.textContent = "Cadastrando cliente...";
-        createClientMessage.className = "form-message info";
-      }
-
-      const response = await adminFetch("http://localhost:3000/clients", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          full_name: fullName,
-          company_name: companyName,
-          cpf_cnpj: cpfCnpj,
-          email,
-          address_zip: addressZip,
-          address_street: addressStreet,
-          address_number: addressNumber,
-          address_complement: addressComplement,
-          address_neighborhood: addressNeighborhood,
-          address_city: addressCity,
-          address_state: addressState,
-          phone,
-          whatsapp
-        })
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || "Erro ao cadastrar cliente.");
-      }
-
-      const temporaryPassword =
-        result.temporary_password ||
-        result.temporaryPassword ||
-        result.tempPassword ||
-        result.initialPassword ||
-        result.initial_password ||
-        result.password ||
-        "";
-
-      createClientForm.reset();
-
-      if (temporaryPassword) {
-        showPassword(temporaryPassword);
-
-        if (createClientMessage) {
-          createClientMessage.textContent =
-            result.message || "Cliente cadastrado com sucesso.";
-          createClientMessage.className = "form-message success";
-        }
-
-        showAdminFeedback(
-          result.message || "Cliente cadastrado com sucesso.",
-          "success"
-        );
-      } else {
-        hidePasswordBox();
-
-        if (createClientMessage) {
-          createClientMessage.textContent =
-            "Cliente cadastrado com sucesso, mas a senha temporária não foi retornada pelo servidor.";
-          createClientMessage.className = "form-message error";
-        }
-
-        showAdminFeedback(
-          "Cliente cadastrado, mas a senha temporária não foi retornada pelo servidor.",
-          "error"
-        );
-      }
-
-      await fetchClients();
-    } catch (error) {
-      console.error("ERRO AO CADASTRAR CLIENTE:", error);
-
-      if (createClientMessage) {
-        createClientMessage.textContent = error.message || "Erro ao cadastrar cliente.";
-        createClientMessage.className = "form-message error";
-      }
-
-      showAdminFeedback(
-        error.message || "Erro ao cadastrar cliente.",
-        "error"
-      );
-    } finally {
-      if (submitButton) {
-        submitButton.disabled = false;
-        submitButton.textContent = "Cadastrar Cliente";
-      }
-    }
-  }
-
-  async function toggleClientStatus(clientId, currentStatus) {
-    try {
-      const nextStatus = !currentStatus;
-      const actionLabel = nextStatus ? "ativar" : "inativar";
-      const actionTitle = nextStatus ? "Ativar cliente?" : "Inativar cliente?";
-      const actionConfirmText = nextStatus ? "Ativar" : "Inativar";
-      const actionType = nextStatus ? "success" : "warning";
-
-      const confirmation = await showAdminActionConfirm({
-        type: actionType,
-        title: actionTitle,
-        message: `Deseja realmente ${actionLabel} este cliente?`,
-        confirmText: actionConfirmText,
-        cancelText: "Cancelar"
-      });
-
-      if (!confirmation) {
-        return;
-      }
-
-      showAdminFeedback(
-        `${nextStatus ? "Ativando" : "Inativando"} cliente...`,
-        "info",
-        false
-      );
-
-      const response = await adminFetch(
-        `http://localhost:3000/admin/clients/${clientId}/status`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            is_active: nextStatus
-          })
-        }
-      );
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          result.error || "Erro ao atualizar status do cliente."
-        );
-      }
-
-      showAdminFeedback(result.message || "Status do cliente atualizado.", "success");
-
-      await fetchClients();
-    } catch (error) {
-      console.error("ERRO AO ALTERAR STATUS:", error);
-
-      showAdminFeedback(
-        error.message || "Erro ao atualizar status do cliente.",
-        "error"
-      );
-
-      await showAdminActionMessage({
-        type: "danger",
-        title: "Erro ao atualizar",
-        message: error.message || "Não foi possível atualizar o status do cliente.",
-        confirmText: "OK"
+      nameInput.addEventListener("input", () => {
+        rerender();
       });
     }
-  }
 
-  async function deleteClient(clientId, clientName) {
-    try {
-      const confirmation = await showAdminActionConfirm({
-        type: "danger",
-        title: "Excluir cliente?",
-        message: `Deseja realmente excluir o cliente "${clientName}"? Esta ação removerá o perfil, o login e todos os documentos vinculados. Essa ação não poderá ser desfeita.`,
-        confirmText: "Excluir",
-        cancelText: "Cancelar"
+    if (categorySelect && categorySelect.dataset.bound !== "true") {
+      categorySelect.dataset.bound = "true";
+
+      categorySelect.addEventListener("change", () => {
+        rerender();
       });
+    }
 
-      if (!confirmation) {
-        return;
-      }
+    if (yearSelect && yearSelect.dataset.bound !== "true") {
+      yearSelect.dataset.bound = "true";
 
-      showAdminFeedback("Excluindo cliente...", "warning", false);
-
-      const response = await adminFetch(
-        `http://localhost:3000/admin/clients/${clientId}`,
-        {
-          method: "DELETE"
-        }
-      );
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || "Erro ao excluir cliente.");
-      }
-
-      delete clientDocumentsCache[clientId];
-
-      showAdminFeedback(result.message || "Cliente excluído com sucesso.", "success");
-
-      await fetchClients();
-      await fetchRenewalAlerts();
-
-      await showAdminActionMessage({
-        type: "success",
-        title: "Cliente excluído",
-        message: result.message || "O cliente foi excluído com sucesso.",
-        confirmText: "OK"
+      yearSelect.addEventListener("change", () => {
+        rerender();
       });
-    } catch (error) {
-      console.error("ERRO AO EXCLUIR CLIENTE:", error);
+    }
 
-      showAdminFeedback(
-        error.message || "Erro ao excluir cliente.",
-        "error"
-      );
+    if (clearBtn && clearBtn.dataset.bound !== "true") {
+      clearBtn.dataset.bound = "true";
 
-      await showAdminActionMessage({
-        type: "danger",
-        title: "Erro ao excluir",
-        message: error.message || "Não foi possível excluir o cliente.",
-        confirmText: "OK"
+      clearBtn.addEventListener("click", () => {
+        if (nameInput) nameInput.value = "";
+        if (categorySelect) categorySelect.value = "";
+        if (yearSelect) yearSelect.value = "";
+
+        rerender();
       });
     }
   }
 
   function closeAllDocumentMenus() {
-    document.querySelectorAll(".document-actions-dropdown").forEach((dropdown) => {
-      dropdown.classList.add("hidden");
-    });
-
-    document.querySelectorAll(".document-menu-toggle").forEach((button) => {
-      button.textContent = "▾";
+    document.querySelectorAll("[data-document-actions]").forEach((menu) => {
+      menu.classList.add("hidden");
     });
   }
 
-  function attachClientActionEvents() {
-    document.querySelectorAll(".toggle-documents-btn").forEach((button) => {
-      if (button.dataset.bound === "true") return;
-
-      button.dataset.bound = "true";
-
-      button.addEventListener("click", async () => {
-        const clientId = button.dataset.clientId;
-        const wrapper = document.getElementById(`documentsWrapper-${clientId}`);
-        const label = button.querySelector("[data-action-label]");
-
-        if (!clientId || !wrapper) return;
-
-        const isHidden = wrapper.classList.contains("hidden");
-
-        if (!isHidden) {
-          wrapper.classList.add("hidden");
-
-          if (label) {
-            label.textContent = "Visualizar Documentos";
-          }
-
-          return;
-        }
-
-        wrapper.classList.remove("hidden");
-
-        if (label) {
-          label.textContent = "Ocultar Documentos";
-        }
-
-        try {
-          const documents = await fetchClientDocuments(clientId);
-          renderDocumentsForClient(clientId, documents);
-        } catch (error) {
-          const loading = document.getElementById(`documentsLoading-${clientId}`);
-
-          if (loading) {
-            loading.classList.remove("hidden");
-            loading.textContent = error.message || "Erro ao carregar documentos.";
-          }
-
-          showAdminFeedback(
-            error.message || "Erro ao carregar documentos.",
-            "error"
-          );
-        }
-      });
-    });
-
-    document.querySelectorAll(".toggle-upload-btn").forEach((button) => {
-      if (button.dataset.bound === "true") return;
-
-      button.dataset.bound = "true";
-
-      button.addEventListener("click", () => {
-        const clientId = button.dataset.clientId;
-        const wrapper = document.getElementById(`uploadWrapper-${clientId}`);
-        const label = button.querySelector("[data-action-label]");
-
-        if (!wrapper) return;
-
-        const isHidden = wrapper.classList.contains("hidden");
-
-        if (isHidden) {
-          wrapper.classList.remove("hidden");
-
-          if (label) {
-            label.textContent = "Ocultar Upload";
-          }
-        } else {
-          wrapper.classList.add("hidden");
-
-          if (label) {
-            label.textContent = "Upload de Documento";
-          }
-        }
-      });
-    });
-
-    document.querySelectorAll(".toggle-client-status-btn").forEach((button) => {
-      if (button.dataset.bound === "true") return;
-
-      button.dataset.bound = "true";
-
-      button.addEventListener("click", async () => {
-        const clientId = button.dataset.clientId;
-        const currentStatus = button.dataset.currentStatus === "true";
-
-        if (!clientId) {
-          showAdminFeedback("Cliente inválido para alteração de status.", "error");
-          return;
-        }
-
-        await toggleClientStatus(clientId, currentStatus);
-      });
-    });
-
-    document.querySelectorAll(".delete-client-btn").forEach((button) => {
-      if (button.dataset.bound === "true") return;
-
-      button.dataset.bound = "true";
-
-      button.addEventListener("click", async () => {
-        const clientId = button.dataset.clientId;
-        const clientName = button.dataset.clientName || "Cliente";
-
-        if (!clientId) {
-          showAdminFeedback("Cliente inválido para exclusão.", "error");
-          return;
-        }
-
-        await deleteClient(clientId, clientName);
-      });
-    });
-
-    document.querySelectorAll(".upload-form").forEach((form) => {
-      if (form.dataset.bound === "true") return;
-
-      form.dataset.bound = "true";
-
-      form.addEventListener("submit", uploadClientDocument);
-    });
-  }
-  async function uploadClientDocument(event) {
-    event.preventDefault();
-
-    const form = event.currentTarget;
-    const clientId = form?.dataset?.clientId;
-
-    const category = form.querySelector("[data-upload-category]")?.value || "";
-    const subcategory = form.querySelector("[data-upload-subcategory]")?.value.trim() || "";
-    const year = form.querySelector("[data-upload-year]")?.value.trim() || "";
-    const releaseDate = form.querySelector("[data-upload-release-date]")?.value || "";
-    const expirationDate = form.querySelector("[data-upload-expiration-date]")?.value || "";
-    const fileInput = form.querySelector("[data-upload-file]");
-    const message = form.querySelector("[data-upload-message]");
-    const submitButton = form.querySelector(".upload-submit-btn");
-
-    if (
-      !clientId ||
-      !category ||
-      !year ||
-      !releaseDate ||
-      !expirationDate ||
-      !fileInput?.files?.length ||
-      !submitButton
-    ) {
-      setInlineMessage(message, "Preencha todos os campos obrigatórios.", "error");
-      return;
-    }
-
-    if (isExpirationBeforeRelease(releaseDate, expirationDate)) {
-      setInlineMessage(
-        message,
-        "A data de validade não pode ser menor que a data de lançamento.",
-        "error"
-      );
-      return;
-    }
-
-    const originalText = submitButton.textContent;
-
-    try {
-      submitButton.disabled = true;
-      submitButton.textContent = "Enviando...";
-
-      setInlineMessage(message, "Enviando documento...", "info");
-      showAdminFeedback("Enviando documento...", "info", false);
-
-      const formData = new FormData();
-      formData.append("client_id", clientId);
-      formData.append("category", category);
-      formData.append("subcategory", subcategory);
-      formData.append("year", year);
-      formData.append("release_date", releaseDate);
-      formData.append("expiration_date", expirationDate);
-      formData.append("file", fileInput.files[0]);
-
-      const response = await adminFetch("http://localhost:3000/admin/documents/upload", {
-        method: "POST",
-        body: formData
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || "Erro ao enviar documento.");
-      }
-
-      setInlineMessage(
-        message,
-        result.message || "Documento enviado com sucesso.",
-        "success"
-      );
-
-      showAdminFeedback(
-        result.message || "Documento enviado com sucesso.",
-        "success"
-      );
-
-      form.reset();
-
-      const documentsWrapper = document.getElementById(`documentsWrapper-${clientId}`);
-      const documentsButton = document.querySelector(
-        `.toggle-documents-btn[data-client-id="${clientId}"]`
-      );
-
-      if (documentsWrapper) {
-        documentsWrapper.classList.remove("hidden");
-      }
-
-      if (documentsButton) {
-        const label = documentsButton.querySelector("[data-action-label]");
-
-        if (label) {
-          label.textContent = "Ocultar Documentos";
-        }
-      }
-
-      const documents = await fetchClientDocuments(clientId);
-      renderDocumentsForClient(clientId, documents);
-      await fetchRenewalAlerts();
-    } catch (error) {
-      console.error("ERRO AO ENVIAR DOCUMENTO:", error);
-
-      setInlineMessage(
-        message,
-        error.message || "Erro ao enviar documento.",
-        "error"
-      );
-
-      showAdminFeedback(
-        error.message || "Erro ao enviar documento.",
-        "error"
-      );
-    } finally {
-      submitButton.disabled = false;
-      submitButton.textContent = originalText;
-    }
-  }
-
-  function bindDocumentFilters(clientId) {
-    const documents = clientDocumentsCache[clientId] || [];
-    const content = document.getElementById(`documentsContent-${clientId}`);
-
-    if (!content) return;
-
-    const nameInput = content.querySelector("[data-document-filter-name]");
-    const categorySelect = content.querySelector("[data-document-filter-category]");
-    const yearSelect = content.querySelector("[data-document-filter-year]");
-    const clearButton = content.querySelector("[data-document-clear-filters]");
-
-    function rerenderDocuments() {
-      renderDocumentsForClient(clientId, documents);
-    }
-
-    if (nameInput) {
-      nameInput.addEventListener("input", () => {
-        rerenderDocuments();
-      });
-    }
-
-    if (categorySelect) {
-      categorySelect.addEventListener("change", () => {
-        rerenderDocuments();
-      });
-    }
-
-    if (yearSelect) {
-      yearSelect.addEventListener("change", () => {
-        rerenderDocuments();
-      });
-    }
-
-    if (clearButton) {
-      clearButton.addEventListener("click", () => {
-        if (nameInput) {
-          nameInput.value = "";
-        }
-
-        if (categorySelect) {
-          categorySelect.value = "";
-        }
-
-        if (yearSelect) {
-          yearSelect.value = "";
-        }
-
-        rerenderDocuments();
-      });
-    }
-  }
-
-  function attachDocumentActionEvents() {
+  function bindDocumentActions() {
     document.querySelectorAll("[data-document-menu-toggle]").forEach((button) => {
       if (button.dataset.bound === "true") return;
 
@@ -2906,21 +2887,17 @@ document.addEventListener("DOMContentLoaded", async () => {
       button.addEventListener("click", (event) => {
         event.stopPropagation();
 
-        const documentItem = button.closest("[data-document-item]");
-        const dropdown = documentItem?.querySelector("[data-document-actions]");
+        const item = button.closest("[data-document-item]");
+        const menu = item?.querySelector("[data-document-actions]");
 
-        if (!dropdown) return;
+        if (!menu) return;
 
-        const isHidden = dropdown.classList.contains("hidden");
+        const isOpen = !menu.classList.contains("hidden");
 
         closeAllDocumentMenus();
 
-        if (isHidden) {
-          dropdown.classList.remove("hidden");
-          button.textContent = "▴";
-        } else {
-          dropdown.classList.add("hidden");
-          button.textContent = "▾";
+        if (!isOpen) {
+          menu.classList.remove("hidden");
         }
       });
     });
@@ -2930,38 +2907,12 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       button.dataset.bound = "true";
 
-      button.addEventListener("click", async (event) => {
-        event.stopPropagation();
-
+      button.addEventListener("click", () => {
         const documentId = button.dataset.documentId;
 
-        if (!documentId) {
-          showAdminFeedback("Documento inválido para download.", "error");
-          return;
-        }
+        if (!documentId) return;
 
-        await downloadDocument(documentId, button);
-      });
-    });
-
-    document.querySelectorAll("[data-document-delete]").forEach((button) => {
-      if (button.dataset.bound === "true") return;
-
-      button.dataset.bound = "true";
-
-      button.addEventListener("click", async (event) => {
-        event.stopPropagation();
-
-        const documentId = button.dataset.documentId;
-        const clientId = button.dataset.clientId;
-        const fileName = button.dataset.fileName || "Documento";
-
-        if (!documentId || !clientId) {
-          showAdminFeedback("Documento inválido para exclusão.", "error");
-          return;
-        }
-
-        await deleteDocument(documentId, clientId, fileName, button);
+        downloadDocument(documentId, button);
       });
     });
 
@@ -2970,18 +2921,22 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       button.dataset.bound = "true";
 
-      button.addEventListener("click", (event) => {
-        event.stopPropagation();
-
+      button.addEventListener("click", () => {
         const documentItem = button.closest("[data-document-item]");
-        const fileInput = documentItem?.querySelector("[data-document-replace-input]");
+        const input = documentItem?.querySelector("[data-document-replace-input]");
 
-        if (!fileInput) {
-          showAdminFeedback("Campo de substituição não encontrado.", "error");
+        if (!input) {
+          showAdminActionMessage({
+            type: "danger",
+            title: "Campo não encontrado",
+            message: "Não foi possível localizar o campo de substituição do arquivo.",
+            confirmText: "OK"
+          });
+
           return;
         }
 
-        fileInput.click();
+        input.click();
       });
     });
 
@@ -3003,19 +2958,35 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
 
         await replaceDocument(documentId, clientId, file, button);
+
         input.value = "";
       });
     });
-  }
 
+    document.querySelectorAll("[data-document-delete]").forEach((button) => {
+      if (button.dataset.bound === "true") return;
+
+      button.dataset.bound = "true";
+
+      button.addEventListener("click", () => {
+        const documentId = button.dataset.documentId;
+        const clientId = button.dataset.clientId;
+        const fileName = button.dataset.fileName || "Documento";
+
+        if (!documentId || !clientId) return;
+
+        deleteDocument(documentId, clientId, fileName, button);
+      });
+    });
+  }
   async function downloadDocument(documentId, buttonElement) {
-    const originalText = buttonElement.textContent;
+    const originalText = buttonElement?.textContent || "Baixar";
 
     try {
-      buttonElement.disabled = true;
-      buttonElement.textContent = "Baixando...";
-
-      showAdminFeedback("Preparando download do documento...", "info", false);
+      if (buttonElement) {
+        buttonElement.disabled = true;
+        buttonElement.textContent = "Baixando...";
+      }
 
       const response = await adminFetch("http://localhost:3000/admin/documents/download", {
         method: "POST",
@@ -3039,77 +3010,39 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       window.open(result.url, "_blank");
 
-      showAdminFeedback("Download iniciado com sucesso.", "success");
+      await fetchDashboardSummary();
+
+      await showAdminActionMessage({
+        type: "success",
+        title: "Download iniciado",
+        message: "O documento foi aberto em uma nova aba.",
+        confirmText: "OK"
+      });
     } catch (error) {
       console.error("ERRO AO BAIXAR DOCUMENTO:", error);
 
-      showAdminFeedback(
-        error.message || "Erro ao baixar documento.",
-        "error"
-      );
+      await showAdminActionMessage({
+        type: "danger",
+        title: "Erro ao baixar documento",
+        message: error.message || "Não foi possível baixar o documento.",
+        confirmText: "OK"
+      });
     } finally {
-      buttonElement.disabled = false;
-      buttonElement.textContent = originalText;
-    }
-  }
-
-  async function deleteDocument(documentId, clientId, fileName, buttonElement) {
-    const confirmation = confirm(
-      `Deseja realmente excluir o documento "${fileName}"?`
-    );
-
-    if (!confirmation) return;
-
-    const originalText = buttonElement.textContent;
-
-    try {
-      buttonElement.disabled = true;
-      buttonElement.textContent = "Excluindo...";
-
-      showAdminFeedback("Excluindo documento...", "warning", false);
-
-      const response = await adminFetch(
-        `http://localhost:3000/admin/documents/${documentId}`,
-        {
-          method: "DELETE"
-        }
-      );
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || "Erro ao excluir documento.");
+      if (buttonElement) {
+        buttonElement.disabled = false;
+        buttonElement.textContent = originalText;
       }
-
-      const documents = await fetchClientDocuments(clientId);
-      renderDocumentsForClient(clientId, documents);
-      await fetchRenewalAlerts();
-
-      showAdminFeedback(
-        result.message || "Documento excluído com sucesso.",
-        "success"
-      );
-    } catch (error) {
-      console.error("ERRO AO EXCLUIR DOCUMENTO:", error);
-
-      showAdminFeedback(
-        error.message || "Erro ao excluir documento.",
-        "error"
-      );
-    } finally {
-      buttonElement.disabled = false;
-      buttonElement.textContent = originalText;
     }
   }
 
   async function replaceDocument(documentId, clientId, file, buttonElement) {
-    const originalText = buttonElement.textContent;
+    const originalText = buttonElement?.textContent || "Substituir";
 
     try {
-      buttonElement.disabled = true;
-      buttonElement.textContent = "Substituindo...";
-
-      showAdminFeedback("Substituindo documento...", "info", false);
+      if (buttonElement) {
+        buttonElement.disabled = true;
+        buttonElement.textContent = "Enviando...";
+      }
 
       const formData = new FormData();
       formData.append("file", file);
@@ -3128,168 +3061,62 @@ document.addEventListener("DOMContentLoaded", async () => {
         throw new Error(result.error || "Erro ao substituir documento.");
       }
 
-      const documents = await fetchClientDocuments(clientId);
-      renderDocumentsForClient(clientId, documents);
-      await fetchRenewalAlerts();
+      const client = allClientsCache.find((item) => getClientId(item) === clientId);
+      const card = getClientCardById(clientId);
+      const wrapper = card?.querySelector("[data-client-documents-wrapper], .client-documents-wrapper");
 
-      showAdminFeedback(
-        result.message || "Documento substituído com sucesso.",
-        "success"
-      );
+      if (client && wrapper && !wrapper.classList.contains("hidden")) {
+        await fetchClientDocuments(client, wrapper);
+      } else {
+        await fetchClientDocumentsData(clientId);
+      }
+
+      await refreshDashboardDataAfterActivity();
+
+      await showAdminActionMessage({
+        type: "success",
+        title: "Documento substituído",
+        message: result.message || "O documento foi substituído com sucesso.",
+        confirmText: "OK"
+      });
     } catch (error) {
       console.error("ERRO AO SUBSTITUIR DOCUMENTO:", error);
 
-      showAdminFeedback(
-        error.message || "Erro ao substituir documento.",
-        "error"
-      );
+      await showAdminActionMessage({
+        type: "danger",
+        title: "Erro ao substituir documento",
+        message: error.message || "Não foi possível substituir o documento.",
+        confirmText: "OK"
+      });
     } finally {
-      buttonElement.disabled = false;
-      buttonElement.textContent = originalText;
+      if (buttonElement) {
+        buttonElement.disabled = false;
+        buttonElement.textContent = originalText;
+      }
     }
   }
 
-  function attachBannerActionEvents() {
-    attachBannerDescriptionEvents();
-
-    document.querySelectorAll(".toggle-banner-status-btn").forEach((button) => {
-      if (button.dataset.bound === "true") return;
-
-      button.dataset.bound = "true";
-
-      button.addEventListener("click", async () => {
-        const bannerId = button.dataset.bannerId;
-        const currentStatus = button.dataset.currentStatus === "true";
-
-        if (!bannerId) {
-          showAdminFeedback("Banner inválido para alteração de status.", "error");
-          return;
-        }
-
-        await toggleBannerStatus(bannerId, currentStatus);
-      });
-    });
-
-    document.querySelectorAll(".edit-banner-btn").forEach((button) => {
-      if (button.dataset.bound === "true") return;
-
-      button.dataset.bound = "true";
-
-      button.addEventListener("click", () => {
-        const bannerId = button.dataset.bannerId;
-        const banner = allHomeBannersCache.find((item) => {
-          return String(item.id) === String(bannerId);
-        });
-
-        if (!banner) {
-          showAdminFeedback("Banner não encontrado para edição.", "error");
-          return;
-        }
-
-        setBannerFormEditMode(banner);
-      });
-    });
-
-    document.querySelectorAll(".delete-banner-btn").forEach((button) => {
-      if (button.dataset.bound === "true") return;
-
-      button.dataset.bound = "true";
-
-      button.addEventListener("click", async () => {
-        const bannerId = button.dataset.bannerId;
-        const bannerTitle = button.dataset.bannerTitle || "Banner";
-
-        if (!bannerId) {
-          showAdminFeedback("Banner inválido para exclusão.", "error");
-          return;
-        }
-
-        await deleteHomeBanner(bannerId, bannerTitle);
-      });
-    });
-  }
-
-  async function toggleBannerStatus(bannerId, currentStatus) {
-    const nextStatus = !currentStatus;
-
-    const confirmation = confirm(
-      `Deseja realmente ${nextStatus ? "ativar" : "desativar"} este banner?`
-    );
-
-    if (!confirmation) return;
-
-    showAdminFeedback("Atualizando status do banner...", "info", false);
-
-    try {
-      const banner = allHomeBannersCache.find((item) => {
-        return String(item.id) === String(bannerId);
-      });
-
-      if (!banner) {
-        throw new Error("Banner não encontrado para alteração de status.");
-      }
-
-      const formData = new FormData();
-
-      formData.append("title", banner.title || "");
-      formData.append("action_type", banner.action_type || "link");
-      formData.append(
-        "link_target",
-        banner.action_type === "link" ? banner.link_target || "" : ""
-      );
-      formData.append("link", banner.link || "");
-      formData.append(
-        "description",
-        banner.action_type === "modal" ? banner.description || "" : ""
-      );
-      formData.append("is_active", String(nextStatus));
-
-      const response = await adminFetch(
-        `http://localhost:3000/admin/notices/${bannerId}`,
-        {
-          method: "PUT",
-          body: formData
-        }
-      );
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || "Erro ao atualizar status do banner.");
-      }
-
-      showAdminFeedback(
-        result.message || "Status do banner atualizado com sucesso.",
-        "success"
-      );
-
-      await fetchHomeBanners();
-    } catch (error) {
-      console.error("ERRO AO ALTERAR STATUS DO BANNER:", error);
-
-      showAdminFeedback(
-        error.message || "Erro ao atualizar status do banner.",
-        "error"
-      );
-    }
-  }
-
-  async function deleteHomeBanner(bannerId, bannerTitle) {
-    const confirmation = await showAdminActionConfirm({
+  async function deleteDocument(documentId, clientId, fileName, buttonElement) {
+    const confirmed = await showAdminActionConfirm({
       type: "danger",
-      title: "Excluir banner?",
-      message: `Deseja realmente excluir o banner "${bannerTitle}"? Essa ação não poderá ser desfeita.`,
+      title: "Excluir documento",
+      message: `Deseja realmente excluir o documento "${fileName}"? Essa ação não poderá ser desfeita.`,
       confirmText: "Excluir",
       cancelText: "Cancelar"
     });
 
-    if (!confirmation) return;
+    if (!confirmed) return;
 
-    showAdminFeedback("Excluindo banner...", "warning", false);
+    const originalText = buttonElement?.textContent || "Excluir";
 
     try {
+      if (buttonElement) {
+        buttonElement.disabled = true;
+        buttonElement.textContent = "Excluindo...";
+      }
+
       const response = await adminFetch(
-        `http://localhost:3000/admin/notices/${bannerId}`,
+        `http://localhost:3000/admin/documents/${documentId}`,
         {
           method: "DELETE"
         }
@@ -3298,21 +3125,823 @@ document.addEventListener("DOMContentLoaded", async () => {
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || "Erro ao excluir banner.");
+        throw new Error(result.error || "Erro ao excluir documento.");
       }
 
-      showAdminFeedback(
-        result.message || "Banner excluído com sucesso.",
-        "success"
+      const client = allClientsCache.find((item) => getClientId(item) === clientId);
+      const card = getClientCardById(clientId);
+      const wrapper = card?.querySelector("[data-client-documents-wrapper], .client-documents-wrapper");
+
+      if (client && wrapper && !wrapper.classList.contains("hidden")) {
+        await fetchClientDocuments(client, wrapper);
+      } else {
+        await fetchClientDocumentsData(clientId);
+      }
+
+      await refreshDashboardDataAfterActivity();
+
+      await showAdminActionMessage({
+        type: "success",
+        title: "Documento excluído",
+        message: result.message || "O documento foi excluído com sucesso.",
+        confirmText: "OK"
+      });
+    } catch (error) {
+      console.error("ERRO AO EXCLUIR DOCUMENTO:", error);
+
+      await showAdminActionMessage({
+        type: "danger",
+        title: "Erro ao excluir documento",
+        message: error.message || "Não foi possível excluir o documento.",
+        confirmText: "OK"
+      });
+    } finally {
+      if (buttonElement) {
+        buttonElement.disabled = false;
+        buttonElement.textContent = originalText;
+      }
+    }
+  }
+
+  function getBannerId(banner) {
+    return banner?.id || banner?.notice_id || "";
+  }
+
+  function getBannerTitle(banner) {
+    return banner?.title || "Banner sem título";
+  }
+
+  function getBannerImageUrl(banner) {
+    return banner?.image_url || "";
+  }
+
+  function getBannerActionType(banner) {
+    return banner?.action_type || "modal";
+  }
+
+  function getBannerLinkTarget(banner) {
+    return banner?.link_target || "";
+  }
+
+  function getBannerLink(banner) {
+    return banner?.link || "";
+  }
+
+  function getBannerDescription(banner) {
+    return banner?.description || "";
+  }
+
+  function getBannerStatusLabel(isActive) {
+    return isActive ? "Ativo" : "Inativo";
+  }
+
+  function isBannerActive(banner) {
+    return banner?.is_active !== false;
+  }
+
+  function getBannerOrderIdsFromDOM() {
+    if (!homeBannersList) return [];
+
+    return Array.from(homeBannersList.querySelectorAll("[data-home-banner-card]"))
+      .map((card) => card.dataset.bannerId)
+      .filter(Boolean);
+  }
+
+  function getBannerOrderSignature() {
+    return getBannerOrderIdsFromDOM().join("|");
+  }
+
+  function loadImageDimensions(file) {
+    return new Promise((resolve, reject) => {
+      if (!file) {
+        reject(new Error("Imagem não encontrada."));
+        return;
+      }
+
+      const image = new Image();
+      const objectUrl = URL.createObjectURL(file);
+
+      image.onload = () => {
+        URL.revokeObjectURL(objectUrl);
+
+        resolve({
+          width: image.naturalWidth,
+          height: image.naturalHeight
+        });
+      };
+
+      image.onerror = () => {
+        URL.revokeObjectURL(objectUrl);
+        reject(new Error("Não foi possível validar a imagem enviada."));
+      };
+
+      image.src = objectUrl;
+    });
+  }
+
+  function isValidBannerAspectRatio(width, height) {
+    if (!width || !height) {
+      return false;
+    }
+
+    const expectedRatio = BANNER_ASPECT_RATIO_WIDTH / BANNER_ASPECT_RATIO_HEIGHT;
+    const currentRatio = width / height;
+    const tolerance = 0.01;
+
+    return Math.abs(currentRatio - expectedRatio) <= tolerance;
+  }
+
+  async function validateBannerImageFile(file, isRequired = true) {
+    if (!file) {
+      return isRequired ? "Selecione uma imagem para o banner." : "";
+    }
+
+    if (!file.type || !file.type.startsWith("image/")) {
+      return "O arquivo selecionado precisa ser uma imagem válida.";
+    }
+
+    try {
+      const dimensions = await loadImageDimensions(file);
+
+      if (!isValidBannerAspectRatio(dimensions.width, dimensions.height)) {
+        return BANNER_DIMENSION_MESSAGE;
+      }
+
+      return "";
+    } catch (error) {
+      return error.message || "Não foi possível validar a imagem enviada.";
+    }
+  }
+
+  function updateBannerActionFieldsVisibility() {
+    const actionType = bannerActionType?.value || "modal";
+    const linkTarget = bannerLinkTarget?.value || "contato";
+
+    const isModal = actionType === "modal";
+    const isLink = actionType === "link";
+    const isCustomLink = isLink && linkTarget === "custom";
+
+    if (bannerLinkTargetGroup) {
+      bannerLinkTargetGroup.classList.toggle("hidden", !isLink);
+    }
+
+    if (bannerCustomLinkGroup) {
+      bannerCustomLinkGroup.classList.toggle("hidden", !isCustomLink);
+    }
+
+    if (bannerDescriptionGroup) {
+      bannerDescriptionGroup.classList.toggle("hidden", !isModal);
+    }
+
+    if (bannerDescription) {
+      bannerDescription.required = isModal;
+    }
+
+    if (bannerLink) {
+      bannerLink.required = isCustomLink;
+    }
+  }
+
+  function getBannerFormPayloadValidation(isEditing = false) {
+    const title = bannerTitle?.value?.trim() || "";
+    const actionType = bannerActionType?.value || "modal";
+    const linkTarget = bannerLinkTarget?.value || "";
+    const link = bannerLink?.value?.trim() || "";
+    const description = bannerDescription?.value?.trim() || "";
+
+    if (!title) {
+      return "Informe o título do banner.";
+    }
+
+    if (!actionType) {
+      return "Selecione o tipo de ação do banner.";
+    }
+
+    if (actionType === "link") {
+      if (!linkTarget) {
+        return "Selecione o destino do banner.";
+      }
+
+      if (linkTarget === "custom" && !link) {
+        return "Informe o link personalizado do banner.";
+      }
+    }
+
+    if (actionType === "modal" && !description) {
+      return "Informe a descrição que será exibida no informativo.";
+    }
+
+    if (!isEditing && !bannerImage?.files?.length) {
+      return "Selecione uma imagem para o banner.";
+    }
+
+    return "";
+  }
+
+  function buildBannerFormData() {
+    const formData = new FormData();
+
+    const actionType = bannerActionType?.value || "modal";
+    const linkTarget = bannerLinkTarget?.value || "";
+    const customLink = bannerLink?.value?.trim() || "";
+    const imageFile = bannerImage?.files?.[0] || null;
+
+    formData.append("title", bannerTitle?.value?.trim() || "");
+    formData.append("action_type", actionType);
+    formData.append("link_target", actionType === "link" ? linkTarget : "");
+    formData.append("description", bannerDescription?.value?.trim() || "");
+    formData.append("is_active", bannerIsActive?.checked ? "true" : "false");
+
+    if (actionType === "link" && linkTarget === "custom") {
+      formData.append("link", customLink);
+    } else {
+      formData.append("link", "");
+    }
+
+    if (imageFile) {
+      formData.append("image", imageFile);
+    }
+
+    return formData;
+  }
+
+  function renderHomeBannersMessage(message = "", type = "info") {
+    if (!homeBannersListMessage) return;
+
+    homeBannersListMessage.textContent = message;
+    homeBannersListMessage.className = `list-message ${type}`;
+  }
+
+  function clearHomeBannersList() {
+    if (homeBannersList) {
+      homeBannersList.replaceChildren();
+    }
+  }
+
+  function renderHomeBannerCard(banner) {
+    const card = cloneTemplate(homeBannerCardTemplate);
+
+    if (!card) {
+      return null;
+    }
+
+    const bannerId = getBannerId(banner);
+    const imageUrl = getBannerImageUrl(banner);
+    const actionType = getBannerActionType(banner);
+    const linkTarget = getBannerLinkTarget(banner);
+    const link = getBannerLink(banner);
+    const description = getBannerDescription(banner);
+    const isActive = isBannerActive(banner);
+
+    card.dataset.bannerId = bannerId;
+
+    setElementText(card, "[data-banner-title]", getBannerTitle(banner));
+    setElementText(card, "[data-banner-action-type]", getActionTypeLabel(actionType));
+    setElementText(card, "[data-banner-link-target]", getLinkTargetLabel(linkTarget));
+    setElementText(card, "[data-banner-created-at]", formatDateTime(banner?.created_at));
+
+    const image = card.querySelector("[data-banner-image]");
+
+    if (image) {
+      if (imageUrl) {
+        image.src = imageUrl;
+      }
+
+      image.alt = `Banner ${getBannerTitle(banner)}`;
+    }
+
+    const linkRow = card.querySelector("[data-banner-link-row]");
+    const linkElement = card.querySelector("[data-banner-link]");
+
+    if (linkRow) {
+      linkRow.classList.toggle("hidden", !link);
+    }
+
+    if (linkElement && link) {
+      linkElement.href = link;
+      linkElement.textContent = link;
+    }
+
+    const descriptionBox = card.querySelector("[data-banner-description-box]");
+    const descriptionElement = card.querySelector("[data-banner-description]");
+
+    if (descriptionBox) {
+      descriptionBox.classList.toggle("hidden", !description);
+    }
+
+    if (descriptionElement) {
+      descriptionElement.textContent = description;
+    }
+
+    const status = card.querySelector("[data-banner-status]");
+
+    if (status) {
+      status.textContent = getBannerStatusLabel(isActive);
+      status.classList.toggle("active", isActive);
+      status.classList.toggle("inactive", !isActive);
+    }
+
+    const statusButton = card.querySelector("[data-banner-status-button]");
+
+    if (statusButton) {
+      statusButton.dataset.bannerId = bannerId;
+      statusButton.dataset.currentStatus = String(isActive);
+      statusButton.textContent = isActive ? "Desativar" : "Ativar";
+      statusButton.classList.toggle("danger", isActive);
+      statusButton.classList.toggle("success", !isActive);
+
+      statusButton.addEventListener("click", () => {
+        toggleBannerStatus(banner);
+      });
+    }
+
+    const editButton = card.querySelector("[data-banner-edit]");
+
+    if (editButton) {
+      editButton.dataset.bannerId = bannerId;
+
+      editButton.addEventListener("click", () => {
+        editBanner(banner);
+      });
+    }
+
+    const deleteButton = card.querySelector("[data-banner-delete]");
+
+    if (deleteButton) {
+      deleteButton.dataset.bannerId = bannerId;
+      deleteButton.dataset.bannerTitle = getBannerTitle(banner);
+
+      deleteButton.addEventListener("click", () => {
+        deleteBanner(banner);
+      });
+    }
+
+    return card;
+  }
+
+  function destroyHomeBannersSortable() {
+    if (homeBannersSortable) {
+      homeBannersSortable.destroy();
+      homeBannersSortable = null;
+    }
+  }
+
+  function initializeHomeBannersSortable() {
+    if (!homeBannersList || typeof Sortable === "undefined") {
+      return;
+    }
+
+    destroyHomeBannersSortable();
+
+    homeBannersSortable = new Sortable(homeBannersList, {
+      animation: 180,
+      handle: ".home-banner-drag-hint",
+      draggable: "[data-home-banner-card]",
+      ghostClass: "sortable-ghost",
+      chosenClass: "sortable-chosen",
+      dragClass: "sortable-drag",
+
+      onStart() {
+        bannerOrderBeforeDrag = getBannerOrderSignature();
+      },
+
+      async onEnd() {
+        const nextSignature = getBannerOrderSignature();
+
+        if (!nextSignature || nextSignature === bannerOrderBeforeDrag) {
+          return;
+        }
+
+        await saveBannerOrder();
+      }
+    });
+  }
+
+  function renderHomeBannersList(banners) {
+    if (!homeBannersList) return;
+
+    clearHomeBannersList();
+
+    const safeBanners = Array.isArray(banners) ? banners : [];
+
+    if (!safeBanners.length) {
+      renderHomeBannersMessage("Nenhum banner cadastrado até o momento.", "info");
+      destroyHomeBannersSortable();
+      updateDashboardBannersSummary([]);
+      return;
+    }
+
+    renderHomeBannersMessage(`${safeBanners.length} banner(s) cadastrado(s).`, "info");
+
+    const fragment = document.createDocumentFragment();
+
+    safeBanners.forEach((banner) => {
+      const card = renderHomeBannerCard(banner);
+
+      if (card) {
+        fragment.appendChild(card);
+      }
+    });
+
+    homeBannersList.appendChild(fragment);
+    initializeHomeBannersSortable();
+    updateDashboardBannersSummary(safeBanners);
+  }
+
+  async function fetchHomeBanners() {
+    if (!homeBannersList) return;
+
+    try {
+      renderHomeBannersMessage("Carregando banners...", "info");
+      clearHomeBannersList();
+
+      const response = await adminFetch("http://localhost:3000/admin/notices");
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Erro ao carregar banners.");
+      }
+
+      allHomeBannersCache = Array.isArray(result)
+        ? result
+        : Array.isArray(result.notices)
+          ? result.notices
+          : [];
+
+      homeBannersLoaded = true;
+
+      renderHomeBannersList(allHomeBannersCache);
+    } catch (error) {
+      console.error("ERRO AO BUSCAR BANNERS:", error);
+
+      renderHomeBannersMessage(
+        error.message || "Não foi possível carregar os banners.",
+        "error"
       );
 
-      if (String(bannerEditId?.value || "") === String(bannerId)) {
-        homeBannerForm?.reset();
-        setBannerFormCreateMode();
-        hideBannerForm();
+      updateDashboardBannersSummary([]);
+    }
+  }
+
+  async function saveBannerOrder() {
+    const orderedIds = getBannerOrderIdsFromDOM();
+
+    if (!orderedIds.length) return;
+
+    try {
+      showAdminFeedback("Salvando nova ordem dos banners...", "info", false);
+
+      const response = await adminFetch("http://localhost:3000/admin/notices/reorder", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          orderedIds
+        })
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Erro ao salvar a ordem dos banners.");
+      }
+
+      hideAdminFeedback();
+
+      await fetchHomeBanners();
+      await refreshDashboardDataAfterActivity();
+
+      await showAdminActionMessage({
+        type: "success",
+        title: "Ordem atualizada",
+        message: "A nova ordem dos banners foi salva com sucesso.",
+        confirmText: "OK"
+      });
+    } catch (error) {
+      console.error("ERRO AO REORDENAR BANNERS:", error);
+
+      hideAdminFeedback();
+
+      await showAdminActionMessage({
+        type: "danger",
+        title: "Erro ao salvar ordem",
+        message: error.message || "Não foi possível salvar a nova ordem dos banners.",
+        confirmText: "OK"
+      });
+
+      await fetchHomeBanners();
+    }
+  }
+
+  function setBannerFormCreateMode() {
+    if (bannerEditId) {
+      bannerEditId.value = "";
+    }
+
+    if (bannerEditModeBox) {
+      bannerEditModeBox.classList.add("hidden");
+    }
+
+    if (bannerCurrentImageBox) {
+      bannerCurrentImageBox.classList.add("hidden");
+    }
+
+    if (bannerCurrentImage) {
+      bannerCurrentImage.removeAttribute("src");
+    }
+
+    if (saveBannerBtn) {
+      saveBannerBtn.textContent = "Cadastrar Banner";
+    }
+
+    if (bannerIsActive) {
+      bannerIsActive.checked = true;
+    }
+
+    if (bannerActionType) {
+      bannerActionType.value = "modal";
+    }
+
+    if (bannerLinkTarget) {
+      bannerLinkTarget.value = "contato";
+    }
+
+    clearBannerMessage();
+    updateBannerActionFieldsVisibility();
+  }
+
+  function setBannerFormEditMode(banner) {
+    if (!banner) return;
+
+    const bannerId = getBannerId(banner);
+    const actionType = getBannerActionType(banner);
+    const linkTarget = getBannerLinkTarget(banner);
+
+    if (bannerEditId) {
+      bannerEditId.value = bannerId;
+    }
+
+    if (bannerTitle) {
+      bannerTitle.value = getBannerTitle(banner);
+    }
+
+    if (bannerActionType) {
+      bannerActionType.value = actionType;
+    }
+
+    if (bannerLinkTarget) {
+      bannerLinkTarget.value = linkTarget || "contato";
+    }
+
+    if (bannerLink) {
+      bannerLink.value = getBannerLink(banner);
+    }
+
+    if (bannerDescription) {
+      bannerDescription.value = getBannerDescription(banner);
+    }
+
+    if (bannerIsActive) {
+      bannerIsActive.checked = isBannerActive(banner);
+    }
+
+    if (bannerImage) {
+      bannerImage.value = "";
+    }
+
+    if (bannerEditModeBox) {
+      bannerEditModeBox.classList.remove("hidden");
+    }
+
+    const imageUrl = getBannerImageUrl(banner);
+
+    if (bannerCurrentImageBox) {
+      bannerCurrentImageBox.classList.toggle("hidden", !imageUrl);
+    }
+
+    if (bannerCurrentImage && imageUrl) {
+      bannerCurrentImage.src = imageUrl;
+    }
+
+    if (saveBannerBtn) {
+      saveBannerBtn.textContent = "Salvar Alterações";
+    }
+
+    clearBannerMessage();
+    updateBannerActionFieldsVisibility();
+  }
+
+  function cancelBannerEdit() {
+    if (homeBannerForm) {
+      homeBannerForm.reset();
+    }
+
+    setBannerFormCreateMode();
+  }
+
+  async function handleSaveBanner(event) {
+    event.preventDefault();
+
+    if (!homeBannerForm) return;
+
+    const isEditing = Boolean(bannerEditId?.value);
+    const validationError = getBannerFormPayloadValidation(isEditing);
+
+    if (validationError) {
+      if (homeBannerMessage) {
+        homeBannerMessage.textContent = validationError;
+        homeBannerMessage.className = "form-message error";
+      }
+
+      return;
+    }
+
+    const imageFile = bannerImage?.files?.[0] || null;
+    const imageValidationError = await validateBannerImageFile(imageFile, !isEditing);
+
+    if (imageValidationError) {
+      if (homeBannerMessage) {
+        homeBannerMessage.textContent = imageValidationError;
+        homeBannerMessage.className = "form-message error";
+      }
+
+      return;
+    }
+
+    const endpoint = isEditing
+      ? `http://localhost:3000/admin/notices/${bannerEditId.value}`
+      : "http://localhost:3000/admin/notices/upload";
+
+    const method = isEditing ? "PUT" : "POST";
+    const loadingText = isEditing ? "Salvando..." : "Cadastrando...";
+
+    try {
+      setButtonLoading(saveBannerBtn, true, loadingText);
+
+      if (homeBannerMessage) {
+        homeBannerMessage.textContent = isEditing
+          ? "Salvando alterações do banner..."
+          : "Cadastrando banner...";
+        homeBannerMessage.className = "form-message info";
+      }
+
+      const response = await adminFetch(endpoint, {
+        method,
+        body: buildBannerFormData()
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Erro ao salvar banner.");
+      }
+
+      if (homeBannerMessage) {
+        homeBannerMessage.textContent = result.message || "Banner salvo com sucesso.";
+        homeBannerMessage.className = "form-message success";
+      }
+
+      homeBannerForm.reset();
+      setBannerFormCreateMode();
+      hideBannerForm();
+
+      homeBannersLoaded = false;
+      await fetchHomeBanners();
+      await refreshDashboardDataAfterActivity();
+
+      await showAdminActionMessage({
+        type: "success",
+        title: isEditing ? "Banner atualizado" : "Banner cadastrado",
+        message: isEditing
+          ? "O banner foi atualizado com sucesso."
+          : "O banner foi cadastrado com sucesso.",
+        confirmText: "OK"
+      });
+    } catch (error) {
+      console.error("ERRO AO SALVAR BANNER:", error);
+
+      if (homeBannerMessage) {
+        homeBannerMessage.textContent =
+          error.message || "Não foi possível salvar o banner.";
+        homeBannerMessage.className = "form-message error";
+      }
+
+      await showAdminActionMessage({
+        type: "danger",
+        title: "Erro ao salvar banner",
+        message: error.message || "Não foi possível salvar o banner.",
+        confirmText: "OK"
+      });
+    } finally {
+      setButtonLoading(saveBannerBtn, false);
+    }
+  }
+
+  function editBanner(banner) {
+    if (!banner) return;
+
+    if (!homeBannersWrapper || homeBannersWrapper.classList.contains("hidden")) {
+      showHomeBanners();
+    }
+
+    setBannerFormEditMode(banner);
+    showBannerForm();
+
+    setTimeout(() => {
+      homeBannerForm?.scrollIntoView({
+        behavior: "smooth",
+        block: "start"
+      });
+    }, 180);
+  }
+
+  async function toggleBannerStatus(banner) {
+    const bannerId = getBannerId(banner);
+    const isActive = isBannerActive(banner);
+
+    if (!bannerId) return;
+
+    const confirmed = await showAdminActionConfirm({
+      type: isActive ? "warning" : "success",
+      title: isActive ? "Desativar banner" : "Ativar banner",
+      message: isActive
+        ? `Deseja realmente desativar o banner "${getBannerTitle(banner)}"?`
+        : `Deseja realmente ativar o banner "${getBannerTitle(banner)}"?`,
+      confirmText: isActive ? "Desativar" : "Ativar",
+      cancelText: "Cancelar"
+    });
+
+    if (!confirmed) return;
+
+    try {
+      const response = await adminFetch(`http://localhost:3000/admin/notices/${bannerId}/toggle`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          is_active: !isActive
+        })
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Erro ao atualizar status do banner.");
       }
 
       await fetchHomeBanners();
+      await refreshDashboardDataAfterActivity();
+
+      await showAdminActionMessage({
+        type: "success",
+        title: !isActive ? "Banner ativado" : "Banner desativado",
+        message: !isActive
+          ? "O banner foi ativado com sucesso."
+          : "O banner foi desativado com sucesso.",
+        confirmText: "OK"
+      });
+    } catch (error) {
+      console.error("ERRO AO ALTERAR STATUS DO BANNER:", error);
+
+      await showAdminActionMessage({
+        type: "danger",
+        title: "Erro ao atualizar banner",
+        message: error.message || "Não foi possível atualizar o status do banner.",
+        confirmText: "OK"
+      });
+    }
+  }
+
+  async function deleteBanner(banner) {
+    const bannerId = getBannerId(banner);
+
+    if (!bannerId) return;
+
+    const confirmed = await showAdminActionConfirm({
+      type: "danger",
+      title: "Excluir banner",
+      message: `Deseja realmente excluir o banner "${getBannerTitle(banner)}"? Essa ação não poderá ser desfeita.`,
+      confirmText: "Excluir",
+      cancelText: "Cancelar"
+    });
+
+    if (!confirmed) return;
+
+    try {
+      const response = await adminFetch(`http://localhost:3000/admin/notices/${bannerId}`, {
+        method: "DELETE"
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Erro ao excluir banner.");
+      }
+
+      await fetchHomeBanners();
+      await refreshDashboardDataAfterActivity();
 
       await showAdminActionMessage({
         type: "success",
@@ -3323,242 +3952,85 @@ document.addEventListener("DOMContentLoaded", async () => {
     } catch (error) {
       console.error("ERRO AO EXCLUIR BANNER:", error);
 
-      showAdminFeedback(
-        error.message || "Erro ao excluir banner.",
-        "error"
-      );
-
       await showAdminActionMessage({
         type: "danger",
-        title: "Erro ao excluir",
+        title: "Erro ao excluir banner",
         message: error.message || "Não foi possível excluir o banner.",
         confirmText: "OK"
       });
     }
   }
 
-  async function submitHomeBanner(event) {
-    event.preventDefault();
+  function bindCreateClientModalEvents() {
+    if (closeCreateClientModalBtn && closeCreateClientModalBtn.dataset.bound !== "true") {
+      closeCreateClientModalBtn.dataset.bound = "true";
 
-    if (!homeBannerForm || !saveBannerBtn) return;
-
-    clearBannerMessage();
-
-    const title = bannerTitle?.value.trim() || "";
-    const actionType = bannerActionType?.value || "link";
-    const linkTarget = bannerLinkTarget?.value || "";
-    const link = bannerLink?.value.trim() || "";
-    const description = bannerDescription?.value.trim() || "";
-    const isActive = bannerIsActive?.checked !== false;
-    const selectedFile = bannerImage?.files?.[0] || null;
-    const editing = isBannerEditMode();
-    const currentBannerId = bannerEditId?.value || "";
-
-    if (!title) {
-      homeBannerMessage.textContent = "Digite o título do banner.";
-      homeBannerMessage.className = "form-message error";
-      return;
-    }
-
-    if (actionType === "link" && !linkTarget) {
-      homeBannerMessage.textContent = "Selecione o destino do banner.";
-      homeBannerMessage.className = "form-message error";
-      return;
-    }
-
-    if (actionType === "link" && linkTarget === "custom" && !link) {
-      homeBannerMessage.textContent = "Digite o link personalizado do banner.";
-      homeBannerMessage.className = "form-message error";
-      return;
-    }
-
-    if (actionType === "modal" && !description) {
-      homeBannerMessage.textContent = "Digite a descrição detalhada do banner.";
-      homeBannerMessage.className = "form-message error";
-      return;
-    }
-
-    if (!editing && !selectedFile) {
-      homeBannerMessage.textContent = "Selecione a imagem do banner.";
-      homeBannerMessage.className = "form-message error";
-      return;
-    }
-
-    if (selectedFile) {
-      const imageValidation = await validateBannerImageBeforeSubmit(selectedFile);
-
-      if (!imageValidation.valid) {
-        homeBannerMessage.textContent = imageValidation.error || BANNER_DIMENSION_MESSAGE;
-        homeBannerMessage.className = "form-message error";
-        return;
-      }
-    }
-
-    const originalText = saveBannerBtn.textContent;
-
-    try {
-      saveBannerBtn.disabled = true;
-      saveBannerBtn.textContent = editing ? "Atualizando..." : "Salvando...";
-
-      homeBannerMessage.textContent = editing
-        ? "Atualizando banner..."
-        : "Salvando banner...";
-      homeBannerMessage.className = "form-message info";
-
-      const formData = new FormData();
-
-      formData.append("title", title);
-      formData.append("action_type", actionType);
-      formData.append("link_target", actionType === "link" ? linkTarget : "");
-      formData.append("link", actionType === "link" ? link : "");
-      formData.append("description", actionType === "modal" ? description : "");
-      formData.append("is_active", String(isActive));
-
-      if (selectedFile) {
-        formData.append("image", selectedFile);
-      }
-
-      const url = editing
-        ? `http://localhost:3000/admin/notices/${currentBannerId}`
-        : "http://localhost:3000/admin/notices/upload";
-
-      const method = editing ? "PUT" : "POST";
-
-      const response = await adminFetch(url, {
-        method,
-        body: formData
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || "Erro ao salvar banner.");
-      }
-
-      homeBannerMessage.textContent =
-        result.message || (editing ? "Banner atualizado com sucesso." : "Banner salvo com sucesso.");
-      homeBannerMessage.className = "form-message success";
-
-      showAdminFeedback(
-        result.message || (editing ? "Banner atualizado com sucesso." : "Banner salvo com sucesso."),
-        "success"
-      );
-
-      homeBannerForm.reset();
-      setBannerFormCreateMode();
-      hideBannerForm();
-
-      await fetchHomeBanners();
-    } catch (error) {
-      console.error("ERRO AO SALVAR BANNER:", error);
-
-      homeBannerMessage.textContent = error.message || "Erro ao salvar banner.";
-      homeBannerMessage.className = "form-message error";
-
-      showAdminFeedback(
-        error.message || "Erro ao salvar banner.",
-        "error"
-      );
-    } finally {
-      saveBannerBtn.disabled = false;
-      saveBannerBtn.textContent = editing ? "Atualizar Banner" : "Salvar Banner";
-    }
-  }
-
-  function bindMasks() {
-    if (cpfCnpjInput) {
-      cpfCnpjInput.addEventListener("input", () => {
-        cpfCnpjInput.value = formatCpfCnpj(cpfCnpjInput.value);
+      closeCreateClientModalBtn.addEventListener("click", () => {
+        hideCreateClientForm();
       });
     }
 
-    if (phoneInput) {
-      phoneInput.addEventListener("input", () => {
-        phoneInput.value = formatPhone(phoneInput.value);
+    if (cancelCreateClientModalBtn && cancelCreateClientModalBtn.dataset.bound !== "true") {
+      cancelCreateClientModalBtn.dataset.bound = "true";
+
+      cancelCreateClientModalBtn.addEventListener("click", () => {
+        hideCreateClientForm();
       });
     }
 
-    if (whatsappInput) {
-      whatsappInput.addEventListener("input", () => {
-        whatsappInput.value = formatPhone(whatsappInput.value);
+    if (createClientModalBackdrop && createClientModalBackdrop.dataset.bound !== "true") {
+      createClientModalBackdrop.dataset.bound = "true";
+
+      createClientModalBackdrop.addEventListener("click", () => {
+        hideCreateClientForm();
       });
     }
   }
 
-  function bindSidebarEvents() {
-    document.querySelectorAll(".admin-sidebar-link").forEach((link) => {
-      if (link.dataset.sidebarBound === "true") return;
+  function bindClientFilters() {
+    if (clientsSearchInput && clientsSearchInput.dataset.bound !== "true") {
+      clientsSearchInput.dataset.bound = "true";
 
-      const action = getSidebarActionFromLink(link);
+      clientsSearchInput.addEventListener("input", () => {
+        if (clientsSearchDebounceTimer) {
+          clearTimeout(clientsSearchDebounceTimer);
+        }
 
-      if (!action) return;
-
-      link.dataset.sidebarBound = "true";
-
-      link.addEventListener("click", async (event) => {
-        event.preventDefault();
-        await handleSidebarAction(action);
+        clientsSearchDebounceTimer = setTimeout(() => {
+          renderClientsList(allClientsCache);
+        }, 180);
       });
-    });
+    }
+
+    if (clientsStatusFilter && clientsStatusFilter.dataset.bound !== "true") {
+      clientsStatusFilter.dataset.bound = "true";
+
+      clientsStatusFilter.addEventListener("change", () => {
+        renderClientsList(allClientsCache);
+      });
+    }
+
+    if (clientsTypeFilter && clientsTypeFilter.dataset.bound !== "true") {
+      clientsTypeFilter.dataset.bound = "true";
+
+      clientsTypeFilter.addEventListener("change", () => {
+        renderClientsList(allClientsCache);
+      });
+    }
   }
 
-  function bindGeneralEvents() {
-    document.addEventListener("click", () => {
-      closeAllDocumentMenus();
-    });
+  function bindRenewalFilters() {
+    if (dashboardRenewalStatusFilter && dashboardRenewalStatusFilter.dataset.bound !== "true") {
+      dashboardRenewalStatusFilter.dataset.bound = "true";
 
-    bindSidebarEvents();
-    bindAdminActionModalEvents();
-
-    if (logoutBtn) {
-      logoutBtn.addEventListener("click", async () => {
-        await logoutAdmin();
-      });
-    }
-
-    if (toggleCreateClientBtn) {
-      toggleCreateClientBtn.addEventListener("click", toggleCreateClientForm);
-    }
-
-    if (clientsQuickCreateBtn) {
-      clientsQuickCreateBtn.addEventListener("click", () => {
-        showCreateClientForm();
-        setSidebarActive("clients");
-        updateHash("#clientes");
-      });
-    }
-
-    if (dashboardQuickNewClientBtn) {
-      dashboardQuickNewClientBtn.addEventListener("click", openCreateClientFromQuickAction);
-    }
-
-    if (dashboardQuickClientsBtn) {
-      dashboardQuickClientsBtn.addEventListener("click", async () => {
-        await openClientsFromQuickAction();
-      });
-    }
-
-    if (dashboardQuickCreateBannerBtn) {
-      dashboardQuickCreateBannerBtn.addEventListener("click", async () => {
-        await openBannersFromQuickAction({
-          openForm: true
-        });
-      });
-    }
-
-    if (dashboardQuickBannersBtn) {
-      dashboardQuickBannersBtn.addEventListener("click", async () => {
-        await openBannersFromQuickAction();
-      });
-    }
-
-    if (dashboardRenewalStatusFilter) {
       dashboardRenewalStatusFilter.addEventListener("change", () => {
         renderRenewalAlerts(renewalAlertsCache);
       });
     }
 
-    if (dashboardRenewalClearFiltersBtn) {
+    if (dashboardRenewalClearFiltersBtn && dashboardRenewalClearFiltersBtn.dataset.bound !== "true") {
+      dashboardRenewalClearFiltersBtn.dataset.bound = "true";
+
       dashboardRenewalClearFiltersBtn.addEventListener("click", () => {
         if (dashboardRenewalStatusFilter) {
           dashboardRenewalStatusFilter.value = "all";
@@ -3567,245 +4039,296 @@ document.addEventListener("DOMContentLoaded", async () => {
         renderRenewalAlerts(renewalAlertsCache);
       });
     }
+  }
 
-    if (closeCreateClientModalBtn) {
-      closeCreateClientModalBtn.addEventListener("click", () => {
-        hideCreateClientForm();
+  function bindBannerEvents() {
+    if (bannerActionType && bannerActionType.dataset.bound !== "true") {
+      bannerActionType.dataset.bound = "true";
+
+      bannerActionType.addEventListener("change", () => {
+        updateBannerActionFieldsVisibility();
       });
     }
 
-    if (cancelCreateClientModalBtn) {
-      cancelCreateClientModalBtn.addEventListener("click", () => {
-        hideCreateClientForm({
-          resetForm: true
+    if (bannerLinkTarget && bannerLinkTarget.dataset.bound !== "true") {
+      bannerLinkTarget.dataset.bound = "true";
+
+      bannerLinkTarget.addEventListener("change", () => {
+        updateBannerActionFieldsVisibility();
+      });
+    }
+
+    if (homeBannerForm && homeBannerForm.dataset.bound !== "true") {
+      homeBannerForm.dataset.bound = "true";
+
+      homeBannerForm.addEventListener("submit", handleSaveBanner);
+    }
+
+    if (toggleBannerFormBtn && toggleBannerFormBtn.dataset.bound !== "true") {
+      toggleBannerFormBtn.dataset.bound = "true";
+
+      toggleBannerFormBtn.addEventListener("click", () => {
+        if (!homeBannerForm) return;
+
+        const isOpen = !homeBannerForm.classList.contains("hidden");
+
+        if (isOpen) {
+          homeBannerForm.reset();
+          setBannerFormCreateMode();
+          hideBannerForm();
+          return;
+        }
+
+        homeBannerForm.reset();
+        setBannerFormCreateMode();
+        showBannerForm();
+
+        setTimeout(() => {
+          homeBannerForm.scrollIntoView({
+            behavior: "smooth",
+            block: "start"
+          });
+        }, 180);
+      });
+    }
+
+    if (cancelBannerEditBtn && cancelBannerEditBtn.dataset.bound !== "true") {
+      cancelBannerEditBtn.dataset.bound = "true";
+
+      cancelBannerEditBtn.addEventListener("click", () => {
+        cancelBannerEdit();
+      });
+    }
+
+    if (cancelBannerEditBtnBottom && cancelBannerEditBtnBottom.dataset.bound !== "true") {
+      cancelBannerEditBtnBottom.dataset.bound = "true";
+
+      cancelBannerEditBtnBottom.addEventListener("click", () => {
+        cancelBannerEdit();
+        hideBannerForm();
+      });
+    }
+  }
+
+  function bindNavigationEvents() {
+    document.querySelectorAll(".admin-sidebar-link").forEach((link) => {
+      if (link.dataset.bound === "true") return;
+
+      link.dataset.bound = "true";
+
+      link.addEventListener("click", async (event) => {
+        const action = getSidebarActionFromLink(link);
+
+        if (!action) return;
+
+        event.preventDefault();
+
+        await handleSidebarAction(action, true);
+      });
+    });
+
+    if (toggleCreateClientBtn && toggleCreateClientBtn.dataset.bound !== "true") {
+      toggleCreateClientBtn.dataset.bound = "true";
+
+      toggleCreateClientBtn.addEventListener("click", () => {
+        openCreateClientFromQuickAction();
+      });
+    }
+
+    if (toggleClientsListBtn && toggleClientsListBtn.dataset.bound !== "true") {
+      toggleClientsListBtn.dataset.bound = "true";
+
+      toggleClientsListBtn.addEventListener("click", async () => {
+        await openClientsFromQuickAction();
+      });
+    }
+
+    if (toggleHomeBannersBtn && toggleHomeBannersBtn.dataset.bound !== "true") {
+      toggleHomeBannersBtn.dataset.bound = "true";
+
+      toggleHomeBannersBtn.addEventListener("click", async () => {
+        await openBannersFromQuickAction();
+      });
+    }
+
+    if (dashboardQuickNewClientBtn && dashboardQuickNewClientBtn.dataset.bound !== "true") {
+      dashboardQuickNewClientBtn.dataset.bound = "true";
+
+      dashboardQuickNewClientBtn.addEventListener("click", () => {
+        openCreateClientFromQuickAction();
+      });
+    }
+
+    if (dashboardQuickClientsBtn && dashboardQuickClientsBtn.dataset.bound !== "true") {
+      dashboardQuickClientsBtn.dataset.bound = "true";
+
+      dashboardQuickClientsBtn.addEventListener("click", async () => {
+        await openClientsFromQuickAction();
+      });
+    }
+
+    if (dashboardQuickCreateBannerBtn && dashboardQuickCreateBannerBtn.dataset.bound !== "true") {
+      dashboardQuickCreateBannerBtn.dataset.bound = "true";
+
+      dashboardQuickCreateBannerBtn.addEventListener("click", async () => {
+        await openBannersFromQuickAction({
+          openForm: true
         });
       });
     }
 
-    if (createClientModalBackdrop) {
-      createClientModalBackdrop.addEventListener("click", () => {
-        hideCreateClientForm();
+    if (dashboardQuickBannersBtn && dashboardQuickBannersBtn.dataset.bound !== "true") {
+      dashboardQuickBannersBtn.dataset.bound = "true";
+
+      dashboardQuickBannersBtn.addEventListener("click", async () => {
+        await openBannersFromQuickAction();
+      });
+    }
+  }
+
+  function bindGeneralEvents() {
+    if (logoutBtn && logoutBtn.dataset.bound !== "true") {
+      logoutBtn.dataset.bound = "true";
+
+      logoutBtn.addEventListener("click", async () => {
+        await logoutAdmin();
       });
     }
 
-    document.addEventListener("keydown", (event) => {
-      if (event.key !== "Escape") {
-        return;
-      }
+    if (sidebarLogoutBtn && sidebarLogoutBtn.dataset.bound !== "true") {
+      sidebarLogoutBtn.dataset.bound = "true";
 
-      if (isAdminActionModalOpen()) {
-        closeAdminActionModal(false);
-        return;
-      }
+      sidebarLogoutBtn.addEventListener("click", async () => {
+        await logoutAdmin();
+      });
+    }
 
-      if (isCreateClientModalOpen()) {
-        hideCreateClientForm();
+    if (createClientForm && createClientForm.dataset.bound !== "true") {
+      createClientForm.dataset.bound = "true";
+
+      createClientForm.addEventListener("submit", handleCreateClient);
+    }
+
+    if (copyTemporaryPasswordBtn && copyTemporaryPasswordBtn.dataset.bound !== "true") {
+      copyTemporaryPasswordBtn.dataset.bound = "true";
+
+      copyTemporaryPasswordBtn.addEventListener("click", copyTemporaryPassword);
+    }
+
+    if (clientsQuickCreateBtn && clientsQuickCreateBtn.dataset.bound !== "true") {
+      clientsQuickCreateBtn.dataset.bound = "true";
+
+      clientsQuickCreateBtn.addEventListener("click", () => {
+        openCreateClientFromQuickAction();
+      });
+    }
+
+    if (cpfCnpjInput && cpfCnpjInput.dataset.bound !== "true") {
+      cpfCnpjInput.dataset.bound = "true";
+
+      cpfCnpjInput.addEventListener("input", () => {
+        cpfCnpjInput.value = formatCpfCnpj(cpfCnpjInput.value);
+      });
+    }
+
+    if (phoneInput && phoneInput.dataset.bound !== "true") {
+      phoneInput.dataset.bound = "true";
+
+      phoneInput.addEventListener("input", () => {
+        phoneInput.value = formatPhone(phoneInput.value);
+      });
+    }
+
+    if (whatsappInput && whatsappInput.dataset.bound !== "true") {
+      whatsappInput.dataset.bound = "true";
+
+      whatsappInput.addEventListener("input", () => {
+        whatsappInput.value = formatPhone(whatsappInput.value);
+      });
+    }
+
+    document.addEventListener("click", (event) => {
+      if (!event.target.closest("[data-document-menu-toggle]") && !event.target.closest("[data-document-actions]")) {
+        closeAllDocumentMenus();
       }
     });
 
-    if (toggleClientsListBtn) {
-      toggleClientsListBtn.addEventListener("click", async () => {
-        if (!clientsSectionWrapper) return;
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        closeAllDocumentMenus();
 
-        setSidebarActive("clients");
-        updateHash("#clientes");
-
-        if (clientsSectionWrapper.classList.contains("hidden")) {
-          showClientsList();
-
-          if (!clientsLoaded) {
-            await fetchClients();
-          } else {
-            renderClientsList(allClientsCache);
-          }
-
-          scrollToSection(clientsSectionWrapper);
-        } else {
-          hideClientsList();
-        }
-      });
-    }
-
-    if (toggleHomeBannersBtn) {
-      toggleHomeBannersBtn.addEventListener("click", async () => {
-        if (!homeBannersWrapper) return;
-
-        setSidebarActive("banners");
-        updateHash("#banners");
-
-        if (homeBannersWrapper.classList.contains("hidden")) {
-          showHomeBanners();
-
-          if (!homeBannersLoaded) {
-            await fetchHomeBanners();
-          } else {
-            renderHomeBannersList(allHomeBannersCache);
-          }
-
-          scrollToSection(homeBannersWrapper);
-        } else {
-          hideHomeBanners();
-        }
-      });
-    }
-
-    if (toggleBannerFormBtn) {
-      toggleBannerFormBtn.addEventListener("click", toggleBannerForm);
-    }
-
-    if (createClientForm) {
-      createClientForm.addEventListener("submit", createClient);
-    }
-
-    if (homeBannerForm) {
-      homeBannerForm.addEventListener("submit", submitHomeBanner);
-    }
-
-    if (bannerActionType) {
-      bannerActionType.addEventListener("change", updateBannerFormVisibility);
-    }
-
-    if (bannerLinkTarget) {
-      bannerLinkTarget.addEventListener("change", updateBannerFormVisibility);
-    }
-
-    if (cancelBannerEditBtn) {
-      cancelBannerEditBtn.addEventListener("click", () => {
-        homeBannerForm?.reset();
-        setBannerFormCreateMode();
-        hideBannerForm();
-      });
-    }
-
-    if (cancelBannerEditBtnBottom) {
-      cancelBannerEditBtnBottom.addEventListener("click", () => {
-        homeBannerForm?.reset();
-        setBannerFormCreateMode();
-        hideBannerForm();
-      });
-    }
-
-    if (copyTemporaryPasswordBtn && temporaryPasswordField) {
-      copyTemporaryPasswordBtn.addEventListener("click", async () => {
-        const password = temporaryPasswordField.value;
-
-        if (!password) return;
-
-        try {
-          await navigator.clipboard.writeText(password);
-          copyTemporaryPasswordBtn.textContent = "Copiado!";
-          showAdminFeedback("Senha temporária copiada.", "success");
-
-          setTimeout(() => {
-            copyTemporaryPasswordBtn.textContent = "Copiar senha";
-          }, 1800);
-        } catch (error) {
-          console.error("ERRO AO COPIAR SENHA:", error);
-
-          temporaryPasswordField.select();
-          document.execCommand("copy");
-
-          copyTemporaryPasswordBtn.textContent = "Copiado!";
-          showAdminFeedback("Senha temporária copiada.", "success");
-
-          setTimeout(() => {
-            copyTemporaryPasswordBtn.textContent = "Copiar senha";
-          }, 1800);
-        }
-      });
-    }
-
-    if (clientsSearchInput) {
-      clientsSearchInput.addEventListener("input", () => {
-        if (clientsSearchDebounceTimer) {
-          clearTimeout(clientsSearchDebounceTimer);
+        if (isAdminActionModalOpen()) {
+          closeAdminActionModal(false);
         }
 
-        clientsSearchDebounceTimer = setTimeout(() => {
-          renderClientsList(allClientsCache);
-        }, 250);
-      });
-    }
-
-    if (clientsStatusFilter) {
-      clientsStatusFilter.addEventListener("change", () => {
-        renderClientsList(allClientsCache);
-      });
-    }
-
-    if (clientsTypeFilter) {
-      clientsTypeFilter.addEventListener("change", () => {
-        renderClientsList(allClientsCache);
-      });
-    }
+        if (isCreateClientModalOpen()) {
+          hideCreateClientForm();
+        }
+      }
+    });
   }
 
-  function prepareInitialLayout() {
-    closeCreateClientModal();
-    closePanel(clientsSectionWrapper);
-    closePanel(homeBannersWrapper);
-    closeAdminActionModal(false);
+  function validateAdminAccess() {
+    const role = String(profile?.role || "").toLowerCase();
 
-    hidePasswordBox();
-    setBannerFormCreateMode();
-
-    if (homeBannerForm) {
-      closePanel(homeBannerForm);
+    if (role !== "admin") {
+      clearAdminSession();
+      window.location.href = "login.html";
+      return false;
     }
 
-    if (toggleCreateClientBtn) {
-      toggleCreateClientBtn.textContent = "Novo Cliente";
+    if (!enforceAdminSessionLimit()) {
+      return false;
     }
 
-    if (toggleClientsListBtn) {
-      toggleClientsListBtn.textContent = "Exibir Clientes";
-    }
+    return true;
+  }
 
-    if (toggleHomeBannersBtn) {
-      toggleHomeBannersBtn.textContent = "Exibir Banners";
-    }
-
-    if (toggleBannerFormBtn) {
-      toggleBannerFormBtn.textContent = "Criar Banner";
-    }
-
-    if (dashboardRenewalStatusFilter) {
-      dashboardRenewalStatusFilter.value = "all";
-    }
-
-    updateBannerFormVisibility();
-    setSidebarActive("dashboard");
+  async function loadInitialDashboardData() {
+    await Promise.allSettled([
+      fetchDashboardSummary(),
+      fetchClients(),
+      fetchHomeBanners(),
+      fetchRenewalAlerts(),
+      fetchRecentActivities()
+    ]);
   }
 
   async function initializeAdminPanel() {
-    try {
-      await ensureValidAdminSession();
-
-      loadAdminInfo();
-      bindMasks();
-      bindGeneralEvents();
-      prepareInitialLayout();
-      scheduleAdminSessionRefresh();
-
-      hideAdminFeedback();
-
-      await Promise.allSettled([
-        fetchClients(),
-        fetchHomeBanners(),
-        fetchRenewalAlerts()
-      ]);
-
-      await applyInitialHashNavigation();
-    } catch (error) {
-      console.error("ERRO AO INICIALIZAR PAINEL ADMINISTRATIVO:", error);
-
-      showAdminFeedback(
-        error.message || "Erro ao inicializar painel administrativo.",
-        "error",
-        false
-      );
+    if (!validateAdminAccess()) {
+      return;
     }
+
+    bindAdminActionModalEvents();
+    bindCreateClientModalEvents();
+    bindNavigationEvents();
+    bindGeneralEvents();
+    bindClientFilters();
+    bindRenewalFilters();
+    bindBannerEvents();
+
+    loadAdminInfo();
+
+    setBannerFormCreateMode();
+    updateBannerActionFieldsVisibility();
+
+    scheduleAdminMaxSessionExpiration();
+    scheduleAdminSessionRefresh();
+
+    await loadInitialDashboardData();
+    await applyInitialHashNavigation();
   }
 
-  await initializeAdminPanel();
+  try {
+    await initializeAdminPanel();
+  } catch (error) {
+    console.error("ERRO AO INICIAR PAINEL ADMINISTRATIVO:", error);
+
+    await showAdminActionMessage({
+      type: "danger",
+      title: "Erro ao carregar painel",
+      message: error.message || "Não foi possível carregar o painel administrativo.",
+      confirmText: "OK"
+    });
+  }
 });

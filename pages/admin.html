@@ -60,7 +60,7 @@
           <div class="admin-sidebar-divider"></div>
 
           <div class="admin-sidebar-group admin-sidebar-group-bottom">
-            <a href="#sair" class="admin-sidebar-link admin-sidebar-link-logout">
+            <a href="#sair" id="sidebarLogoutBtn" class="admin-sidebar-link admin-sidebar-link-logout">
               <span class="admin-sidebar-link-icon">
                 <i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i>
               </span>
@@ -167,6 +167,30 @@
                   <span>Banners inativos</span>
                   <strong id="dashboardInactiveBanners">0</strong>
                   <small>Banners fora de exibição</small>
+                </article>
+
+                <article class="dashboard-summary-card">
+                  <span>Tráfego de Acesso</span>
+                  <strong id="dashboardTotalAccess">0</strong>
+                  <small>Total de acessos registrados</small>
+                </article>
+
+                <article class="dashboard-summary-card">
+                  <span>Acesso do Mês</span>
+                  <strong id="dashboardAccessThisMonth">0</strong>
+                  <small>Acessos registrados neste mês</small>
+                </article>
+
+                <article class="dashboard-summary-card">
+                  <span>Download de Documentos</span>
+                  <strong id="dashboardTotalDocumentDownloads">0</strong>
+                  <small>Total de downloads realizados</small>
+                </article>
+
+                <article class="dashboard-summary-card">
+                  <span>Download de Documentos do Mês</span>
+                  <strong id="dashboardDocumentDownloadsThisMonth">0</strong>
+                  <small>Downloads realizados neste mês</small>
                 </article>
               </div>
             </section>
@@ -295,17 +319,24 @@
                 </p>
               </div>
 
-              <div id="dashboardRecentActivitiesList" class="dashboard-activities-list dashboard-activities-scroll-area">
-                <article class="dashboard-activity-item dashboard-empty-activity">
-                  <div class="dashboard-activity-marker" aria-hidden="true"></div>
+              <div class="dashboard-table-wrapper dashboard-activities-scroll-area">
+                <table class="dashboard-activities-table">
+                  <thead>
+                    <tr>
+                      <th>Atividade</th>
+                      <th>Detalhes</th>
+                      <th>Data e hora</th>
+                    </tr>
+                  </thead>
 
-                  <div class="dashboard-activity-content">
-                    <strong>Nenhuma atividade carregada</strong>
-                    <p>
-                      As movimentações recentes aparecerão aqui.
-                    </p>
-                  </div>
-                </article>
+                  <tbody id="dashboardRecentActivitiesList">
+                    <tr class="dashboard-empty-row">
+                      <td colspan="3">
+                        Nenhuma atividade carregada.
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
             </section>
           </div>
@@ -1002,7 +1033,6 @@
           <input
             type="date"
             data-upload-release-date
-            required
           />
         </div>
 
@@ -1011,7 +1041,6 @@
           <input
             type="date"
             data-upload-expiration-date
-            required
           />
         </div>
 

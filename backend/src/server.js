@@ -5,6 +5,7 @@ console.log("ARQUIVO EM EXECUÇÃO:", __filename);
 
 const express = require("express");
 const multer = require("multer");
+const sharp = require("sharp");
 const { createClient } = require("@supabase/supabase-js");
 
 console.log("URL:", process.env.SUPABASE_URL ? "OK" : "NÃO CARREGOU");
@@ -38,6 +39,8 @@ app.use((req, res, next) => {
 
 const PORT = 3000;
 const ONE_DAY_IN_MS = 24 * 60 * 60 * 1000;
+const ADMIN_ACTIVITY_RETENTION_DAYS = 7;
+const ADMIN_ACTIVITY_CLEANUP_INTERVAL_MS = ONE_DAY_IN_MS;
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -46,136 +49,92 @@ const upload = multer({
   }
 });
 
-const ALLOWED_BANNER_SIZES = [
-  { width: 1920, height: 600 },
-  { width: 1600, height: 500 }
-];
+const BANNER_ASPECT_RATIO_WIDTH = 16;
+const BANNER_ASPECT_RATIO_HEIGHT = 5;
+const BANNER_FINAL_WIDTH = 1920;
+const BANNER_FINAL_HEIGHT = 600;
+const BANNER_WEBP_QUALITY = 82;
 
-function isAllowedBannerSize(width, height) {
-  return ALLOWED_BANNER_SIZES.some((size) => {
-    return size.width === width && size.height === height;
-  });
+function isAllowedBannerAspectRatio(width, height) {
+  const normalizedWidth = Number(width || 0);
+  const normalizedHeight = Number(height || 0);
+
+  if (!normalizedWidth || !normalizedHeight) {
+    return false;
+  }
+
+  return (
+    normalizedWidth * BANNER_ASPECT_RATIO_HEIGHT ===
+    normalizedHeight * BANNER_ASPECT_RATIO_WIDTH
+  );
 }
 
 function getBannerSizeErrorMessage() {
-  return "A imagem do banner precisa estar exatamente em 1920x600px ou 1600x500px.";
+  return "A imagem do banner precisa estar na proporção 16:5. Exemplos aceitos: 5120x1600, 3200x1000, 2560x800, 1920x600 ou 1600x500.";
 }
 
-function getImageDimensionsFromBuffer(buffer) {
-  if (!buffer || buffer.length < 24) {
-    return null;
-  }
+function getBannerOptimizedFileName(originalName) {
+  const sanitizedFileName = sanitizeFileName(originalName);
+  const fileNameWithoutExtension =
+    sanitizedFileName.replace(/\.[^.]+$/, "") || "banner";
 
-  const isPng =
-    buffer[0] === 0x89 &&
-    buffer[1] === 0x50 &&
-    buffer[2] === 0x4e &&
-    buffer[3] === 0x47 &&
-    buffer[4] === 0x0d &&
-    buffer[5] === 0x0a &&
-    buffer[6] === 0x1a &&
-    buffer[7] === 0x0a;
-
-  if (isPng) {
-    return {
-      width: buffer.readUInt32BE(16),
-      height: buffer.readUInt32BE(20)
-    };
-  }
-
-  const isJpeg = buffer[0] === 0xff && buffer[1] === 0xd8;
-
-  if (isJpeg) {
-    let offset = 2;
-
-    while (offset < buffer.length) {
-      if (buffer[offset] !== 0xff) {
-        offset++;
-        continue;
-      }
-
-      const marker = buffer[offset + 1];
-      const length = buffer.readUInt16BE(offset + 2);
-
-      if (
-        marker === 0xc0 ||
-        marker === 0xc1 ||
-        marker === 0xc2 ||
-        marker === 0xc3 ||
-        marker === 0xc5 ||
-        marker === 0xc6 ||
-        marker === 0xc7 ||
-        marker === 0xc9 ||
-        marker === 0xca ||
-        marker === 0xcb ||
-        marker === 0xcd ||
-        marker === 0xce ||
-        marker === 0xcf
-      ) {
-        return {
-          height: buffer.readUInt16BE(offset + 5),
-          width: buffer.readUInt16BE(offset + 7)
-        };
-      }
-
-      offset += 2 + length;
-    }
-  }
-
-  const isWebp =
-    buffer.toString("ascii", 0, 4) === "RIFF" &&
-    buffer.toString("ascii", 8, 12) === "WEBP";
-
-  if (isWebp) {
-    const chunkType = buffer.toString("ascii", 12, 16);
-
-    if (chunkType === "VP8X" && buffer.length >= 30) {
-      const width = 1 + buffer.readUIntLE(24, 3);
-      const height = 1 + buffer.readUIntLE(27, 3);
-
-      return { width, height };
-    }
-
-    if (chunkType === "VP8 " && buffer.length >= 30) {
-      const width = buffer.readUInt16LE(26) & 0x3fff;
-      const height = buffer.readUInt16LE(28) & 0x3fff;
-
-      return { width, height };
-    }
-
-    if (chunkType === "VP8L" && buffer.length >= 25) {
-      const bits = buffer.readUInt32LE(21);
-      const width = (bits & 0x3fff) + 1;
-      const height = ((bits >> 14) & 0x3fff) + 1;
-
-      return { width, height };
-    }
-  }
-
-  return null;
+  return `${fileNameWithoutExtension}.webp`;
 }
 
-function validateBannerImageDimensions(image) {
-  const dimensions = getImageDimensionsFromBuffer(image?.buffer);
+async function prepareBannerImageForStorage(image) {
+  try {
+    if (!image?.buffer) {
+      return {
+        valid: false,
+        error: "Nenhuma imagem foi enviada."
+      };
+    }
 
-  if (!dimensions) {
+    const metadata = await sharp(image.buffer).metadata();
+
+    const width = Number(metadata?.width || 0);
+    const height = Number(metadata?.height || 0);
+
+    if (!width || !height) {
+      return {
+        valid: false,
+        error: "Não foi possível identificar a resolução da imagem. Use PNG, JPG, JPEG ou WEBP na proporção 16:5."
+      };
+    }
+
+    if (!isAllowedBannerAspectRatio(width, height)) {
+      return {
+        valid: false,
+        error: `${getBannerSizeErrorMessage()} Resolução enviada: ${width}x${height}px.`
+      };
+    }
+
+    const optimizedBuffer = await sharp(image.buffer)
+      .resize(BANNER_FINAL_WIDTH, BANNER_FINAL_HEIGHT, {
+        fit: "fill"
+      })
+      .webp({
+        quality: BANNER_WEBP_QUALITY
+      })
+      .toBuffer();
+
+    return {
+      valid: true,
+      dimensions: {
+        width,
+        height
+      },
+      buffer: optimizedBuffer,
+      contentType: "image/webp"
+    };
+  } catch (error) {
+    console.error("ERRO AO VALIDAR/OTIMIZAR BANNER:", error);
+
     return {
       valid: false,
-      error: "Não foi possível identificar a resolução da imagem. Use PNG, JPG, JPEG ou WEBP em 1920x600px ou 1600x500px."
+      error: "Não foi possível validar e otimizar a imagem. Use PNG, JPG, JPEG ou WEBP na proporção 16:5."
     };
   }
-
-  if (!isAllowedBannerSize(dimensions.width, dimensions.height)) {
-    return {
-      valid: false,
-      error: `${getBannerSizeErrorMessage()} Resolução enviada: ${dimensions.width}x${dimensions.height}px.`
-    };
-  }
-
-  return {
-    valid: true,
-    dimensions
-  };
 }
 
 function extractBannerStoragePathFromUrl(imageUrl) {
@@ -502,6 +461,7 @@ function isValidBannerActionType(value) {
 function isValidBannerLinkTarget(value) {
   return ["contato", "servicos", "whatsapp", "custom"].includes(String(value || "").trim());
 }
+
 async function findDuplicateDocument({ clientId, category, subcategory, year, fileName }) {
   let query = adminSupabase
     .from("documents")
@@ -551,97 +511,456 @@ async function getNextNoticeDisplayOrder() {
   return Number(data?.display_order || 0) + 1;
 }
 
+function getClientDisplayName(client) {
+  return (
+    normalizeText(client?.company_name) ||
+    normalizeText(client?.full_name) ||
+    "Cliente não identificado"
+  );
+}
+
+function getDocumentDescription(documentItem) {
+  const parts = [
+    normalizeText(documentItem?.category),
+    normalizeText(documentItem?.subcategory),
+    normalizeText(documentItem?.year)
+  ].filter(Boolean);
+
+  const documentContext = parts.length ? parts.join(" / ") : "Documento";
+  const fileName = normalizeText(documentItem?.file_name);
+
+  return fileName ? `${documentContext} — ${fileName}` : documentContext;
+}
+
+async function getClientBasicInfo(clientId) {
+  const normalizedClientId = normalizeText(clientId);
+
+  if (!normalizedClientId) {
+    return null;
+  }
+
+  const { data, error } = await adminSupabase
+    .from("profiles")
+    .select("user_id, full_name, company_name, role")
+    .eq("user_id", normalizedClientId)
+    .eq("role", "client")
+    .maybeSingle();
+
+  if (error) {
+    console.error("ERRO AO BUSCAR CLIENTE PARA ATIVIDADE:", error);
+    return null;
+  }
+
+  return data || null;
+}
+
+function getAdminActivityRetentionCutoffDate() {
+  const cutoffDate = new Date();
+  cutoffDate.setDate(cutoffDate.getDate() - ADMIN_ACTIVITY_RETENTION_DAYS);
+
+  return cutoffDate;
+}
+
+function getAdminActivityRetentionCutoffIso() {
+  return getAdminActivityRetentionCutoffDate().toISOString();
+}
+
+function removeAdminPanelReference(value) {
+  const text = normalizeText(value);
+
+  if (!text) {
+    return null;
+  }
+
+  return text
+    .replace(/\s+(no|do)\s+painel\s+administrativo\.?/gi, "")
+    .replace(/\s{2,}/g, " ")
+    .replace(/\s+\./g, ".")
+    .trim();
+}
+
+function sanitizeAdminActivity(activity) {
+  if (!activity || typeof activity !== "object") {
+    return activity;
+  }
+
+  return {
+    ...activity,
+    title: removeAdminPanelReference(activity.title) || activity.title,
+    description: removeAdminPanelReference(activity.description)
+  };
+}
+
+async function cleanupOldAdminActivities() {
+  const cutoffIso = getAdminActivityRetentionCutoffIso();
+
+  const { error } = await adminSupabase
+    .from("admin_activities")
+    .delete()
+    .lt("created_at", cutoffIso);
+
+  if (error) {
+    console.error("ERRO AO LIMPAR ATIVIDADES ANTIGAS:", error);
+    return {
+      success: false,
+      cutoffIso,
+      error
+    };
+  }
+
+  return {
+    success: true,
+    cutoffIso
+  };
+}
+
+async function cleanupOldAdminActivitiesSilently() {
+  try {
+    return await cleanupOldAdminActivities();
+  } catch (error) {
+    console.error("ERRO INESPERADO AO LIMPAR ATIVIDADES ANTIGAS:", error);
+
+    return {
+      success: false,
+      cutoffIso: getAdminActivityRetentionCutoffIso(),
+      error
+    };
+  }
+}
+
+function scheduleAdminActivityCleanup() {
+  cleanupOldAdminActivitiesSilently();
+
+  setInterval(() => {
+    cleanupOldAdminActivitiesSilently();
+  }, ADMIN_ACTIVITY_CLEANUP_INTERVAL_MS);
+}
+
+async function registerAdminActivity({
+  actionType,
+  title,
+  description = null,
+  entityType,
+  entityId = null,
+  clientId = null,
+  clientName = null,
+  metadata = {}
+}) {
+  try {
+    const normalizedActionType = normalizeText(actionType);
+    const normalizedTitle = removeAdminPanelReference(title);
+    const normalizedEntityType = normalizeText(entityType);
+
+    if (!normalizedActionType || !normalizedTitle || !normalizedEntityType) {
+      console.error("ATIVIDADE ADMIN NÃO REGISTRADA: dados obrigatórios ausentes.");
+      return null;
+    }
+
+    await cleanupOldAdminActivitiesSilently();
+
+    const { data, error } = await adminSupabase
+      .from("admin_activities")
+      .insert({
+        action_type: normalizedActionType,
+        title: normalizedTitle,
+        description: removeAdminPanelReference(description),
+        entity_type: normalizedEntityType,
+        entity_id: entityId ? String(entityId) : null,
+        client_id: clientId ? String(clientId) : null,
+        client_name: normalizeOptionalText(clientName),
+        metadata: metadata && typeof metadata === "object" ? metadata : {}
+      })
+      .select(`
+        id,
+        action_type,
+        title,
+        description,
+        entity_type,
+        entity_id,
+        client_id,
+        client_name,
+        metadata,
+        created_at
+      `)
+      .single();
+
+    if (error) {
+      console.error("ERRO AO REGISTRAR ATIVIDADE ADMIN:", error);
+      return null;
+    }
+
+    return data;
+  } catch (error) {
+    console.error("ERRO INESPERADO AO REGISTRAR ATIVIDADE ADMIN:", error);
+    return null;
+  }
+}
+
+async function registerSystemEvent({
+  eventType,
+  userId = null,
+  clientId = null,
+  documentId = null,
+  page = null,
+  metadata = {}
+}) {
+  try {
+    const normalizedEventType = normalizeText(eventType);
+
+    if (!normalizedEventType) {
+      return null;
+    }
+
+    const { data, error } = await adminSupabase
+      .from("system_events")
+      .insert({
+        event_type: normalizedEventType,
+        user_id: userId ? String(userId) : null,
+        client_id: clientId ? String(clientId) : null,
+        document_id: documentId ? String(documentId) : null,
+        page: normalizeOptionalText(page),
+        metadata: metadata && typeof metadata === "object" ? metadata : {}
+      })
+      .select("id, event_type, user_id, client_id, document_id, page, metadata, created_at")
+      .single();
+
+    if (error) {
+      console.error("ERRO AO REGISTRAR EVENTO DO SISTEMA:", error);
+      return null;
+    }
+
+    return data;
+  } catch (error) {
+    console.error("ERRO INESPERADO AO REGISTRAR EVENTO DO SISTEMA:", error);
+    return null;
+  }
+}
+
+function getCurrentMonthStartIso() {
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+
+  return monthStart.toISOString();
+}
+async function getTableCount(tableName, applyQuery) {
+  let query = adminSupabase
+    .from(tableName)
+    .select("*", { count: "exact", head: true });
+
+  if (typeof applyQuery === "function") {
+    query = applyQuery(query);
+  }
+
+  const { count, error } = await query;
+
+  if (error) {
+    throw error;
+  }
+
+  return Number(count || 0);
+}
+
 app.get("/", (req, res) => {
   res.send("Servidor Caseg Protege rodando 🚀");
 });
 
+app.get("/admin/activities", async (req, res) => {
+  try {
+    const adminAccess = await validateAdminAccess(req, res);
+
+    if (!adminAccess) {
+      return;
+    }
+
+    const limit = Math.min(
+      Math.max(Number(req.query.limit || 20), 1),
+      50
+    );
+
+    const cleanupResult = await cleanupOldAdminActivities();
+    const cutoffIso = cleanupResult?.cutoffIso || getAdminActivityRetentionCutoffIso();
+
+    const { data, error } = await adminSupabase
+      .from("admin_activities")
+      .select(`
+        id,
+        action_type,
+        title,
+        description,
+        entity_type,
+        entity_id,
+        client_id,
+        client_name,
+        metadata,
+        created_at
+      `)
+      .gte("created_at", cutoffIso)
+      .order("created_at", { ascending: false })
+      .limit(limit);
+
+    if (error) {
+      return res.status(500).json({
+        error:
+          error.message ||
+          "Erro ao buscar atividades recentes."
+      });
+    }
+
+    const sanitizedActivities = (data || []).map(sanitizeAdminActivity);
+
+    return res.status(200).json(sanitizedActivities);
+  } catch (error) {
+    console.error("ERRO EM GET /admin/activities:", error);
+
+    res.status(500).json({
+      error: "Erro interno ao buscar atividades recentes."
+    });
+  }
+});
+
+app.get("/admin/dashboard/summary", async (req, res) => {
+  try {
+    const adminAccess = await validateAdminAccess(req, res);
+
+    if (!adminAccess) {
+      return;
+    }
+
+    const monthStartIso = getCurrentMonthStartIso();
+
+    const [
+      totalDocuments,
+      documentsThisMonth,
+      clientsThisMonth,
+      inactiveBanners,
+      totalAccess,
+      accessThisMonth,
+      totalDocumentDownloads,
+      documentDownloadsThisMonth
+    ] = await Promise.all([
+      getTableCount("documents"),
+      getTableCount("documents", (query) => query.gte("created_at", monthStartIso)),
+      getTableCount("profiles", (query) =>
+        query.eq("role", "client").gte("created_at", monthStartIso)
+      ),
+      getTableCount("notices", (query) => query.eq("is_active", false)),
+      getTableCount("system_events", (query) =>
+        query.eq("event_type", "access").eq("page", "cliente")
+      ),
+      getTableCount("system_events", (query) =>
+        query.eq("event_type", "access").eq("page", "cliente").gte("created_at", monthStartIso)
+      ),
+      getTableCount("system_events", (query) =>
+        query.eq("event_type", "document_download").eq("page", "cliente")
+      ),
+      getTableCount("system_events", (query) =>
+        query.eq("event_type", "document_download").eq("page", "cliente").gte("created_at", monthStartIso)
+      )
+    ]);
+
+    return res.status(200).json({
+      total_documents: totalDocuments,
+      documents_this_month: documentsThisMonth,
+      clients_this_month: clientsThisMonth,
+      inactive_banners: inactiveBanners,
+      total_access: totalAccess,
+      access_this_month: accessThisMonth,
+      total_document_downloads: totalDocumentDownloads,
+      document_downloads_this_month: documentDownloadsThisMonth
+    });
+  } catch (error) {
+    console.error("ERRO EM GET /admin/dashboard/summary:", error);
+
+    res.status(500).json({
+      error: "Erro interno ao buscar resumo do dashboard."
+    });
+  }
+});
+
 app.post("/login", async (req, res) => {
   try {
-    const { cpf_cnpj, password } = req.body;
+    const cpf_cnpj = normalizeText(req.body.cpf_cnpj).replace(/\D/g, "");
+    const password = normalizeText(req.body.password);
 
     if (!cpf_cnpj || !password) {
       return res.status(400).json({
-        error: "cpf_cnpj e password são obrigatórios"
+        error: "CPF/CNPJ e senha são obrigatórios."
       });
     }
 
     const { data: profile, error: profileError } = await adminSupabase
       .from("profiles")
-      .select("user_id, email, role, full_name, company_name, must_change_password, is_active")
+      .select("*")
       .eq("cpf_cnpj", cpf_cnpj)
       .single();
 
     if (profileError || !profile) {
-      return res.status(400).json({
-        error: "CPF/CNPJ não encontrado"
+      return res.status(401).json({
+        error: "CPF/CNPJ ou senha inválidos."
       });
     }
 
     if (profile.role === "client" && profile.is_active === false) {
       return res.status(403).json({
-        error: "Este cliente está inativo. Entre em contato com a administração."
+        error: "Cliente inativo. Entre em contato com a administração."
       });
     }
 
-    const { data: authData, error: authError } =
+    const { data: loginData, error: loginError } =
       await publicSupabase.auth.signInWithPassword({
         email: profile.email,
         password
       });
 
-    if (authError) {
+    if (loginError || !loginData?.session) {
       return res.status(401).json({
-        error: "Senha inválida"
+        error: "CPF/CNPJ ou senha inválidos."
       });
     }
 
-    res.json({
-      message: "Login realizado com sucesso",
-      profile: {
-        user_id: profile.user_id,
-        cpf_cnpj,
-        role: profile.role,
-        full_name: profile.full_name,
-        company_name: profile.company_name,
-        email: profile.email,
-        must_change_password: profile.must_change_password,
-        is_active: profile.is_active
-      },
-      session: authData.session
+    if (profile.role === "client") {
+      await registerSystemEvent({
+        eventType: "access",
+        userId: profile.user_id,
+        clientId: profile.user_id,
+        page: "cliente",
+        metadata: {
+          role: profile.role,
+          company_name: profile.company_name || null,
+          full_name: profile.full_name || null
+        }
+      });
+    }
+
+    return res.status(200).json({
+      message: "Login realizado com sucesso.",
+      session: loginData.session,
+      profile
     });
   } catch (error) {
     console.error("ERRO EM /login:", error);
-    res.status(500).json({ error: "Erro interno do servidor" });
+
+    res.status(500).json({
+      error: "Erro interno do servidor"
+    });
   }
 });
 
 app.post("/admin/refresh-session", async (req, res) => {
   try {
-    const { refresh_token } = req.body;
+    const refreshToken = normalizeText(req.body.refresh_token);
 
-    if (!refresh_token) {
+    if (!refreshToken) {
       return res.status(400).json({
-        error: "refresh_token é obrigatório."
+        error: "Refresh token é obrigatório."
       });
     }
 
-    const sessionSupabase = createClient(
-      process.env.SUPABASE_URL,
-      process.env.SUPABASE_ANON_KEY,
-      {
-        auth: {
-          persistSession: false,
-          autoRefreshToken: false,
-          detectSessionInUrl: false
-        }
-      }
-    );
-
-    const { data, error } = await sessionSupabase.auth.refreshSession({
-      refresh_token
+    const { data, error } = await publicSupabase.auth.refreshSession({
+      refresh_token: refreshToken
     });
 
-    if (error || !data || !data.session || !data.user) {
+    if (error || !data?.session?.access_token || !data?.user?.id) {
       return res.status(401).json({
         error: "Sessão expirada. Faça login novamente."
       });
@@ -659,29 +978,20 @@ app.post("/admin/refresh-session", async (req, res) => {
 
     if (profile.role !== "admin") {
       return res.status(403).json({
-        error: "A renovação automática é permitida apenas para administradores."
+        error: "Acesso restrito a administradores."
       });
     }
 
     return res.status(200).json({
-      message: "Sessão administrativa renovada com sucesso.",
-      profile: {
-        user_id: profile.user_id,
-        cpf_cnpj: profile.cpf_cnpj,
-        role: profile.role,
-        full_name: profile.full_name,
-        company_name: profile.company_name,
-        email: profile.email,
-        must_change_password: profile.must_change_password,
-        is_active: profile.is_active
-      },
-      session: data.session
+      message: "Sessão renovada com sucesso.",
+      session: data.session,
+      profile
     });
   } catch (error) {
     console.error("ERRO EM POST /admin/refresh-session:", error);
 
-    return res.status(500).json({
-      error: "Erro interno ao renovar sessão administrativa."
+    res.status(500).json({
+      error: "Erro interno ao renovar sessão."
     });
   }
 });
@@ -696,244 +1006,240 @@ app.put("/update-password", async (req, res) => {
       });
     }
 
+    const newPassword = normalizeText(req.body.new_password);
+
+    if (!newPassword) {
+      return res.status(400).json({
+        error: "A nova senha é obrigatória."
+      });
+    }
+
+    if (!isStrongPassword(newPassword)) {
+      return res.status(400).json({
+        error: "A senha deve ter no mínimo 8 caracteres, uma letra maiúscula e um número."
+      });
+    }
+
     const userId = authResult.user.id;
-    const { new_password } = req.body;
-    const normalizedPassword = String(new_password || "").trim();
 
-    if (!normalizedPassword) {
-      return res.status(400).json({
-        error: "new_password é obrigatório."
+    const { error: updateAuthError } =
+      await adminSupabase.auth.admin.updateUserById(userId, {
+        password: newPassword
       });
-    }
-
-    if (!isStrongPassword(normalizedPassword)) {
-      return res.status(400).json({
-        error: "A nova senha deve ter no mínimo 8 caracteres, 1 letra maiúscula e 1 número."
-      });
-    }
-
-    const profileResult = await getUserProfile(userId);
-
-    if (profileResult.error) {
-      return res.status(profileResult.status).json({
-        error: profileResult.error
-      });
-    }
-
-    const profile = profileResult.profile;
-
-    if (profile.role !== "client") {
-      return res.status(403).json({
-        error: "Apenas clientes podem atualizar a senha por esta rota."
-      });
-    }
-
-    const { error: updateAuthError } = await adminSupabase.auth.admin.updateUserById(
-      userId,
-      {
-        password: normalizedPassword
-      }
-    );
 
     if (updateAuthError) {
       return res.status(500).json({
-        error: updateAuthError.message || "Erro ao atualizar senha no Auth."
+        error:
+          updateAuthError.message ||
+          "Erro ao atualizar senha do usuário."
       });
     }
 
-    const { error: updateProfileError } = await adminSupabase
-      .from("profiles")
-      .update({
-        must_change_password: false
-      })
-      .eq("user_id", userId);
+    const { data: updatedProfile, error: updateProfileError } =
+      await adminSupabase
+        .from("profiles")
+        .update({
+          must_change_password: false
+        })
+        .eq("user_id", userId)
+        .select("*")
+        .single();
 
     if (updateProfileError) {
       return res.status(500).json({
-        error: updateProfileError.message || "Erro ao atualizar perfil do usuário."
+        error:
+          updateProfileError.message ||
+          "Senha atualizada, mas houve erro ao atualizar o perfil."
       });
     }
 
     return res.status(200).json({
-      message: "Senha atualizada com sucesso."
+      message: "Senha atualizada com sucesso.",
+      profile: updatedProfile
     });
   } catch (error) {
-    console.error("ERRO EM PUT /update-password:", error);
-    res.status(500).json({ error: "Erro interno do servidor" });
+    console.error("ERRO EM /update-password:", error);
+
+    res.status(500).json({
+      error: "Erro interno do servidor"
+    });
   }
 });
 
 app.post("/clients", async (req, res) => {
   try {
     const adminAccess = await validateAdminAccess(req, res);
+
     if (!adminAccess) {
       return;
     }
 
-    const {
-      full_name,
-      company_name,
-      cpf_cnpj,
-      email,
-      role,
-      address_zip,
-      address_street,
-      address_number,
-      address_complement,
-      address_neighborhood,
-      address_city,
-      address_state,
-      phone,
-      whatsapp
-    } = req.body;
+    const full_name = normalizeText(req.body.full_name);
+    const company_name = normalizeText(req.body.company_name);
+    const cpf_cnpj = normalizeText(req.body.cpf_cnpj).replace(/\D/g, "");
+    const email = normalizeText(req.body.email).toLowerCase();
+    const phone = normalizeText(req.body.phone).replace(/\D/g, "");
+    const whatsapp = normalizeText(req.body.whatsapp).replace(/\D/g, "");
 
     if (!full_name || !company_name || !cpf_cnpj || !email) {
       return res.status(400).json({
-        error: "Campos obrigatórios: full_name, company_name, cpf_cnpj e email."
+        error: "Campos obrigatórios: nome do cliente, empresa, CPF/CNPJ e e-mail."
       });
     }
 
-    if (role && role !== "client") {
+    if (![11, 14].includes(cpf_cnpj.length)) {
       return res.status(400).json({
-        error: "Esta rota permite apenas cadastro com role = client."
+        error: "CPF/CNPJ inválido."
       });
     }
 
-    const normalizedEmail = email.trim().toLowerCase();
-    const normalizedCpfCnpj = String(cpf_cnpj).trim();
-    const normalizedZip = address_zip ? String(address_zip).trim() : null;
-    const normalizedPhone = phone ? String(phone).trim() : null;
-    const normalizedWhatsapp = whatsapp ? String(whatsapp).trim() : null;
-
-    const { data: existingProfiles, error: existingProfilesError } = await adminSupabase
+    const { data: existingCpfCnpj } = await adminSupabase
       .from("profiles")
-      .select("user_id, email, cpf_cnpj")
-      .or(`email.eq.${normalizedEmail},cpf_cnpj.eq.${normalizedCpfCnpj}`);
+      .select("user_id")
+      .eq("cpf_cnpj", cpf_cnpj)
+      .maybeSingle();
 
-    if (existingProfilesError) {
-      return res.status(500).json({
-        error: "Erro ao verificar duplicidade de cliente."
+    if (existingCpfCnpj) {
+      return res.status(409).json({
+        error: "Já existe um cliente cadastrado com este CPF/CNPJ."
       });
     }
 
-    if (existingProfiles && existingProfiles.length > 0) {
-      return res.status(400).json({
-        error: "Já existe um cliente com este e-mail ou CPF/CNPJ."
+    const { data: existingEmail } = await adminSupabase
+      .from("profiles")
+      .select("user_id")
+      .eq("email", email)
+      .maybeSingle();
+
+    if (existingEmail) {
+      return res.status(409).json({
+        error: "Já existe um cliente cadastrado com este e-mail."
       });
     }
 
     const temporaryPassword = generateTemporaryPassword();
 
-    const { data: createdUserData, error: createUserError } =
+    const { data: createdUser, error: createUserError } =
       await adminSupabase.auth.admin.createUser({
-        email: normalizedEmail,
+        email,
         password: temporaryPassword,
-        email_confirm: true
+        email_confirm: true,
+        user_metadata: {
+          full_name,
+          company_name,
+          role: "client"
+        }
       });
 
-    if (createUserError || !createdUserData || !createdUserData.user) {
-      return res.status(400).json({
-        error: createUserError?.message || "Erro ao criar usuário no Auth."
+    if (createUserError || !createdUser?.user?.id) {
+      return res.status(500).json({
+        error:
+          createUserError?.message ||
+          "Erro ao criar usuário do cliente."
       });
     }
 
-    const newUserId = createdUserData.user.id;
+    const clientUserId = createdUser.user.id;
 
-    const { error: insertProfileError } = await adminSupabase
-      .from("profiles")
-      .insert({
-        user_id: newUserId,
-        full_name,
-        company_name,
-        cpf_cnpj: normalizedCpfCnpj,
-        email: normalizedEmail,
-        role: "client",
-        must_change_password: true,
-        is_active: true,
-        address_zip: normalizedZip,
-        address_street: address_street || null,
-        address_number: address_number || null,
-        address_complement: address_complement || null,
-        address_neighborhood: address_neighborhood || null,
-        address_city: address_city || null,
-        address_state: address_state || null,
-        phone: normalizedPhone,
-        whatsapp: normalizedWhatsapp
-      });
+    const { data: insertedProfile, error: insertProfileError } =
+      await adminSupabase
+        .from("profiles")
+        .insert({
+          user_id: clientUserId,
+          full_name,
+          company_name,
+          cpf_cnpj,
+          email,
+          phone: phone || null,
+          whatsapp: whatsapp || null,
+          role: "client",
+          is_active: true,
+          must_change_password: true
+        })
+        .select("*")
+        .single();
 
     if (insertProfileError) {
-      await adminSupabase.auth.admin.deleteUser(newUserId);
+      await adminSupabase.auth.admin.deleteUser(clientUserId);
 
-      return res.status(400).json({
-        error: insertProfileError.message || "Erro ao salvar perfil do cliente."
+      return res.status(500).json({
+        error:
+          insertProfileError.message ||
+          "Erro ao salvar perfil do cliente."
       });
     }
+
+    await registerAdminActivity({
+      actionType: "client_created",
+      title: "Cliente cadastrado",
+      description: `${getClientDisplayName({ company_name, full_name })} foi cadastrado.`,
+      entityType: "client",
+      entityId: clientUserId,
+      clientId: clientUserId,
+      clientName: getClientDisplayName(insertedProfile),
+      metadata: {
+        client_id: clientUserId,
+        company_name,
+        full_name,
+        email,
+        cpf_cnpj
+      }
+    });
 
     return res.status(201).json({
       message: "Cliente cadastrado com sucesso.",
-      client: {
-        user_id: newUserId,
-        full_name,
-        company_name,
-        cpf_cnpj: normalizedCpfCnpj,
-        email: normalizedEmail,
-        role: "client",
-        is_active: true
-      },
+      client: insertedProfile,
       temporary_password: temporaryPassword
     });
   } catch (error) {
     console.error("ERRO EM /clients:", error);
-    res.status(500).json({ error: "Erro interno do servidor" });
+
+    res.status(500).json({
+      error: "Erro interno do servidor"
+    });
   }
 });
 
 app.get("/clients", async (req, res) => {
   try {
     const adminAccess = await validateAdminAccess(req, res);
+
     if (!adminAccess) {
       return;
     }
 
     const { data, error } = await adminSupabase
       .from("profiles")
-      .select(`
-        user_id,
-        full_name,
-        company_name,
-        cpf_cnpj,
-        email,
-        phone,
-        whatsapp,
-        role,
-        is_active,
-        created_at
-      `)
+      .select("*")
       .eq("role", "client")
       .order("created_at", { ascending: false });
 
     if (error) {
       return res.status(500).json({
-        error: error.message || "Erro ao listar clientes."
+        error: error.message || "Erro ao buscar clientes."
       });
     }
 
     return res.status(200).json(data || []);
   } catch (error) {
     console.error("ERRO EM GET /clients:", error);
-    res.status(500).json({ error: "Erro interno do servidor" });
+
+    res.status(500).json({
+      error: "Erro interno do servidor"
+    });
   }
 });
 
 app.put("/admin/clients/:clientId/status", async (req, res) => {
   try {
     const adminAccess = await validateAdminAccess(req, res);
+
     if (!adminAccess) {
       return;
     }
 
     const { clientId } = req.params;
-    const { is_active } = req.body;
+    const is_active = req.body.is_active;
 
     if (!clientId) {
       return res.status(400).json({
@@ -947,45 +1253,53 @@ app.put("/admin/clients/:clientId/status", async (req, res) => {
       });
     }
 
-    const { data: currentClient, error: currentClientError } = await adminSupabase
-      .from("profiles")
-      .select("user_id, full_name, role, is_active")
-      .eq("user_id", clientId)
-      .eq("role", "client")
-      .single();
+    const { data: currentClient, error: currentError } =
+      await adminSupabase
+        .from("profiles")
+        .select("*")
+        .eq("user_id", clientId)
+        .eq("role", "client")
+        .single();
 
-    if (currentClientError || !currentClient) {
+    if (currentError || !currentClient) {
       return res.status(404).json({
         error: "Cliente não encontrado."
       });
     }
 
-    const { data: updatedClient, error: updateError } = await adminSupabase
-      .from("profiles")
-      .update({
-        is_active
-      })
-      .eq("user_id", clientId)
-      .eq("role", "client")
-      .select(`
-        user_id,
-        full_name,
-        company_name,
-        cpf_cnpj,
-        email,
-        phone,
-        whatsapp,
-        role,
-        is_active,
-        created_at
-      `)
-      .single();
+    const { data: updatedClient, error: updateError } =
+      await adminSupabase
+        .from("profiles")
+        .update({
+          is_active
+        })
+        .eq("user_id", clientId)
+        .eq("role", "client")
+        .select("*")
+        .single();
 
     if (updateError || !updatedClient) {
       return res.status(500).json({
-        error: updateError?.message || "Erro ao atualizar status do cliente."
+        error:
+          updateError?.message ||
+          "Erro ao atualizar status do cliente."
       });
     }
+
+    await registerAdminActivity({
+      actionType: is_active ? "client_activated" : "client_deactivated",
+      title: is_active ? "Cliente ativado" : "Cliente inativado",
+      description: `${getClientDisplayName(updatedClient)} foi ${is_active ? "ativado" : "inativado"}.`,
+      entityType: "client",
+      entityId: clientId,
+      clientId,
+      clientName: getClientDisplayName(updatedClient),
+      metadata: {
+        client_id: clientId,
+        previous_status: currentClient.is_active,
+        new_status: updatedClient.is_active
+      }
+    });
 
     return res.status(200).json({
       message: "Status do cliente atualizado com sucesso.",
@@ -993,12 +1307,16 @@ app.put("/admin/clients/:clientId/status", async (req, res) => {
     });
   } catch (error) {
     console.error("ERRO EM PUT /admin/clients/:clientId/status:", error);
-    res.status(500).json({ error: "Erro interno do servidor" });
+
+    res.status(500).json({
+      error: "Erro interno do servidor"
+    });
   }
 });
 app.delete("/admin/clients/:clientId", async (req, res) => {
   try {
     const adminAccess = await validateAdminAccess(req, res);
+
     if (!adminAccess) {
       return;
     }
@@ -1011,96 +1329,131 @@ app.delete("/admin/clients/:clientId", async (req, res) => {
       });
     }
 
-    const { data: clientProfile, error: clientProfileError } = await adminSupabase
-      .from("profiles")
-      .select("user_id, full_name, role")
-      .eq("user_id", clientId)
-      .eq("role", "client")
-      .single();
+    const { data: clientProfile, error: clientError } =
+      await adminSupabase
+        .from("profiles")
+        .select("*")
+        .eq("user_id", clientId)
+        .eq("role", "client")
+        .single();
 
-    if (clientProfileError || !clientProfile) {
+    if (clientError || !clientProfile) {
       return res.status(404).json({
         error: "Cliente não encontrado."
       });
     }
 
-    const { data: clientDocuments, error: documentsError } = await adminSupabase
-      .from("documents")
-      .select("id, file_path")
-      .eq("client_id", clientId);
+    const { data: clientDocuments, error: documentsError } =
+      await adminSupabase
+        .from("documents")
+        .select("id, file_path")
+        .eq("client_id", clientId);
 
     if (documentsError) {
       return res.status(500).json({
-        error: documentsError.message || "Erro ao buscar documentos do cliente."
+        error:
+          documentsError.message ||
+          "Erro ao buscar documentos do cliente."
       });
     }
 
-    const documentFilePaths = (clientDocuments || [])
-      .map((doc) => doc.file_path)
+    const filePaths = (clientDocuments || [])
+      .map((documentItem) => documentItem.file_path)
       .filter(Boolean);
 
-    const storageRemoveError = await removeStorageFiles(
-      "documents",
-      documentFilePaths
-    );
+    const storageError = await removeStorageFiles("documents", filePaths);
 
-    if (storageRemoveError) {
+    if (storageError) {
       return res.status(500).json({
         error:
-          storageRemoveError.message ||
-          "Erro ao excluir arquivos do cliente no storage."
+          storageError.message ||
+          "Erro ao remover arquivos do cliente."
       });
     }
 
-    const { error: deleteDocumentsError } = await adminSupabase
-      .from("documents")
-      .delete()
-      .eq("client_id", clientId);
+    const { error: documentsDeleteError } =
+      await adminSupabase
+        .from("documents")
+        .delete()
+        .eq("client_id", clientId);
 
-    if (deleteDocumentsError) {
+    if (documentsDeleteError) {
       return res.status(500).json({
         error:
-          deleteDocumentsError.message ||
+          documentsDeleteError.message ||
           "Erro ao excluir documentos do cliente."
       });
     }
 
-    const { error: deleteProfileError } = await adminSupabase
-      .from("profiles")
-      .delete()
-      .eq("user_id", clientId);
+    const { error: eventsDeleteError } =
+      await adminSupabase
+        .from("system_events")
+        .delete()
+        .eq("client_id", clientId);
 
-    if (deleteProfileError) {
+    if (eventsDeleteError) {
+      console.error("ERRO AO EXCLUIR EVENTOS DO CLIENTE:", eventsDeleteError);
+    }
+
+    const { error: profileDeleteError } =
+      await adminSupabase
+        .from("profiles")
+        .delete()
+        .eq("user_id", clientId)
+        .eq("role", "client");
+
+    if (profileDeleteError) {
       return res.status(500).json({
         error:
-          deleteProfileError.message ||
+          profileDeleteError.message ||
           "Erro ao excluir perfil do cliente."
       });
     }
 
-    const { error: deleteAuthError } =
+    const { error: userDeleteError } =
       await adminSupabase.auth.admin.deleteUser(clientId);
 
-    if (deleteAuthError) {
+    if (userDeleteError) {
       return res.status(500).json({
         error:
-          deleteAuthError.message ||
-          "Erro ao excluir usuário do Auth."
+          userDeleteError.message ||
+          "Perfil excluído, mas houve erro ao remover o usuário."
       });
     }
+
+    await registerAdminActivity({
+      actionType: "client_deleted",
+      title: "Cliente excluído",
+      description: `${getClientDisplayName(clientProfile)} foi excluído.`,
+      entityType: "client",
+      entityId: clientId,
+      clientId,
+      clientName: getClientDisplayName(clientProfile),
+      metadata: {
+        client_id: clientId,
+        company_name: clientProfile.company_name,
+        full_name: clientProfile.full_name,
+        email: clientProfile.email,
+        removed_documents: filePaths.length
+      }
+    });
 
     return res.status(200).json({
       message: "Cliente excluído com sucesso."
     });
   } catch (error) {
     console.error("ERRO EM DELETE /admin/clients/:clientId:", error);
-    res.status(500).json({ error: "Erro interno do servidor" });
+
+    res.status(500).json({
+      error: "Erro interno do servidor"
+    });
   }
 });
 
 app.get("/clients/:clientId/documents", async (req, res) => {
   try {
     const adminAccess = await validateAdminAccess(req, res);
+
     if (!adminAccess) {
       return;
     }
@@ -1115,30 +1468,26 @@ app.get("/clients/:clientId/documents", async (req, res) => {
 
     const { data, error } = await adminSupabase
       .from("documents")
-      .select(`
-        id,
-        client_id,
-        file_name,
-        category,
-        subcategory,
-        year,
-        release_date,
-        expiration_date,
-        created_at
-      `)
+      .select("*")
       .eq("client_id", clientId)
+      .order("year", { ascending: false })
       .order("created_at", { ascending: false });
 
     if (error) {
       return res.status(500).json({
-        error: error.message || "Erro ao buscar documentos do cliente."
+        error:
+          error.message ||
+          "Erro ao buscar documentos do cliente."
       });
     }
 
     return res.status(200).json(data || []);
   } catch (error) {
     console.error("ERRO EM GET /clients/:clientId/documents:", error);
-    res.status(500).json({ error: "Erro interno do servidor" });
+
+    res.status(500).json({
+      error: "Erro interno do servidor"
+    });
   }
 });
 
@@ -1150,9 +1499,7 @@ app.get("/admin/documents/renewal-alerts", async (req, res) => {
       return;
     }
 
-    const warningDays = 30;
-
-    const { data: documents, error: documentsError } = await adminSupabase
+    const { data: documents, error } = await adminSupabase
       .from("documents")
       .select(`
         id,
@@ -1163,126 +1510,71 @@ app.get("/admin/documents/renewal-alerts", async (req, res) => {
         year,
         release_date,
         expiration_date,
-        created_at
+        created_at,
+        profiles:client_id (
+          full_name,
+          company_name
+        )
       `)
       .not("expiration_date", "is", null)
-      .order("expiration_date", { ascending: true })
-      .order("created_at", { ascending: false });
+      .order("expiration_date", { ascending: true });
 
-    if (documentsError) {
+    if (error) {
       return res.status(500).json({
         error:
-          documentsError.message ||
-          "Erro ao buscar documentos para avisos de renovação."
+          error.message ||
+          "Erro ao buscar documentos para renovação."
       });
     }
 
-    const safeDocuments = Array.isArray(documents) ? documents : [];
+    const latestDocumentsByGroup = new Map();
 
-    const clientIds = [
-      ...new Set(
-        safeDocuments
-          .map((documentItem) => documentItem.client_id)
-          .filter(Boolean)
-      )
-    ];
-
-    let clientsMap = new Map();
-
-    if (clientIds.length) {
-      const { data: clients, error: clientsError } = await adminSupabase
-        .from("profiles")
-        .select("user_id, full_name, company_name, role, is_active")
-        .in("user_id", clientIds);
-
-      if (clientsError) {
-        return res.status(500).json({
-          error:
-            clientsError.message ||
-            "Erro ao buscar clientes dos avisos de renovação."
-        });
-      }
-
-      clientsMap = new Map(
-        (clients || []).map((client) => {
-          return [client.user_id, client];
-        })
-      );
-    }
-
-    const latestDocumentsMap = new Map();
-
-    safeDocuments.forEach((documentItem) => {
-      if (!documentItem.client_id || !documentItem.expiration_date) {
-        return;
-      }
-
+    (documents || []).forEach((documentItem) => {
       const groupKey = getDocumentGroupKey(documentItem);
-      const currentDocument = latestDocumentsMap.get(groupKey);
+      const currentDocument = latestDocumentsByGroup.get(groupKey);
 
-      if (!currentDocument) {
-        latestDocumentsMap.set(groupKey, documentItem);
-        return;
-      }
-
-      const comparison = compareDocumentsByLatest(documentItem, currentDocument);
-
-      if (comparison > 0) {
-        latestDocumentsMap.set(groupKey, documentItem);
+      if (!currentDocument || compareDocumentsByLatest(documentItem, currentDocument) > 0) {
+        latestDocumentsByGroup.set(groupKey, documentItem);
       }
     });
 
-    const alerts = Array.from(latestDocumentsMap.values())
+    const alerts = Array.from(latestDocumentsByGroup.values())
       .map((documentItem) => {
-        const renewalInfo = getRenewalStatusInfo(documentItem.expiration_date);
+        const statusInfo = getRenewalStatusInfo(documentItem.expiration_date);
 
-        if (!renewalInfo) {
+        if (!statusInfo) {
           return null;
         }
 
-        if (renewalInfo.days_until_expiration > warningDays) {
+        if (statusInfo.days_until_expiration > 30) {
           return null;
         }
 
-        const client = clientsMap.get(documentItem.client_id) || {};
+        const profileData = Array.isArray(documentItem.profiles)
+          ? documentItem.profiles[0]
+          : documentItem.profiles;
 
         return {
           id: documentItem.id,
-          document_id: documentItem.id,
           client_id: documentItem.client_id,
-          client_name: client.full_name || "-",
-          company_name: client.company_name || "-",
-          client_is_active: client.is_active !== false,
-          file_name: documentItem.file_name,
-          category: documentItem.category,
-          subcategory: documentItem.subcategory,
-          year: documentItem.year,
+          client_name: profileData?.full_name || "-",
+          company_name: profileData?.company_name || "-",
+          file_name: documentItem.file_name || "Documento",
+          category: documentItem.category || "-",
+          subcategory: documentItem.subcategory || "-",
+          year: documentItem.year || "-",
           release_date: documentItem.release_date,
           expiration_date: documentItem.expiration_date,
           created_at: documentItem.created_at,
-          status: renewalInfo.status,
-          days_until_expiration: renewalInfo.days_until_expiration,
-          deadline_label: renewalInfo.deadline_label,
-          observation: renewalInfo.observation
+          ...statusInfo
         };
       })
       .filter(Boolean)
       .sort((a, b) => {
-        if (a.days_until_expiration !== b.days_until_expiration) {
-          return a.days_until_expiration - b.days_until_expiration;
-        }
-
-        return String(a.company_name || "").localeCompare(
-          String(b.company_name || ""),
-          "pt-BR"
-        );
+        return Number(a.days_until_expiration) - Number(b.days_until_expiration);
       });
 
-    return res.status(200).json({
-      warning_days: warningDays,
-      total: alerts.length,
-      alerts
-    });
+    return res.status(200).json(alerts);
   } catch (error) {
     console.error("ERRO EM GET /admin/documents/renewal-alerts:", error);
 
@@ -1304,7 +1596,7 @@ app.post("/admin/documents/upload", (req, res, next) => {
       }
 
       return res.status(500).json({
-        error: "Erro ao processar o arquivo enviado."
+        error: "Erro ao processar arquivo enviado."
       });
     }
 
@@ -1318,86 +1610,75 @@ app.post("/admin/documents/upload", (req, res, next) => {
       return;
     }
 
-    const clientId = normalizeText(req.body.client_id);
+    const client_id = normalizeText(req.body.client_id);
     const category = normalizeText(req.body.category);
     const subcategory = normalizeOptionalText(req.body.subcategory);
     const year = normalizeText(req.body.year);
-    const releaseDate = normalizeDateInput(req.body.release_date);
-    const expirationDate = normalizeDateInput(req.body.expiration_date);
+    const release_date = normalizeDateInput(req.body.release_date);
+    const expiration_date = normalizeDateInput(req.body.expiration_date);
     const file = req.file;
 
-    if (!clientId || !category || !year || !releaseDate || !expirationDate || !file) {
+    if (!client_id || !category || !year || !file) {
       return res.status(400).json({
-        error:
-          "Campos obrigatórios: client_id, category, year, release_date, expiration_date e file."
+        error: "Campos obrigatórios: cliente, categoria, ano e arquivo."
       });
     }
 
-    if (req.body.release_date && !releaseDate) {
-      return res.status(400).json({
-        error: "A data de lançamento deve estar no formato válido."
-      });
-    }
-
-    if (req.body.expiration_date && !expirationDate) {
-      return res.status(400).json({
-        error: "A data de validade deve estar no formato válido."
-      });
-    }
-
-    if (isExpirationDateBeforeReleaseDate(releaseDate, expirationDate)) {
+    if (
+      release_date &&
+      expiration_date &&
+      isExpirationDateBeforeReleaseDate(release_date, expiration_date)
+    ) {
       return res.status(400).json({
         error: "A data de validade não pode ser menor que a data de lançamento."
       });
     }
 
-    const { data: clientProfile, error: clientProfileError } =
+    const { data: clientProfile, error: clientError } =
       await adminSupabase
         .from("profiles")
         .select("user_id, full_name, company_name, role")
-        .eq("user_id", clientId)
+        .eq("user_id", client_id)
         .eq("role", "client")
         .single();
 
-    if (clientProfileError || !clientProfile) {
+    if (clientError || !clientProfile) {
       return res.status(404).json({
         error: "Cliente não encontrado."
       });
     }
 
-    const {
-      data: duplicateDocument,
-      error: duplicateError
-    } = await findDuplicateDocument({
-      clientId,
-      category,
-      subcategory,
-      year,
-      fileName: file.originalname
-    });
+    const originalFileName = sanitizeFileName(file.originalname || "documento");
+    const timestamp = Date.now();
+    const storagePath = `${client_id}/${year}/${timestamp}_${originalFileName}`;
+
+    const { data: duplicateDocument, error: duplicateError } =
+      await findDuplicateDocument({
+        clientId: client_id,
+        category,
+        subcategory,
+        year,
+        fileName: originalFileName
+      });
 
     if (duplicateError) {
       return res.status(500).json({
-        error: "Erro ao verificar duplicidade do documento."
+        error:
+          duplicateError.message ||
+          "Erro ao verificar documento duplicado."
       });
     }
 
     if (duplicateDocument) {
-      return res.status(400).json({
-        error:
-          "Já existe um documento com o mesmo nome do arquivo, categoria, subcategoria e ano para este cliente."
+      return res.status(409).json({
+        error: "Já existe um documento com a mesma categoria, subcategoria, ano e nome de arquivo para este cliente."
       });
     }
-
-    const sanitizedFileName = sanitizeFileName(file.originalname);
-    const timestamp = Date.now();
-
-    const storagePath = `${clientId}/${year}/${timestamp}_${sanitizedFileName}`;
 
     const { error: uploadError } = await adminSupabase.storage
       .from("documents")
       .upload(storagePath, file.buffer, {
-        contentType: file.mimetype,
+        contentType: file.mimetype || "application/octet-stream",
         upsert: false
       });
 
@@ -1413,18 +1694,18 @@ app.post("/admin/documents/upload", (req, res, next) => {
       await adminSupabase
         .from("documents")
         .insert({
-          client_id: clientId,
-          file_name: file.originalname,
-          file_path: storagePath,
+          client_id,
           category,
           subcategory,
           year,
-          release_date: releaseDate,
-          expiration_date: expirationDate
+          release_date,
+          expiration_date,
+          file_name: originalFileName,
+          file_path: storagePath,
+          mime_type: file.mimetype || null,
+          file_size: file.size || null
         })
-        .select(
-          "id, client_id, file_name, category, subcategory, year, release_date, expiration_date, created_at"
-        )
+        .select("*")
         .single();
 
     if (insertError) {
@@ -1439,12 +1720,31 @@ app.post("/admin/documents/upload", (req, res, next) => {
       });
     }
 
+    await registerAdminActivity({
+      actionType: "document_uploaded",
+      title: "Documento enviado",
+      description: `Documento enviado para ${getClientDisplayName(clientProfile)}. ${getDocumentDescription(insertedDocument)}.`,
+      entityType: "document",
+      entityId: insertedDocument.id,
+      clientId: client_id,
+      clientName: getClientDisplayName(clientProfile),
+      metadata: {
+        document_id: insertedDocument.id,
+        file_name: insertedDocument.file_name,
+        category: insertedDocument.category,
+        subcategory: insertedDocument.subcategory,
+        year: insertedDocument.year,
+        release_date: insertedDocument.release_date,
+        expiration_date: insertedDocument.expiration_date
+      }
+    });
+
     return res.status(201).json({
       message: "Documento enviado com sucesso.",
       document: insertedDocument
     });
   } catch (error) {
-    console.error("ERRO EM POST /admin/documents/upload:", error);
+    console.error("ERRO EM /admin/documents/upload:", error);
 
     res.status(500).json({
       error: "Erro interno do servidor"
@@ -1464,7 +1764,7 @@ app.put("/admin/documents/:documentId/replace", (req, res, next) => {
       }
 
       return res.status(500).json({
-        error: "Erro ao processar o arquivo enviado."
+        error: "Erro ao processar arquivo enviado."
       });
     }
 
@@ -1481,50 +1781,35 @@ app.put("/admin/documents/:documentId/replace", (req, res, next) => {
     const { documentId } = req.params;
     const file = req.file;
 
-    if (!documentId) {
+    if (!documentId || !file) {
       return res.status(400).json({
-        error: "documentId é obrigatório."
+        error: "documentId e arquivo são obrigatórios."
       });
     }
 
-    if (!file) {
-      return res.status(400).json({
-        error: "É obrigatório selecionar um novo arquivo."
-      });
-    }
-
-    const { data: currentDocument, error: currentDocumentError } =
+    const { data: currentDocument, error: documentError } =
       await adminSupabase
         .from("documents")
-        .select(`
-          id,
-          client_id,
-          file_name,
-          file_path,
-          category,
-          subcategory,
-          year,
-          release_date,
-          expiration_date
-        `)
+        .select("*")
         .eq("id", documentId)
         .single();
 
-    if (currentDocumentError || !currentDocument) {
+    if (documentError || !currentDocument) {
       return res.status(404).json({
         error: "Documento não encontrado."
       });
     }
 
-    const sanitizedFileName = sanitizeFileName(file.originalname);
-    const timestamp = Date.now();
+    const clientProfile = await getClientBasicInfo(currentDocument.client_id);
 
-    const storagePath = `${currentDocument.client_id}/${currentDocument.year}/${timestamp}_${sanitizedFileName}`;
+    const originalFileName = sanitizeFileName(file.originalname || "documento");
+    const timestamp = Date.now();
+    const storagePath = `${currentDocument.client_id}/${currentDocument.year}/${timestamp}_${originalFileName}`;
 
     const { error: uploadError } = await adminSupabase.storage
       .from("documents")
       .upload(storagePath, file.buffer, {
-        contentType: file.mimetype,
+        contentType: file.mimetype || "application/octet-stream",
         upsert: false
       });
 
@@ -1532,7 +1817,7 @@ app.put("/admin/documents/:documentId/replace", (req, res, next) => {
       return res.status(500).json({
         error:
           uploadError.message ||
-          "Erro ao enviar o novo arquivo para o storage."
+          "Erro ao enviar novo arquivo para o storage."
       });
     }
 
@@ -1540,13 +1825,14 @@ app.put("/admin/documents/:documentId/replace", (req, res, next) => {
       await adminSupabase
         .from("documents")
         .update({
-          file_name: file.originalname,
-          file_path: storagePath
+          file_name: originalFileName,
+          file_path: storagePath,
+          mime_type: file.mimetype || null,
+          file_size: file.size || null,
+          updated_at: new Date().toISOString()
         })
         .eq("id", documentId)
-        .select(
-          "id, client_id, file_name, category, subcategory, year, release_date, expiration_date, created_at"
-        )
+        .select("*")
         .single();
 
     if (updateError || !updatedDocument) {
@@ -1565,12 +1851,32 @@ app.put("/admin/documents/:documentId/replace", (req, res, next) => {
       const { error: removeOldFileError } =
         await adminSupabase.storage
           .from("documents")
-          .remove([currentDocument.file_path.trim()]);
+          .remove([currentDocument.file_path]);
 
       if (removeOldFileError) {
         console.error("ERRO AO REMOVER ARQUIVO ANTIGO:", removeOldFileError);
       }
     }
+
+    await registerAdminActivity({
+      actionType: "document_replaced",
+      title: "Documento substituído",
+      description: `Documento substituído para ${getClientDisplayName(clientProfile)}. ${getDocumentDescription(updatedDocument)}.`,
+      entityType: "document",
+      entityId: updatedDocument.id,
+      clientId: updatedDocument.client_id,
+      clientName: getClientDisplayName(clientProfile),
+      metadata: {
+        document_id: updatedDocument.id,
+        previous_file_name: currentDocument.file_name,
+        new_file_name: updatedDocument.file_name,
+        category: updatedDocument.category,
+        subcategory: updatedDocument.subcategory,
+        year: updatedDocument.year,
+        release_date: updatedDocument.release_date,
+        expiration_date: updatedDocument.expiration_date
+      }
+    });
 
     return res.status(200).json({
       message: "Documento substituído com sucesso.",
@@ -1596,37 +1902,53 @@ app.get("/documents", async (req, res) => {
     }
 
     const userId = authResult.user.id;
+    const profileResult = await getUserProfile(userId);
+
+    if (profileResult.error) {
+      return res.status(profileResult.status).json({
+        error: profileResult.error
+      });
+    }
+
+    const profile = profileResult.profile;
+
+    if (profile.role !== "client") {
+      return res.status(403).json({
+        error: "Acesso restrito a clientes."
+      });
+    }
+
+    if (profile.is_active === false) {
+      return res.status(403).json({
+        error: "Cliente inativo. Entre em contato com a administração."
+      });
+    }
 
     const { data, error } = await adminSupabase
       .from("documents")
-      .select(`
-        id,
-        client_id,
-        file_name,
-        category,
-        subcategory,
-        year,
-        created_at
-      `)
+      .select("*")
       .eq("client_id", userId)
       .order("year", { ascending: false })
       .order("created_at", { ascending: false });
 
     if (error) {
       return res.status(500).json({
-        error: error.message
+        error:
+          error.message ||
+          "Erro ao buscar documentos."
       });
     }
 
-    res.json(data || []);
-  } catch (err) {
-    console.error("ERRO AO BUSCAR DOCUMENTOS:", err);
+    return res.status(200).json(data || []);
+  } catch (error) {
+    console.error("ERRO EM GET /documents:", error);
 
     res.status(500).json({
-      error: "Erro ao buscar documentos."
+      error: "Erro interno do servidor"
     });
   }
 });
+
 app.post("/documents/download", async (req, res) => {
   try {
     const authResult = await getAuthenticatedUser(req);
@@ -1638,7 +1960,29 @@ app.post("/documents/download", async (req, res) => {
     }
 
     const userId = authResult.user.id;
-    const { document_id } = req.body;
+    const profileResult = await getUserProfile(userId);
+
+    if (profileResult.error) {
+      return res.status(profileResult.status).json({
+        error: profileResult.error
+      });
+    }
+
+    const profile = profileResult.profile;
+
+    if (profile.role !== "client") {
+      return res.status(403).json({
+        error: "Acesso restrito a clientes."
+      });
+    }
+
+    if (profile.is_active === false) {
+      return res.status(403).json({
+        error: "Cliente inativo. Entre em contato com a administração."
+      });
+    }
+
+    const document_id = normalizeText(req.body.document_id);
 
     if (!document_id) {
       return res.status(400).json({
@@ -1649,8 +1993,9 @@ app.post("/documents/download", async (req, res) => {
     const { data: documentData, error: documentError } =
       await adminSupabase
         .from("documents")
-        .select("id, client_id, file_path, file_name")
+        .select("*")
         .eq("id", document_id)
+        .eq("client_id", userId)
         .single();
 
     if (documentError || !documentData) {
@@ -1659,30 +2004,48 @@ app.post("/documents/download", async (req, res) => {
       });
     }
 
-    if (documentData.client_id !== userId) {
-      return res.status(403).json({
-        error: "Acesso negado a este documento."
+    if (!documentData.file_path) {
+      return res.status(404).json({
+        error: "Arquivo do documento não encontrado."
       });
     }
 
-    const { data, error } = await adminSupabase.storage
-      .from("documents")
-      .createSignedUrl(documentData.file_path.trim(), 60);
+    const { data: signedUrlData, error: signedUrlError } =
+      await adminSupabase.storage
+        .from("documents")
+        .createSignedUrl(documentData.file_path, 60 * 5);
 
-    if (error) {
+    if (signedUrlError || !signedUrlData?.signedUrl) {
       return res.status(500).json({
-        error: error.message
+        error:
+          signedUrlError?.message ||
+          "Erro ao gerar link temporário do documento."
       });
     }
 
-    res.json({
-      url: data.signedUrl
+    await registerSystemEvent({
+      eventType: "document_download",
+      userId,
+      clientId: userId,
+      documentId: documentData.id,
+      page: "cliente",
+      metadata: {
+        file_name: documentData.file_name,
+        category: documentData.category,
+        subcategory: documentData.subcategory,
+        year: documentData.year
+      }
     });
-  } catch (err) {
-    console.error("ERRO AO GERAR DOWNLOAD:", err);
+
+    return res.status(200).json({
+      url: signedUrlData.signedUrl,
+      file_name: documentData.file_name
+    });
+  } catch (error) {
+    console.error("ERRO EM POST /documents/download:", error);
 
     res.status(500).json({
-      error: "Erro ao gerar link do documento."
+      error: "Erro interno do servidor"
     });
   }
 });
@@ -1695,7 +2058,7 @@ app.post("/admin/documents/download", async (req, res) => {
       return;
     }
 
-    const { document_id } = req.body;
+    const document_id = normalizeText(req.body.document_id);
 
     if (!document_id) {
       return res.status(400).json({
@@ -1706,7 +2069,7 @@ app.post("/admin/documents/download", async (req, res) => {
     const { data: documentData, error: documentError } =
       await adminSupabase
         .from("documents")
-        .select("id, client_id, file_path, file_name")
+        .select("*")
         .eq("id", document_id)
         .single();
 
@@ -1717,25 +2080,27 @@ app.post("/admin/documents/download", async (req, res) => {
     }
 
     if (!documentData.file_path) {
-      return res.status(400).json({
-        error: "Este documento não possui caminho de arquivo válido."
+      return res.status(404).json({
+        error: "Arquivo do documento não encontrado."
       });
     }
 
-    const { data, error } = await adminSupabase.storage
-      .from("documents")
-      .createSignedUrl(documentData.file_path.trim(), 60);
+    const { data: signedUrlData, error: signedUrlError } =
+      await adminSupabase.storage
+        .from("documents")
+        .createSignedUrl(documentData.file_path, 60 * 5);
 
-    if (error) {
+    if (signedUrlError || !signedUrlData?.signedUrl) {
       return res.status(500).json({
         error:
-          error.message ||
+          signedUrlError?.message ||
           "Erro ao gerar link temporário do documento."
       });
     }
 
     return res.status(200).json({
-      url: data.signedUrl
+      url: signedUrlData.signedUrl,
+      file_name: documentData.file_name
     });
   } catch (error) {
     console.error("ERRO EM POST /admin/documents/download:", error);
@@ -1745,7 +2110,6 @@ app.post("/admin/documents/download", async (req, res) => {
     });
   }
 });
-
 app.delete("/admin/documents/:documentId", async (req, res) => {
   try {
     const adminAccess = await validateAdminAccess(req, res);
@@ -1765,7 +2129,7 @@ app.delete("/admin/documents/:documentId", async (req, res) => {
     const { data: documentData, error: documentError } =
       await adminSupabase
         .from("documents")
-        .select("id, file_path, file_name")
+        .select("id, client_id, file_path, file_name, category, subcategory, year, release_date, expiration_date")
         .eq("id", documentId)
         .single();
 
@@ -1774,6 +2138,8 @@ app.delete("/admin/documents/:documentId", async (req, res) => {
         error: "Documento não encontrado."
       });
     }
+
+    const clientProfile = await getClientBasicInfo(documentData.client_id);
 
     if (documentData.file_path) {
       const { error: storageError } =
@@ -1790,6 +2156,15 @@ app.delete("/admin/documents/:documentId", async (req, res) => {
       }
     }
 
+    const { error: eventsDeleteError } = await adminSupabase
+      .from("system_events")
+      .delete()
+      .eq("document_id", documentId);
+
+    if (eventsDeleteError) {
+      console.error("ERRO AO EXCLUIR EVENTOS DO DOCUMENTO:", eventsDeleteError);
+    }
+
     const { error: deleteDbError } = await adminSupabase
       .from("documents")
       .delete()
@@ -1802,6 +2177,25 @@ app.delete("/admin/documents/:documentId", async (req, res) => {
           "Erro ao excluir documento do banco."
       });
     }
+
+    await registerAdminActivity({
+      actionType: "document_deleted",
+      title: "Documento excluído",
+      description: `Documento excluído de ${getClientDisplayName(clientProfile)}. ${getDocumentDescription(documentData)}.`,
+      entityType: "document",
+      entityId: documentId,
+      clientId: documentData.client_id,
+      clientName: getClientDisplayName(clientProfile),
+      metadata: {
+        document_id: documentData.id,
+        file_name: documentData.file_name,
+        category: documentData.category,
+        subcategory: documentData.subcategory,
+        year: documentData.year,
+        release_date: documentData.release_date,
+        expiration_date: documentData.expiration_date
+      }
+    });
 
     return res.status(200).json({
       message: "Documento excluído com sucesso."
@@ -1927,23 +2321,23 @@ app.post("/admin/notices/upload", (req, res, next) => {
       });
     }
 
-    const imageValidation = validateBannerImageDimensions(image);
+    const optimizedBanner = await prepareBannerImageForStorage(image);
 
-    if (!imageValidation.valid) {
+    if (!optimizedBanner.valid) {
       return res.status(400).json({
-        error: imageValidation.error
+        error: optimizedBanner.error
       });
     }
 
-    const sanitizedFileName = sanitizeFileName(image.originalname);
+    const sanitizedFileName = getBannerOptimizedFileName(image.originalname);
     const timestamp = Date.now();
 
     const storagePath = `home-banners/${timestamp}_${sanitizedFileName}`;
 
     const { error: uploadError } = await adminSupabase.storage
       .from("banners")
-      .upload(storagePath, image.buffer, {
-        contentType: image.mimetype,
+      .upload(storagePath, optimizedBanner.buffer, {
+        contentType: optimizedBanner.contentType,
         upsert: false
       });
 
@@ -2015,6 +2409,22 @@ app.post("/admin/notices/upload", (req, res, next) => {
           "Erro ao salvar banner no banco."
       });
     }
+
+    await registerAdminActivity({
+      actionType: "banner_created",
+      title: "Banner criado",
+      description: `Banner "${insertedNotice.title}" foi criado para a Home.`,
+      entityType: "banner",
+      entityId: insertedNotice.id,
+      metadata: {
+        notice_id: insertedNotice.id,
+        title: insertedNotice.title,
+        action_type: insertedNotice.action_type,
+        link_target: insertedNotice.link_target,
+        is_active: insertedNotice.is_active,
+        display_order: insertedNotice.display_order
+      }
+    });
 
     return res.status(201).json({
       message: "Banner da Home criado com sucesso.",
@@ -2098,6 +2508,17 @@ app.put("/admin/notices/reorder", async (req, res) => {
           "Ordem atualizada, mas houve erro ao recarregar banners."
       });
     }
+
+    await registerAdminActivity({
+      actionType: "banners_reordered",
+      title: "Banners reordenados",
+      description: "A ordem dos banners da Home foi atualizada.",
+      entityType: "banner",
+      entityId: null,
+      metadata: {
+        ordered_ids: uniqueIds
+      }
+    });
 
     return res.status(200).json({
       message: "Ordem dos banners atualizada com sucesso.",
@@ -2191,7 +2612,7 @@ app.put("/admin/notices/:noticeId", (req, res, next) => {
     const { data: currentNotice, error: currentError } =
       await adminSupabase
         .from("notices")
-        .select("id, title, image_url, display_order")
+        .select("id, title, image_url, display_order, action_type, link_target, is_active")
         .eq("id", noticeId)
         .single();
 
@@ -2211,23 +2632,23 @@ app.put("/admin/notices/:noticeId", (req, res, next) => {
         });
       }
 
-      const imageValidation = validateBannerImageDimensions(image);
+      const optimizedBanner = await prepareBannerImageForStorage(image);
 
-      if (!imageValidation.valid) {
+      if (!optimizedBanner.valid) {
         return res.status(400).json({
-          error: imageValidation.error
+          error: optimizedBanner.error
         });
       }
 
-      const sanitizedFileName = sanitizeFileName(image.originalname);
+      const sanitizedFileName = getBannerOptimizedFileName(image.originalname);
       const timestamp = Date.now();
 
       newStoragePath = `home-banners/${timestamp}_${sanitizedFileName}`;
 
       const { error: uploadError } = await adminSupabase.storage
         .from("banners")
-        .upload(newStoragePath, image.buffer, {
-          contentType: image.mimetype,
+        .upload(newStoragePath, optimizedBanner.buffer, {
+          contentType: optimizedBanner.contentType,
           upsert: false
         });
 
@@ -2302,6 +2723,26 @@ app.put("/admin/notices/:noticeId", (req, res, next) => {
       }
     }
 
+    await registerAdminActivity({
+      actionType: "banner_updated",
+      title: "Banner editado",
+      description: `Banner "${updatedNotice.title}" foi editado.`,
+      entityType: "banner",
+      entityId: updatedNotice.id,
+      metadata: {
+        notice_id: updatedNotice.id,
+        previous_title: currentNotice.title,
+        new_title: updatedNotice.title,
+        previous_action_type: currentNotice.action_type,
+        new_action_type: updatedNotice.action_type,
+        previous_link_target: currentNotice.link_target,
+        new_link_target: updatedNotice.link_target,
+        previous_status: currentNotice.is_active,
+        new_status: updatedNotice.is_active,
+        image_updated: Boolean(image)
+      }
+    });
+
     return res.status(200).json({
       message: "Banner atualizado com sucesso.",
       notice: updatedNotice
@@ -2368,6 +2809,20 @@ app.put("/admin/notices/:noticeId/toggle", async (req, res) => {
           "Erro ao atualizar status do banner."
       });
     }
+
+    await registerAdminActivity({
+      actionType: isActive ? "banner_activated" : "banner_deactivated",
+      title: isActive ? "Banner ativado" : "Banner desativado",
+      description: `Banner "${updatedNotice.title}" foi ${isActive ? "ativado" : "desativado"}.`,
+      entityType: "banner",
+      entityId: updatedNotice.id,
+      metadata: {
+        notice_id: updatedNotice.id,
+        title: updatedNotice.title,
+        previous_status: currentNotice.is_active,
+        new_status: updatedNotice.is_active
+      }
+    });
 
     return res.status(200).json({
       message: "Status do banner atualizado com sucesso.",
@@ -2439,6 +2894,18 @@ app.delete("/admin/notices/:noticeId", async (req, res) => {
       });
     }
 
+    await registerAdminActivity({
+      actionType: "banner_deleted",
+      title: "Banner excluído",
+      description: `Banner "${currentNotice.title}" foi excluído.`,
+      entityType: "banner",
+      entityId: noticeId,
+      metadata: {
+        notice_id: currentNotice.id,
+        title: currentNotice.title
+      }
+    });
+
     return res.status(200).json({
       message: "Banner excluído com sucesso."
     });
@@ -2478,6 +2945,8 @@ app.get("/notices", async (req, res) => {
 
 console.log("Rotas configuradas:");
 console.log("GET /");
+console.log("GET /admin/activities");
+console.log("GET /admin/dashboard/summary");
 console.log("POST /login");
 console.log("POST /admin/refresh-session");
 console.log("PUT /update-password");
@@ -2503,4 +2972,5 @@ console.log("GET /notices");
 
 app.listen(PORT, () => {
   console.log(`Servidor rodando em http://localhost:${PORT}`);
+  scheduleAdminActivityCleanup();
 });
