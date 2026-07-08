@@ -950,6 +950,37 @@ body.client-panel-page .hidden {
     border: 1px dashed #fcd34d;
 }
 
+/* ===============================
+   AVISO VAZIO - DOCUMENTOS
+================================ */
+
+#recentDocumentsList .empty-message,
+#documentsList .empty-message {
+    width: 100%;
+    min-height: 74px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 18px 16px;
+    border-radius: 12px;
+    border: 1px solid #edf2ef;
+    background: #fbfcfc;
+    color: #64748b;
+    text-align: center;
+    font-size: 13px;
+    font-weight: 750;
+    line-height: 1.45;
+    box-shadow: none;
+}
+
+#recentDocumentsList .empty-message::before,
+#recentDocumentsList .empty-message::after,
+#documentsList .empty-message::before,
+#documentsList .empty-message::after {
+    content: none;
+    display: none;
+}
+
 .doc-category {
     margin: 0;
     border: 1px solid #dfe9e4;
@@ -1837,6 +1868,13 @@ body.client-notice-open {
     .doc-file-link::after {
         grid-column: 2;
         width: fit-content;
+    }
+
+    #recentDocumentsList .empty-message,
+    #documentsList .empty-message {
+        min-height: 72px;
+        padding: 16px 14px;
+        font-size: 12.5px;
     }
 
     .client-footer {

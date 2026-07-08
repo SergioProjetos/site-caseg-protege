@@ -1,0 +1,1227 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Trocar Senha - CASEG Protege</title>
+
+    <link rel="stylesheet" href="../assets/css/style.css" />
+
+    <link
+        rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
+    />
+
+    <style>
+        .change-password-page {
+            --access-green: #176d2c;
+            --access-green-light: #1f8f3a;
+            --access-lime: #9fd117;
+            --access-text: #1a1a1a;
+            --access-muted: #59616d;
+            --access-bg: #f5f6f4;
+            --access-white: #ffffff;
+            --access-border: #e2e5e1;
+            --access-soft-green: #eaf5e5;
+            --access-shadow: 0 14px 34px rgba(0, 0, 0, 0.08);
+            --access-shadow-soft: 0 10px 22px rgba(0, 0, 0, 0.08);
+
+            background: var(--access-bg);
+            color: var(--access-text);
+        }
+
+        .change-password-page * {
+            box-sizing: border-box;
+        }
+
+        .change-password-page .site-header {
+            background: var(--access-white);
+            border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+            box-shadow: 0 6px 22px rgba(0, 0, 0, 0.04);
+        }
+
+        .change-password-page .header-container {
+            max-width: 1500px;
+            margin: 0 auto;
+            padding: 14px 28px;
+            display: grid;
+            grid-template-columns: 260px 1fr 140px;
+            align-items: center;
+            gap: 24px;
+        }
+
+        .change-password-page .logo-link {
+            display: inline-flex;
+            align-items: center;
+            text-decoration: none;
+        }
+
+        .change-password-page .site-logo {
+            width: 190px;
+            height: auto;
+        }
+
+        .change-password-page .main-nav {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 46px;
+        }
+
+        .change-password-page .main-nav a {
+            color: #111111;
+            text-decoration: none;
+            font-size: 17px;
+            font-weight: 800;
+            padding: 10px 0;
+            transition: color 0.2s ease;
+            background: transparent;
+            border: none;
+        }
+
+        .change-password-page .main-nav a::before,
+        .change-password-page .main-nav a::after {
+            content: none !important;
+            display: none !important;
+        }
+
+        .change-password-page .main-nav a:hover {
+            color: var(--access-green);
+        }
+
+        .change-password-page .header-login-button {
+            height: 44px;
+            padding: 0 20px;
+            border-radius: 8px;
+            background: var(--access-green);
+            color: #ffffff;
+            text-decoration: none;
+            font-weight: 800;
+            font-size: 15px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 9px;
+            box-shadow: 0 10px 20px rgba(23, 109, 44, 0.20);
+            transition: transform 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .change-password-page .header-login-button:hover {
+            background: var(--access-green-light);
+            transform: translateY(-2px);
+            box-shadow: 0 14px 26px rgba(23, 109, 44, 0.26);
+        }
+
+        .change-password-page .header-login-button i {
+            font-size: 17px;
+        }
+
+        .change-password-page .header-login-button.admin-user-only-button {
+            width: 44px;
+            min-width: 44px;
+            padding: 0;
+            gap: 0;
+        }
+
+        .change-password-main {
+            max-width: 1500px;
+            margin: 0 auto;
+            padding: 0 28px 28px;
+        }
+
+        .change-password-hero {
+            position: relative;
+            overflow: hidden;
+            border-radius: 18px;
+            background:
+                linear-gradient(
+                    90deg,
+                    rgba(0, 22, 14, 0.92) 0%,
+                    rgba(0, 38, 20, 0.78) 50%,
+                    rgba(0, 22, 14, 0.90) 100%
+                ),
+                url("../assets/img/fundo-industrial-caseg.png") center center / cover no-repeat;
+            box-shadow: var(--access-shadow);
+            color: #ffffff;
+        }
+
+        .change-password-hero-content {
+            min-height: 640px;
+            display: grid;
+            grid-template-columns: 1fr 440px;
+            gap: 42px;
+            align-items: center;
+            padding: 54px 72px;
+        }
+
+        .change-password-info-area {
+            position: relative;
+            z-index: 2;
+        }
+
+        .change-password-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            width: fit-content;
+            margin-bottom: 20px;
+            padding: 8px 14px;
+            border-radius: 999px;
+            background: rgba(31, 143, 58, 0.92);
+            color: #ffffff;
+            font-size: 13px;
+            font-weight: 900;
+        }
+
+        .change-password-info-area h1 {
+            margin: 0 0 18px;
+            max-width: 720px;
+            color: #ffffff;
+            font-size: 43px;
+            line-height: 1.12;
+            font-weight: 900;
+            letter-spacing: -0.6px;
+        }
+
+        .change-password-info-area h1 span {
+            color: var(--access-lime);
+        }
+
+        .change-password-info-area p {
+            margin: 0 0 26px;
+            max-width: 680px;
+            color: rgba(255, 255, 255, 0.88);
+            font-size: 17px;
+            line-height: 1.75;
+            font-weight: 500;
+        }
+
+        .change-password-benefits {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 14px;
+            max-width: 780px;
+        }
+
+        .change-password-benefit-card {
+            min-height: 142px;
+            padding: 18px;
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.10);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            backdrop-filter: blur(4px);
+        }
+
+        .change-password-benefit-card i {
+            width: 46px;
+            height: 46px;
+            margin-bottom: 14px;
+            border-radius: 14px;
+            background: rgba(159, 209, 23, 0.14);
+            color: var(--access-lime);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 21px;
+        }
+
+        .change-password-benefit-card strong {
+            display: block;
+            margin-bottom: 6px;
+            color: #ffffff;
+            font-size: 15px;
+            font-weight: 900;
+        }
+
+        .change-password-benefit-card span {
+            display: block;
+            color: rgba(255, 255, 255, 0.82);
+            font-size: 13px;
+            line-height: 1.45;
+            font-weight: 500;
+        }
+
+        .change-password-panel {
+            position: relative;
+            z-index: 2;
+            background: rgba(255, 255, 255, 0.97);
+            border-radius: 22px;
+            padding: 34px 32px;
+            color: var(--access-text);
+            box-shadow: 0 24px 70px rgba(0, 0, 0, 0.24);
+            border: 1px solid rgba(255, 255, 255, 0.72);
+        }
+
+        .change-password-panel-logo {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        .change-password-panel-logo img {
+            width: 172px;
+            height: auto;
+        }
+
+        .change-password-panel-title {
+            text-align: center;
+            margin-bottom: 22px;
+        }
+
+        .change-password-panel-title h2 {
+            margin: 0 0 8px;
+            color: #1e1e1e;
+            font-size: 27px;
+            line-height: 1.2;
+            font-weight: 900;
+        }
+
+        .change-password-panel-title p {
+            margin: 0 auto;
+            max-width: 340px;
+            color: var(--access-muted);
+            font-size: 14px;
+            line-height: 1.55;
+            font-weight: 500;
+        }
+
+        .change-password-greeting {
+            margin-bottom: 18px;
+            padding: 15px 16px;
+            border-radius: 14px;
+            background: var(--access-soft-green);
+            border: 1px solid rgba(23, 109, 44, 0.12);
+        }
+
+        .change-password-greeting p {
+            margin: 0 0 8px;
+            color: #43505c;
+            font-size: 13.5px;
+            line-height: 1.55;
+            font-weight: 600;
+        }
+
+        .change-password-greeting p:last-child {
+            margin-bottom: 0;
+        }
+
+        .change-password-greeting strong {
+            color: var(--access-green);
+            font-weight: 900;
+        }
+
+        #changePasswordForm {
+            display: grid;
+            gap: 14px;
+        }
+
+        #changePasswordForm label {
+            color: #28313a;
+            font-size: 13px;
+            font-weight: 900;
+        }
+
+        .password-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+            width: 100%;
+        }
+
+        .password-wrapper input {
+            width: 100%;
+            height: 46px;
+            border: 1px solid #dce3dc;
+            border-radius: 10px;
+            background: #fbfdfb;
+            color: #202832;
+            font-family: inherit;
+            font-size: 14px;
+            font-weight: 500;
+            outline: none;
+            padding: 0 48px 0 13px;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+        }
+
+        .password-wrapper input:focus {
+            border-color: rgba(23, 109, 44, 0.55);
+            background: #ffffff;
+            box-shadow: 0 0 0 4px rgba(23, 109, 44, 0.10);
+        }
+
+        .toggle-password-btn {
+            position: absolute;
+            right: 8px;
+            width: 34px;
+            height: 34px;
+            border: none;
+            border-radius: 8px;
+            background: transparent;
+            color: #59616d;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 15px;
+            transition: background-color 0.2s ease, color 0.2s ease;
+        }
+
+        .toggle-password-btn:hover {
+            background: var(--access-soft-green);
+            color: var(--access-green);
+        }
+
+        .password-rules {
+            margin: 0;
+            padding: 14px 16px;
+            border-radius: 14px;
+            background: #fbfdfb;
+            border: 1px solid var(--access-border);
+            list-style: none;
+            display: grid;
+            gap: 8px;
+        }
+
+        .password-rules li {
+            position: relative;
+            padding-left: 24px;
+            font-size: 13px;
+            font-weight: 800;
+            line-height: 1.35;
+            color: #666;
+        }
+
+        .password-rules li::before {
+            content: "\f111";
+            font-family: "Font Awesome 6 Free";
+            font-weight: 900;
+            position: absolute;
+            left: 0;
+            top: 1px;
+            font-size: 11px;
+        }
+
+        .password-rules li.valid {
+            color: var(--access-green);
+        }
+
+        .password-rules li.valid::before {
+            content: "\f058";
+        }
+
+        .password-rules li.invalid {
+            color: #c0392b;
+        }
+
+        .password-rules li.invalid::before {
+            content: "\f057";
+        }
+
+        #passwordMismatchMessage {
+            margin-top: -2px;
+            font-size: 13px;
+            font-weight: 800;
+            color: #c0392b;
+            display: none;
+            line-height: 1.4;
+        }
+
+        #changePasswordForm button[type="submit"] {
+            width: 100%;
+            min-height: 46px;
+            margin-top: 4px;
+            border: none;
+            border-radius: 10px;
+            background: var(--access-green);
+            color: #ffffff;
+            font-family: inherit;
+            font-size: 15px;
+            font-weight: 900;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 9px;
+            box-shadow: 0 10px 20px rgba(23, 109, 44, 0.18);
+            transition: transform 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        #changePasswordForm button[type="submit"]:hover {
+            background: var(--access-green-light);
+            transform: translateY(-2px);
+            box-shadow: 0 14px 24px rgba(23, 109, 44, 0.24);
+        }
+
+        #changePasswordForm button[type="submit"]:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        #changePasswordMessage {
+            min-height: 22px;
+            text-align: center;
+            font-size: 13px;
+            font-weight: 800;
+            line-height: 1.4;
+            margin-top: 4px;
+        }
+
+        .change-password-footer-links {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-top: 8px;
+        }
+
+        .change-password-footer-links a {
+            color: var(--access-green);
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 800;
+            transition: color 0.2s ease;
+        }
+
+        .change-password-footer-links a:hover {
+            color: var(--access-green-light);
+            text-decoration: underline;
+        }
+
+        .change-password-support-note {
+            margin-top: 18px;
+            padding: 14px 16px;
+            border-radius: 14px;
+            background: var(--access-soft-green);
+            border: 1px solid rgba(23, 109, 44, 0.12);
+            display: flex;
+            gap: 12px;
+            align-items: flex-start;
+        }
+
+        .change-password-support-note i {
+            color: var(--access-green);
+            font-size: 18px;
+            margin-top: 2px;
+        }
+
+        .change-password-support-note p {
+            margin: 0;
+            color: #43505c;
+            font-size: 13px;
+            line-height: 1.5;
+            font-weight: 600;
+        }
+
+        .change-password-support-note a {
+            color: var(--access-green);
+            text-decoration: none;
+            font-weight: 900;
+        }
+
+        .change-password-support-note a:hover {
+            text-decoration: underline;
+        }
+
+        .change-password-page .site-footer {
+            position: relative;
+            overflow: hidden;
+            background:
+                linear-gradient(
+                    90deg,
+                    rgba(0, 15, 10, 0.74) 0%,
+                    rgba(0, 18, 12, 0.60) 45%,
+                    rgba(0, 15, 10, 0.74) 100%
+                ),
+                url("../assets/img/fundo-industrial-caseg.png") center center / cover no-repeat;
+            color: #ffffff;
+            border-top: none;
+            margin: 0;
+            padding: 14px 28px;
+            box-shadow: 0 -4px 18px rgba(0, 0, 0, 0.18);
+            border-radius: 0;
+        }
+
+        .change-password-page .footer-container {
+            position: relative;
+            z-index: 2;
+            max-width: 1500px;
+            margin: 0 auto;
+            min-height: 68px;
+            display: grid;
+            grid-template-columns: 215px 1fr auto;
+            align-items: center;
+            gap: 22px;
+        }
+
+        .change-password-page .footer-logo {
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+        }
+
+        .change-password-page .footer-logo img {
+            width: 152px;
+            height: auto;
+            filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.35));
+        }
+
+        .change-password-page .site-footer p {
+            margin: 0;
+            color: rgba(255, 255, 255, 0.95);
+            font-size: 13px;
+            text-align: center;
+            font-weight: 600;
+            line-height: 1.45;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+        }
+
+        .change-password-page .footer-links {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 16px;
+            font-size: 13px;
+        }
+
+        .change-password-page .site-footer a {
+            color: rgba(255, 255, 255, 0.95);
+            text-decoration: none;
+            font-weight: 600;
+            transition: color 0.2s ease;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+        }
+
+        .change-password-page .site-footer a:hover {
+            color: var(--access-lime);
+            text-decoration: none;
+        }
+
+        .change-password-page .footer-links span {
+            color: rgba(255, 255, 255, 0.45);
+        }
+
+        @media (max-width: 1200px) {
+            .change-password-page .header-container {
+                grid-template-columns: 210px 1fr 120px;
+            }
+
+            .change-password-page .main-nav {
+                gap: 30px;
+            }
+
+            .change-password-hero-content {
+                grid-template-columns: 1fr 420px;
+                padding: 48px 44px;
+            }
+
+            .change-password-benefits {
+                grid-template-columns: 1fr;
+                max-width: 520px;
+            }
+
+            .change-password-benefit-card {
+                min-height: auto;
+            }
+        }
+
+        @media (max-width: 1024px) {
+            .change-password-hero-content {
+                grid-template-columns: 1fr;
+                min-height: auto;
+            }
+
+            .change-password-panel {
+                max-width: 480px;
+                margin: 0 auto;
+                width: 100%;
+            }
+        }
+
+        @media (max-width: 900px) {
+            .change-password-page .header-container {
+                grid-template-columns: 1fr auto;
+                gap: 16px;
+                padding: 12px 20px;
+            }
+
+            .change-password-page .site-logo {
+                width: 155px;
+            }
+
+            .change-password-page .main-nav {
+                grid-column: 1 / -1;
+                order: 3;
+                width: 100%;
+                justify-content: center;
+                gap: 24px;
+            }
+
+            .change-password-page .main-nav a {
+                font-size: 15px;
+            }
+
+            .change-password-page .header-login-button {
+                height: 40px;
+                padding: 0 15px;
+                font-size: 13px;
+            }
+
+            .change-password-page .header-login-button.admin-user-only-button {
+                width: 40px;
+                min-width: 40px;
+                padding: 0;
+            }
+
+            .change-password-page .footer-container {
+                grid-template-columns: 1fr;
+                text-align: center;
+                justify-items: center;
+                gap: 8px;
+                min-height: auto;
+            }
+
+            .change-password-page .footer-logo {
+                justify-content: center;
+            }
+
+            .change-password-page .footer-logo img {
+                width: 136px;
+            }
+
+            .change-password-page .footer-links {
+                justify-content: center;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .change-password-main {
+                padding: 0 12px 24px;
+            }
+
+            .change-password-hero {
+                border-radius: 12px;
+            }
+
+            .change-password-hero-content {
+                padding: 34px 22px;
+            }
+
+            .change-password-info-area h1 {
+                font-size: 32px;
+            }
+
+            .change-password-info-area p {
+                font-size: 15px;
+            }
+
+            .change-password-panel {
+                padding: 28px 22px;
+                border-radius: 18px;
+            }
+
+            .change-password-panel-title h2 {
+                font-size: 24px;
+            }
+
+            .change-password-page .site-footer p,
+            .change-password-page .footer-links,
+            .change-password-page .site-footer a {
+                font-size: 12.2px;
+            }
+        }
+
+        @media (max-width: 520px) {
+            .change-password-page .header-container {
+                grid-template-columns: 1fr;
+                justify-items: center;
+            }
+
+            .change-password-page .main-nav {
+                gap: 16px;
+                flex-wrap: wrap;
+            }
+
+            .change-password-page .header-login-button {
+                width: 100%;
+            }
+
+            .change-password-page .header-login-button.admin-user-only-button {
+                width: 44px;
+                min-width: 44px;
+                padding: 0;
+            }
+
+            .change-password-info-area h1 {
+                font-size: 28px;
+            }
+
+            .change-password-panel-logo img {
+                width: 148px;
+            }
+
+            .change-password-page .footer-links {
+                flex-direction: column;
+                gap: 5px;
+            }
+
+            .change-password-page .footer-links span {
+                display: none;
+            }
+
+            .change-password-page .footer-logo img {
+                width: 130px;
+            }
+        }
+    </style>
+
+    <script>
+        const RECOVERY_RESET_TOKEN_KEY = "password_recovery_reset_token";
+        const recoveryResetTokenCheck = localStorage.getItem(RECOVERY_RESET_TOKEN_KEY);
+
+        if (!recoveryResetTokenCheck) {
+            window.location.href = "recuperar-senha.html";
+        }
+    </script>
+</head>
+
+<body class="change-password-page">
+
+    <header class="site-header">
+        <div class="header-container">
+            <a href="home.html" class="logo-link reveal-on-load delay-1">
+                <img
+                    src="../assets/img/logo_transparente.png"
+                    alt="Logo CASEG Protege"
+                    class="site-logo"
+                />
+            </a>
+
+            <nav class="main-nav reveal-on-load delay-2">
+                <a href="home.html">Home</a>
+                <a href="servicos.html">Serviços</a>
+                <a href="avisos.html">Sobre</a>
+                <a href="contato.html">Contato</a>
+            </nav>
+
+            <a href="login.html" class="header-login-button reveal-on-load delay-3">
+                <i class="fa-regular fa-user"></i>
+                Entrar
+            </a>
+        </div>
+    </header>
+
+    <main class="change-password-main">
+        <section class="change-password-hero reveal-on-load delay-2">
+            <div class="change-password-hero-content">
+                <div class="change-password-info-area">
+                    <div class="change-password-badge reveal-on-load delay-2">
+                        <i class="fa-solid fa-key"></i>
+                        Código validado
+                    </div>
+
+                    <h1 class="reveal-on-load delay-3">
+                        Crie uma nova senha para recuperar seu acesso com
+                        <span>segurança.</span>
+                    </h1>
+
+                    <p class="reveal-on-load delay-4">
+                        O código de validação foi confirmado. Agora cadastre uma nova senha
+                        forte para voltar a acessar sua área exclusiva CASEG Protege.
+                    </p>
+
+                    <div class="change-password-benefits">
+                        <div class="change-password-benefit-card reveal-on-load delay-4">
+                            <i class="fa-solid fa-shield-halved"></i>
+                            <strong>Senha protegida</strong>
+                            <span>Use uma senha forte e exclusiva para sua conta.</span>
+                        </div>
+
+                        <div class="change-password-benefit-card reveal-on-load delay-5">
+                            <i class="fa-regular fa-folder-open"></i>
+                            <strong>Acesso restaurado</strong>
+                            <span>Após salvar, você poderá entrar novamente pelo login.</span>
+                        </div>
+
+                        <div class="change-password-benefit-card reveal-on-load delay-6">
+                            <i class="fa-solid fa-user-lock"></i>
+                            <strong>Conta individual</strong>
+                            <span>Não compartilhe suas credenciais de acesso.</span>
+                        </div>
+                    </div>
+                </div>
+
+                <section class="change-password-panel reveal-on-load delay-3">
+                    <div class="change-password-panel-logo">
+                        <img
+                            src="../assets/img/logo_transparente.png"
+                            alt="Logo CASEG Protege"
+                        />
+                    </div>
+
+                    <div class="change-password-panel-title">
+                        <h2>Trocar Senha</h2>
+                        <p>
+                            Cadastre sua nova senha para concluir a recuperação.
+                        </p>
+                    </div>
+
+                    <div class="change-password-greeting">
+                        <p><strong>Validação concluída.</strong></p>
+                        <p>
+                            Digite uma nova senha seguindo os requisitos abaixo.
+                            Depois disso, você será redirecionado para fazer login novamente.
+                        </p>
+                    </div>
+
+                    <form id="changePasswordForm">
+                        <label for="newPassword">Nova senha</label>
+
+                        <div class="password-wrapper">
+                            <input
+                                type="password"
+                                id="newPassword"
+                                name="newPassword"
+                                placeholder="Digite sua nova senha"
+                                autocomplete="new-password"
+                                required
+                            />
+
+                            <button
+                                type="button"
+                                id="toggleNewPassword"
+                                class="toggle-password-btn"
+                                aria-label="Mostrar ou ocultar nova senha"
+                            >
+                                <i id="eyeIconNewPassword" class="fa-solid fa-eye"></i>
+                            </button>
+                        </div>
+
+                        <ul class="password-rules">
+                            <li id="ruleMinLength" class="invalid">Pelo menos 8 caracteres</li>
+                            <li id="ruleUppercase" class="invalid">Pelo menos 1 letra maiúscula</li>
+                            <li id="ruleNumber" class="invalid">Pelo menos 1 número</li>
+                        </ul>
+
+                        <label for="confirmPassword">Confirmar nova senha</label>
+
+                        <div class="password-wrapper">
+                            <input
+                                type="password"
+                                id="confirmPassword"
+                                name="confirmPassword"
+                                placeholder="Confirme sua nova senha"
+                                autocomplete="new-password"
+                                required
+                            />
+
+                            <button
+                                type="button"
+                                id="toggleConfirmPassword"
+                                class="toggle-password-btn"
+                                aria-label="Mostrar ou ocultar confirmação de senha"
+                            >
+                                <i id="eyeIconConfirmPassword" class="fa-solid fa-eye"></i>
+                            </button>
+                        </div>
+
+                        <div id="passwordMismatchMessage">As senhas não coincidem.</div>
+
+                        <button type="submit" id="saveNewPasswordBtn">
+                            <i class="fa-solid fa-check"></i>
+                            Salvar nova senha
+                        </button>
+
+                        <div id="changePasswordMessage"></div>
+
+                        <div class="change-password-footer-links">
+                            <a href="recuperar-senha.html" id="restartRecoveryLink">
+                                Refazer recuperação
+                            </a>
+
+                            <a href="login.html">
+                                Voltar para o login
+                            </a>
+                        </div>
+                    </form>
+
+                    <div class="change-password-support-note">
+                        <i class="fa-regular fa-circle-question"></i>
+                        <p>
+                            Caso tenha dificuldade para alterar sua senha, entre em contato pela página
+                            <a href="contato.html">Contato</a>.
+                        </p>
+                    </div>
+                </section>
+            </div>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <div class="footer-container">
+            <div class="footer-logo">
+                <img
+                    src="../assets/img/logo_footer.png"
+                    alt="Logo CASEG Protege"
+                />
+            </div>
+
+            <p>© 2025 CASEG Protege. Todos os direitos reservados.</p>
+
+            <div class="footer-links">
+                <a href="termos-de-uso.html">Termos de Uso</a>
+                <span>|</span>
+                <a href="politica-privacidade.html">Política de Privacidade</a>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        const RECOVERY_IDENTIFIER_KEY = "password_recovery_identifier";
+        const RECOVERY_RESET_TOKEN_STORAGE_KEY = "password_recovery_reset_token";
+
+        const changePasswordForm = document.querySelector("#changePasswordForm");
+        const changePasswordMessage = document.querySelector("#changePasswordMessage");
+        const newPasswordInput = document.querySelector("#newPassword");
+        const confirmPasswordInput = document.querySelector("#confirmPassword");
+        const passwordMismatchMessage = document.querySelector("#passwordMismatchMessage");
+
+        const toggleNewPasswordBtn = document.querySelector("#toggleNewPassword");
+        const toggleConfirmPasswordBtn = document.querySelector("#toggleConfirmPassword");
+        const eyeIconNewPassword = document.querySelector("#eyeIconNewPassword");
+        const eyeIconConfirmPassword = document.querySelector("#eyeIconConfirmPassword");
+
+        const ruleMinLength = document.querySelector("#ruleMinLength");
+        const ruleUppercase = document.querySelector("#ruleUppercase");
+        const ruleNumber = document.querySelector("#ruleNumber");
+
+        const saveNewPasswordBtn = document.querySelector("#saveNewPasswordBtn");
+        const restartRecoveryLink = document.querySelector("#restartRecoveryLink");
+
+        function setMessage(message, type = "info") {
+            if (!changePasswordMessage) {
+                return;
+            }
+
+            let color = "#0b6b79";
+
+            if (type === "success") {
+                color = "green";
+            }
+
+            if (type === "error") {
+                color = "red";
+            }
+
+            changePasswordMessage.innerHTML = `<span style="color:${color};">${message}</span>`;
+        }
+
+        function showPasswordMismatch(message = "As senhas não coincidem.") {
+            if (!passwordMismatchMessage) {
+                return;
+            }
+
+            passwordMismatchMessage.textContent = message;
+            passwordMismatchMessage.style.display = "block";
+        }
+
+        function hidePasswordMismatch() {
+            if (!passwordMismatchMessage) {
+                return;
+            }
+
+            passwordMismatchMessage.style.display = "none";
+        }
+
+        function validatePasswordsMatch() {
+            const newPassword = newPasswordInput ? newPasswordInput.value.trim() : "";
+            const confirmPassword = confirmPasswordInput ? confirmPasswordInput.value.trim() : "";
+
+            if (!confirmPassword) {
+                hidePasswordMismatch();
+                return true;
+            }
+
+            if (newPassword !== confirmPassword) {
+                showPasswordMismatch("As senhas não coincidem.");
+                return false;
+            }
+
+            hidePasswordMismatch();
+            return true;
+        }
+
+        function setupPasswordToggle(button, input, icon) {
+            if (!button || !input || !icon) {
+                return;
+            }
+
+            button.addEventListener("click", function () {
+                const isPassword = input.type === "password";
+                input.type = isPassword ? "text" : "password";
+                icon.className = isPassword ? "fa-solid fa-eye-slash" : "fa-solid fa-eye";
+            });
+        }
+
+        function updateRuleStatus(element, isValid) {
+            if (!element) {
+                return;
+            }
+
+            element.classList.remove("valid", "invalid");
+            element.classList.add(isValid ? "valid" : "invalid");
+        }
+
+        function validatePasswordStrength(password) {
+            return {
+                minLength: password.length >= 8,
+                uppercase: /[A-Z]/.test(password),
+                number: /\d/.test(password)
+            };
+        }
+
+        function updatePasswordStrengthRules() {
+            const password = newPasswordInput ? newPasswordInput.value : "";
+            const rules = validatePasswordStrength(password);
+
+            updateRuleStatus(ruleMinLength, rules.minLength);
+            updateRuleStatus(ruleUppercase, rules.uppercase);
+            updateRuleStatus(ruleNumber, rules.number);
+
+            return rules;
+        }
+
+        function isPasswordStrongEnough(password) {
+            const rules = validatePasswordStrength(password);
+            return rules.minLength && rules.uppercase && rules.number;
+        }
+
+        function setButtonLoading(isLoading) {
+            if (!saveNewPasswordBtn) {
+                return;
+            }
+
+            saveNewPasswordBtn.disabled = isLoading;
+
+            if (isLoading) {
+                saveNewPasswordBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>Salvando senha...';
+                return;
+            }
+
+            saveNewPasswordBtn.innerHTML = '<i class="fa-solid fa-check"></i>Salvar nova senha';
+        }
+
+        function clearRecoveryStorage() {
+            localStorage.removeItem(RECOVERY_IDENTIFIER_KEY);
+            localStorage.removeItem(RECOVERY_RESET_TOKEN_STORAGE_KEY);
+        }
+
+        function getRecoveryResetToken() {
+            return localStorage.getItem(RECOVERY_RESET_TOKEN_STORAGE_KEY) || "";
+        }
+
+        setupPasswordToggle(toggleNewPasswordBtn, newPasswordInput, eyeIconNewPassword);
+        setupPasswordToggle(toggleConfirmPasswordBtn, confirmPasswordInput, eyeIconConfirmPassword);
+
+        if (newPasswordInput) {
+            newPasswordInput.addEventListener("input", function () {
+                updatePasswordStrengthRules();
+                validatePasswordsMatch();
+            });
+        }
+
+        if (confirmPasswordInput) {
+            confirmPasswordInput.addEventListener("input", validatePasswordsMatch);
+        }
+
+        if (restartRecoveryLink) {
+            restartRecoveryLink.addEventListener("click", function () {
+                clearRecoveryStorage();
+            });
+        }
+
+        if (changePasswordForm) {
+            changePasswordForm.addEventListener("submit", async function (event) {
+                event.preventDefault();
+
+                const resetToken = getRecoveryResetToken();
+                const newPassword = newPasswordInput ? newPasswordInput.value.trim() : "";
+                const confirmPassword = confirmPasswordInput ? confirmPasswordInput.value.trim() : "";
+
+                hidePasswordMismatch();
+                updatePasswordStrengthRules();
+
+                if (!resetToken) {
+                    setMessage("Validação expirada. Solicite um novo código de recuperação.", "error");
+
+                    setTimeout(() => {
+                        clearRecoveryStorage();
+                        window.location.href = "recuperar-senha.html";
+                    }, 1600);
+
+                    return;
+                }
+
+                if (!newPassword || !confirmPassword) {
+                    setMessage("Preencha os dois campos de senha.", "error");
+                    return;
+                }
+
+                if (!isPasswordStrongEnough(newPassword)) {
+                    setMessage("A senha deve ter no mínimo 8 caracteres, 1 letra maiúscula e 1 número.", "error");
+                    return;
+                }
+
+                if (newPassword !== confirmPassword) {
+                    showPasswordMismatch("A confirmação da senha está diferente da nova senha.");
+                    setMessage("Corrija os campos de senha para continuar.", "error");
+                    return;
+                }
+
+                setButtonLoading(true);
+                setMessage("Salvando nova senha...", "info");
+
+                try {
+                    const response = await fetch("http://localhost:3000/auth/recovery/reset", {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json"
+                        },
+                        body: JSON.stringify({
+                            reset_token: resetToken,
+                            new_password: newPassword
+                        })
+                    });
+
+                    const data = await response.json().catch(() => ({}));
+
+                    if (!response.ok) {
+                        setMessage(data.error || "Erro ao atualizar a senha.", "error");
+                        return;
+                    }
+
+                    setMessage("Senha atualizada com sucesso! Redirecionando para o login...", "success");
+
+                    setTimeout(() => {
+                        clearRecoveryStorage();
+                        localStorage.setItem("password_updated", "true");
+                        window.location.href = "login.html";
+                    }, 1800);
+
+                } catch (error) {
+                    console.error("Erro ao trocar senha:", error);
+                    setMessage("Erro ao conectar com o servidor.", "error");
+                } finally {
+                    setButtonLoading(false);
+                }
+            });
+        }
+
+        updatePasswordStrengthRules();
+        hidePasswordMismatch();
+    </script>
+
+    <script src="../assets/js/site-animations.js"></script>
+
+</body>
+</html>

@@ -2132,8 +2132,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     const deleteBtn = card.querySelector('[data-action="delete"], .delete-client-btn');
 
     if (documentsBtn) {
-      documentsBtn.dataset.clientId = clientId;
-      documentsBtn.addEventListener("click", () => toggleClientDocuments(card, client));
+       documentsBtn.dataset.clientId = clientId;
+       setClientDocumentsButtonState(card, false);
+        documentsBtn.addEventListener("click", () => toggleClientDocuments(card, client));
     }
 
     if (uploadBtn) {
@@ -2204,14 +2205,41 @@ document.addEventListener("DOMContentLoaded", async () => {
     return clientsList.querySelector(`[data-client-id="${clientId}"]`);
   }
 
-  function closeClientDocuments(card) {
-    const wrapper = card?.querySelector("[data-client-documents-wrapper], .client-documents-wrapper");
+  function getClientDocumentsButton(card) {
+  return card?.querySelector('[data-action="documents"], .show-documents-btn, .toggle-documents-btn') || null;
+}
 
-    if (wrapper) {
-      wrapper.classList.add("hidden");
-      wrapper.replaceChildren();
-    }
+  function setClientDocumentsButtonState(card, isOpen) {
+  const button = getClientDocumentsButton(card);
+
+  if (!button) {
+    return;
   }
+
+  const label = button.querySelector("[data-action-label], span");
+  const nextLabel = isOpen ? "Ocultar Documentos" : "Visualizar Documentos";
+
+  button.classList.toggle("is-open", isOpen);
+  button.setAttribute("aria-expanded", String(isOpen));
+
+  if (label) {
+    label.textContent = nextLabel;
+    return;
+  }
+
+  button.textContent = nextLabel;
+}
+
+  function closeClientDocuments(card) {
+  const wrapper = card?.querySelector("[data-client-documents-wrapper], .client-documents-wrapper");
+
+  if (wrapper) {
+    wrapper.classList.add("hidden");
+    wrapper.replaceChildren();
+  }
+
+  setClientDocumentsButtonState(card, false);
+}
 
   function closeClientUpload(card) {
     const wrapper = card?.querySelector("[data-client-upload-wrapper], .client-upload-wrapper");
@@ -2250,6 +2278,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     closeOtherClientPanels(card);
 
     wrapper.classList.remove("hidden");
+    setClientDocumentsButtonState(card, true);
     wrapper.innerHTML = '<p class="documents-loading-message">Carregando documentos...</p>';
 
     await fetchClientDocuments(client, wrapper);

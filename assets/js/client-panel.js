@@ -3,6 +3,9 @@ document.addEventListener("DOMContentLoaded", function () {
   let allClientDocuments = [];
   let clientNoticeResolver = null;
 
+  const RECENT_DOCUMENTS_PERIOD_DAYS = 7;
+  const RECENT_DOCUMENTS_PERIOD_MS = RECENT_DOCUMENTS_PERIOD_DAYS * 24 * 60 * 60 * 1000;
+
   try {
     profile = JSON.parse(localStorage.getItem("profile"));
   } catch (error) {
@@ -267,6 +270,33 @@ document.addEventListener("DOMContentLoaded", function () {
     element.removeAttribute("aria-disabled");
   }
 
+  function getDocumentRecentTimestamp(doc) {
+    const dateValue = doc.created_at || doc.updated_at || doc.uploaded_at || "";
+    const timestamp = new Date(dateValue).getTime();
+
+    if (!Number.isFinite(timestamp)) {
+      return 0;
+    }
+
+    return timestamp;
+  }
+
+  function isDocumentWithinRecentPeriod(doc) {
+    const timestamp = getDocumentRecentTimestamp(doc);
+
+    if (!timestamp) {
+      return false;
+    }
+
+    return timestamp >= Date.now() - RECENT_DOCUMENTS_PERIOD_MS;
+  }
+
+  function filterRecentDocuments(documents) {
+    const safeDocuments = Array.isArray(documents) ? documents : [];
+
+    return safeDocuments.filter((doc) => isDocumentWithinRecentPeriod(doc));
+  }
+
   /* ===============================
      MENU LATERAL ATIVO
   ================================ */
@@ -302,6 +332,34 @@ document.addEventListener("DOMContentLoaded", function () {
     setSidebarActiveLink(activeLink);
   }
 
+  function isTrainingPortalLink(link) {
+    if (!link) {
+      return false;
+    }
+
+    const linkText = normalizeSearchText(link.textContent || "");
+    const linkHref = normalizeSearchText(link.getAttribute("href") || "");
+    const linkId = normalizeSearchText(link.id || "");
+
+    return (
+      linkText.includes("treinamento") ||
+      linkHref.includes("treinamento") ||
+      linkId.includes("treinamento") ||
+      linkId.includes("training")
+    );
+  }
+
+  async function showTrainingPortalNotice() {
+    await showClientNotice(
+      "Portal de Treinamentos CASEG Protege estará disponível em breve.",
+      {
+        title: "Portal de treinamento",
+        type: "info",
+        confirmText: "Entendi"
+      }
+    );
+  }
+
   function setupSidebarActiveNavigation() {
     const sidebarLinks = document.querySelectorAll(".client-sidebar-link");
 
@@ -310,7 +368,14 @@ document.addEventListener("DOMContentLoaded", function () {
         return;
       }
 
-      link.addEventListener("click", function () {
+      link.addEventListener("click", async function (event) {
+        if (isTrainingPortalLink(link)) {
+          event.preventDefault();
+          await showTrainingPortalNotice();
+          updateSidebarActiveByHash();
+          return;
+        }
+
         setSidebarActiveLink(link);
       });
     });
@@ -358,6 +423,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
   function updateClientDashboardStats(documents) {
     const safeDocuments = Array.isArray(documents) ? documents : [];
+    const recentDocuments = filterRecentDocuments(safeDocuments);
 
     const categories = new Set();
     const subcategories = new Set();
@@ -378,7 +444,7 @@ document.addEventListener("DOMContentLoaded", function () {
     setText(clientTotalDocuments, String(safeDocuments.length));
     setText(clientTotalCategories, String(categories.size));
     setText(clientTotalSubcategories, String(subcategories.size));
-    setText(clientRecentDocuments, String(safeDocuments.length));
+    setText(clientRecentDocuments, String(recentDocuments.length));
   }
 
   /* ===============================
@@ -386,11 +452,11 @@ document.addEventListener("DOMContentLoaded", function () {
   ================================ */
 
   function sortDocumentsForRecent(documents) {
-    const safeDocuments = Array.isArray(documents) ? [...documents] : [];
+    const safeDocuments = filterRecentDocuments(documents);
 
     safeDocuments.sort((a, b) => {
-      const dateA = new Date(a.created_at || a.updated_at || a.uploaded_at || 0).getTime();
-      const dateB = new Date(b.created_at || b.updated_at || b.uploaded_at || 0).getTime();
+      const dateA = getDocumentRecentTimestamp(a);
+      const dateB = getDocumentRecentTimestamp(b);
 
       if (dateA !== dateB) {
         return dateB - dateA;
@@ -411,7 +477,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     if (recentDocuments.length === 0) {
       recentDocumentsList.innerHTML =
-        "<p class='empty-message'>Nenhum documento recente disponível.</p>";
+        "<p class='empty-message'>Nenhum documento recente nos últimos 7 dias.</p>";
       return;
     }
 
