@@ -1924,6 +1924,12 @@ app.get("/documents", async (req, res) => {
       });
     }
 
+    if (profile.must_change_password === true) {
+      return res.status(403).json({
+        error: "Conclua o primeiro acesso antes de continuar."
+      });
+    }
+
     const { data, error } = await adminSupabase
       .from("documents")
       .select("*")
@@ -1979,6 +1985,12 @@ app.post("/documents/download", async (req, res) => {
     if (profile.is_active === false) {
       return res.status(403).json({
         error: "Cliente inativo. Entre em contato com a administração."
+      });
+    }
+
+    if (profile.must_change_password === true) {
+      return res.status(403).json({
+        error: "Conclua o primeiro acesso antes de continuar."
       });
     }
 
