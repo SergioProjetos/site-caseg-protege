@@ -1025,6 +1025,27 @@ app.put("/update-password", async (req, res) => {
       });
     }
 
+    const userId = authResult.user.id;
+    const profileResult = await getUserProfile(userId);
+
+    if (profileResult.error) {
+      return res.status(403).json({
+        error: "A troca de senha não está disponível para este usuário."
+      });
+    }
+
+    const profile = profileResult.profile;
+
+    if (
+      profile.role !== "client" ||
+      profile.is_active !== true ||
+      profile.must_change_password !== true
+    ) {
+      return res.status(403).json({
+        error: "A troca de senha não está disponível para este usuário."
+      });
+    }
+
     const newPassword = normalizeText(req.body.new_password);
 
     if (!newPassword) {
@@ -1038,8 +1059,6 @@ app.put("/update-password", async (req, res) => {
         error: "A senha deve ter no mínimo 8 caracteres, uma letra maiúscula e um número."
       });
     }
-
-    const userId = authResult.user.id;
 
     const { error: updateAuthError } =
       await adminSupabase.auth.admin.updateUserById(userId, {
