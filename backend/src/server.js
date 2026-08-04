@@ -919,7 +919,7 @@ app.post("/login", async (req, res) => {
       });
     }
 
-    if (profile.role === "client" && profile.is_active === false) {
+    if (profile.role === "client" && profile.is_active !== true) {
       return res.status(403).json({
         error: "Cliente inativo. Entre em contato com a administração."
       });
@@ -1956,7 +1956,7 @@ app.get("/documents", async (req, res) => {
       });
     }
 
-    if (profile.is_active === false) {
+    if (profile.is_active !== true) {
       return res.status(403).json({
         error: "Cliente inativo. Entre em contato com a administração."
       });
@@ -2020,7 +2020,7 @@ app.post("/documents/download", async (req, res) => {
       });
     }
 
-    if (profile.is_active === false) {
+    if (profile.is_active !== true) {
       return res.status(403).json({
         error: "Cliente inativo. Entre em contato com a administração."
       });
