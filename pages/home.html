@@ -2301,16 +2301,41 @@
                 document.body.classList.remove("modal-open");
             }
 
+            function isValidBannerHttpLink(value) {
+                const normalizedValue = String(value || "").trim();
+
+                if (!/^https?:\/\//i.test(normalizedValue)) {
+                    return false;
+                }
+
+                try {
+                    const parsedUrl = new URL(normalizedValue);
+
+                    return (
+                        ["http:", "https:"].includes(parsedUrl.protocol) &&
+                        Boolean(parsedUrl.hostname)
+                    );
+                } catch {
+                    return false;
+                }
+            }
+
             function getResolvedLink(banner) {
                 const linkTarget = String(banner.link_target || "").trim();
                 const customLink = String(banner.link || "").trim();
 
                 if (linkTarget === "contato") return "contato.html";
                 if (linkTarget === "servicos") return "servicos.html";
-                if (linkTarget === "whatsapp") return customLink || "contato.html";
-                if (linkTarget === "custom") return customLink || "";
+                if (linkTarget === "whatsapp") {
+                    if (!customLink) return "contato.html";
 
-                return customLink || "";
+                    return isValidBannerHttpLink(customLink) ? customLink : "";
+                }
+                if (linkTarget === "custom") {
+                    return isValidBannerHttpLink(customLink) ? customLink : "";
+                }
+
+                return "";
             }
 
             function updateCarousel() {
@@ -2382,13 +2407,16 @@
                 }
 
                 if (actionType === "link" && resolvedLink) {
-                    const isExternal =
-                        resolvedLink.startsWith("http://") ||
-                        resolvedLink.startsWith("https://");
+                    const linkTarget = String(banner.link_target || "").trim();
+                    const isExternal = isValidBannerHttpLink(resolvedLink);
+                    const isInternal =
+                        (linkTarget === "contato" && resolvedLink === "contato.html") ||
+                        (linkTarget === "servicos" && resolvedLink === "servicos.html") ||
+                        (linkTarget === "whatsapp" && resolvedLink === "contato.html");
 
                     if (isExternal) {
                         window.open(resolvedLink, "_blank", "noopener,noreferrer");
-                    } else {
+                    } else if (isInternal) {
                         window.location.href = resolvedLink;
                     }
                 }

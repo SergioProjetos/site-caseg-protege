@@ -462,6 +462,25 @@ function isValidBannerLinkTarget(value) {
   return ["contato", "servicos", "whatsapp", "custom"].includes(String(value || "").trim());
 }
 
+function isValidBannerCustomLink(value) {
+  const normalizedValue = String(value || "").trim();
+
+  if (!/^https?:\/\//i.test(normalizedValue)) {
+    return false;
+  }
+
+  try {
+    const parsedUrl = new URL(normalizedValue);
+
+    return (
+      ["http:", "https:"].includes(parsedUrl.protocol) &&
+      Boolean(parsedUrl.hostname)
+    );
+  } catch {
+    return false;
+  }
+}
+
 async function findDuplicateDocument({ clientId, category, subcategory, year, fileName }) {
   let query = adminSupabase
     .from("documents")
@@ -2325,6 +2344,12 @@ app.post("/admin/notices/upload", (req, res, next) => {
             "Para link personalizado, o campo link é obrigatório."
         });
       }
+
+      if (linkTarget === "custom" && !isValidBannerCustomLink(link)) {
+        return res.status(400).json({
+          error: "Insira URL válido"
+        });
+      }
     }
 
     if (!image.mimetype.startsWith("image/")) {
@@ -2617,6 +2642,12 @@ app.put("/admin/notices/:noticeId", (req, res, next) => {
         return res.status(400).json({
           error:
             "Para link personalizado, o campo link é obrigatório."
+        });
+      }
+
+      if (linkTarget === "custom" && !isValidBannerCustomLink(link)) {
+        return res.status(400).json({
+          error: "Insira URL válido"
         });
       }
     }

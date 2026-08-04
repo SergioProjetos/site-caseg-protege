@@ -3354,6 +3354,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (linkTarget === "custom" && !link) {
         return "Informe o link personalizado do banner.";
       }
+
+      if (linkTarget === "custom" && !getValidBannerHttpLink(link)) {
+        return "Insira URL válido";
+      }
     }
 
     if (actionType === "modal" && !description) {
@@ -3407,6 +3411,27 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
+  function getValidBannerHttpLink(value) {
+    const normalizedValue = String(value || "").trim();
+
+    if (!/^https?:\/\//i.test(normalizedValue)) {
+      return "";
+    }
+
+    try {
+      const parsedUrl = new URL(normalizedValue);
+
+      return (
+        ["http:", "https:"].includes(parsedUrl.protocol) &&
+        parsedUrl.hostname
+      )
+        ? normalizedValue
+        : "";
+    } catch {
+      return "";
+    }
+  }
+
   function renderHomeBannerCard(banner) {
     const card = cloneTemplate(homeBannerCardTemplate);
 
@@ -3447,8 +3472,15 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     if (linkElement && link) {
-      linkElement.href = link;
       linkElement.textContent = link;
+
+      const validLink = getValidBannerHttpLink(link);
+
+      if (validLink) {
+        linkElement.href = validLink;
+      } else {
+        linkElement.removeAttribute("href");
+      }
     }
 
     const descriptionBox = card.querySelector("[data-banner-description-box]");
@@ -3783,6 +3815,15 @@ document.addEventListener("DOMContentLoaded", async () => {
         homeBannerMessage.className = "form-message error";
       }
 
+      if (validationError === "Insira URL válido") {
+        await showAdminActionMessage({
+          type: "danger",
+          title: "Erro ao salvar banner",
+          message: validationError,
+          confirmText: "OK"
+        });
+      }
+
       return;
     }
 
@@ -4084,6 +4125,26 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       bannerLinkTarget.addEventListener("change", () => {
         updateBannerActionFieldsVisibility();
+      });
+    }
+
+    if (bannerLink && bannerLink.dataset.invalidBound !== "true") {
+      bannerLink.dataset.invalidBound = "true";
+
+      bannerLink.addEventListener("invalid", (event) => {
+        const actionType = bannerActionType?.value || "modal";
+        const linkTarget = bannerLinkTarget?.value || "";
+
+        if (
+          actionType !== "link" ||
+          linkTarget !== "custom" ||
+          !bannerLink.validity.typeMismatch
+        ) {
+          return;
+        }
+
+        event.preventDefault();
+        void handleSaveBanner(event);
       });
     }
 
