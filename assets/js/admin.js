@@ -35,6 +35,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   const clientsSectionWrapper = document.getElementById("clientsSectionWrapper");
   const homeBannersWrapper = document.getElementById("homeBannersWrapper");
 
+  const homeBannerModal = document.getElementById("homeBannerModal");
+  const homeBannerModalBackdrop = document.getElementById("homeBannerModalBackdrop");
+  const homeBannerModalTitle = document.getElementById("homeBannerModalTitle");
+  const closeHomeBannerModalBtn = document.getElementById("closeHomeBannerModalBtn");
+
   const createClientModal = document.getElementById("createClientModal");
   const createClientModalBackdrop = document.getElementById("createClientModalBackdrop");
   const closeCreateClientModalBtn = document.getElementById("closeCreateClientModalBtn");
@@ -97,7 +102,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   const toggleBannerFormBtn = document.getElementById("toggleBannerFormBtn");
   const saveBannerBtn = document.getElementById("saveBannerBtn");
-  const cancelBannerEditBtn = document.getElementById("cancelBannerEditBtn");
   const cancelBannerEditBtnBottom = document.getElementById("cancelBannerEditBtnBottom");
 
   const bannerEditId = document.getElementById("bannerEditId");
@@ -137,6 +141,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   let homeBannersSortable = null;
   let bannerOrderBeforeDrag = "";
+  let isBannerSaving = false;
 
   let adminSessionRefreshTimer = null;
   let adminSessionRefreshingPromise = null;
@@ -1104,32 +1109,13 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   async function openBannersFromQuickAction(options = {}) {
     if (!homeBannersWrapper) return;
+    if (isBannerSaving) return;
 
     const shouldOpenForm = Boolean(options.openForm);
     const isBannersAlreadyOpen = !homeBannersWrapper.classList.contains("hidden");
-    const isBannerFormAlreadyOpen =
-      homeBannerForm && !homeBannerForm.classList.contains("hidden");
-
-    if (shouldOpenForm && isBannersAlreadyOpen && isBannerFormAlreadyOpen) {
-      homeBannerForm?.reset();
-      setBannerFormCreateMode();
-      hideBannerForm();
-      hideHomeBanners();
-
-      setSidebarActive("dashboard");
-      updateHash("#dashboard");
-      scrollToDashboard();
-      return;
-    }
 
     if (!shouldOpenForm && isBannersAlreadyOpen) {
-      if (isBannerFormAlreadyOpen) {
-        homeBannerForm?.reset();
-        setBannerFormCreateMode();
-        hideBannerForm();
-      }
-
-      hideHomeBanners();
+      if (!hideHomeBanners()) return;
 
       setSidebarActive("dashboard");
       updateHash("#dashboard");
@@ -1148,20 +1134,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     if (shouldOpenForm) {
-      if (homeBannerForm) {
-        homeBannerForm.reset();
-      }
-
       setBannerFormCreateMode();
       showBannerForm();
-
-      setTimeout(() => {
-        homeBannerForm?.scrollIntoView({
-          behavior: "smooth",
-          block: "start"
-        });
-      }, 180);
-
       return;
     }
 
@@ -1738,7 +1712,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function hideHomeBanners() {
-    if (!homeBannersWrapper) return;
+    if (!homeBannersWrapper) return false;
+
+    if (isHomeBannerModalOpen() && !hideBannerForm({ reset: true })) {
+      return false;
+    }
 
     closePanel(homeBannersWrapper);
 
@@ -1746,34 +1724,51 @@ document.addEventListener("DOMContentLoaded", async () => {
       toggleHomeBannersBtn.textContent = "Exibir Banners";
     }
 
-    if (homeBannerForm && !homeBannerForm.classList.contains("hidden")) {
-      hideBannerForm();
-    }
+    return true;
   }
 
   function showBannerForm() {
-    if (!homeBannerForm) return;
+    if (!homeBannerModal || !homeBannerForm) return;
 
-    openPanel(homeBannerForm);
-
-    if (toggleBannerFormBtn) {
-      toggleBannerFormBtn.textContent = "Ocultar formulário";
-    }
+    homeBannerModal.classList.remove("hidden");
+    homeBannerModal.setAttribute("aria-hidden", "false");
 
     clearBannerMessage();
     updateBannerActionFieldsVisibility();
+
+    setTimeout(() => {
+      if (isHomeBannerModalOpen()) {
+        bannerTitle?.focus();
+      }
+    }, 80);
   }
 
-  function hideBannerForm() {
-    if (!homeBannerForm) return;
+  function hideBannerForm(options = {}) {
+    if (!homeBannerModal || !homeBannerForm) return false;
 
-    closePanel(homeBannerForm);
+    const shouldReset = options.reset !== false;
+    const force = Boolean(options.force);
+
+    if (isBannerSaving && !force) {
+      return false;
+    }
+
+    homeBannerModal.classList.add("hidden");
+    homeBannerModal.setAttribute("aria-hidden", "true");
 
     if (toggleBannerFormBtn) {
       toggleBannerFormBtn.textContent = "Criar Banner";
     }
 
-    clearBannerMessage();
+    if (shouldReset) {
+      setBannerFormCreateMode();
+    }
+
+    return true;
+  }
+
+  function isHomeBannerModalOpen() {
+    return Boolean(homeBannerModal && !homeBannerModal.classList.contains("hidden"));
   }
 
   function setButtonLoading(button, isLoading, loadingText = "Aguarde...") {
@@ -3696,8 +3691,28 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function setBannerFormCreateMode() {
+    if (homeBannerForm) {
+      homeBannerForm.reset();
+    }
+
+    if (homeBannerModalTitle) {
+      homeBannerModalTitle.textContent = "Criar Banner";
+    }
+
     if (bannerEditId) {
       bannerEditId.value = "";
+    }
+
+    if (bannerTitle) {
+      bannerTitle.value = "";
+    }
+
+    if (bannerLink) {
+      bannerLink.value = "";
+    }
+
+    if (bannerDescription) {
+      bannerDescription.value = "";
     }
 
     if (bannerEditModeBox) {
@@ -3710,6 +3725,11 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     if (bannerCurrentImage) {
       bannerCurrentImage.removeAttribute("src");
+    }
+
+    if (bannerImage) {
+      bannerImage.value = "";
+      bannerImage.required = true;
     }
 
     if (saveBannerBtn) {
@@ -3738,6 +3758,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     const bannerId = getBannerId(banner);
     const actionType = getBannerActionType(banner);
     const linkTarget = getBannerLinkTarget(banner);
+
+    if (homeBannerModalTitle) {
+      homeBannerModalTitle.textContent = "Editar Banner";
+    }
 
     if (bannerEditId) {
       bannerEditId.value = bannerId;
@@ -3769,6 +3793,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     if (bannerImage) {
       bannerImage.value = "";
+      bannerImage.required = false;
     }
 
     if (bannerEditModeBox) {
@@ -3794,17 +3819,16 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function cancelBannerEdit() {
-    if (homeBannerForm) {
-      homeBannerForm.reset();
-    }
-
-    setBannerFormCreateMode();
+    return hideBannerForm({ reset: true });
   }
 
   async function handleSaveBanner(event) {
     event.preventDefault();
 
     if (!homeBannerForm) return;
+    if (isBannerSaving) return;
+
+    isBannerSaving = true;
 
     const isEditing = Boolean(bannerEditId?.value);
     const validationError = getBannerFormPayloadValidation(isEditing);
@@ -3824,6 +3848,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         });
       }
 
+      isBannerSaving = false;
       return;
     }
 
@@ -3836,6 +3861,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         homeBannerMessage.className = "form-message error";
       }
 
+      isBannerSaving = false;
       return;
     }
 
@@ -3872,9 +3898,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         homeBannerMessage.className = "form-message success";
       }
 
-      homeBannerForm.reset();
-      setBannerFormCreateMode();
-      hideBannerForm();
+      hideBannerForm({ reset: true, force: true });
 
       homeBannersLoaded = false;
       await fetchHomeBanners();
@@ -3905,11 +3929,13 @@ document.addEventListener("DOMContentLoaded", async () => {
       });
     } finally {
       setButtonLoading(saveBannerBtn, false);
+      isBannerSaving = false;
     }
   }
 
   function editBanner(banner) {
     if (!banner) return;
+    if (isBannerSaving) return;
 
     if (!homeBannersWrapper || homeBannersWrapper.classList.contains("hidden")) {
       showHomeBanners();
@@ -3917,13 +3943,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     setBannerFormEditMode(banner);
     showBannerForm();
-
-    setTimeout(() => {
-      homeBannerForm?.scrollIntoView({
-        behavior: "smooth",
-        block: "start"
-      });
-    }, 180);
   }
 
   async function toggleBannerStatus(banner) {
@@ -4112,6 +4131,22 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function bindBannerEvents() {
+    if (closeHomeBannerModalBtn && closeHomeBannerModalBtn.dataset.bound !== "true") {
+      closeHomeBannerModalBtn.dataset.bound = "true";
+
+      closeHomeBannerModalBtn.addEventListener("click", () => {
+        cancelBannerEdit();
+      });
+    }
+
+    if (homeBannerModalBackdrop && homeBannerModalBackdrop.dataset.bound !== "true") {
+      homeBannerModalBackdrop.dataset.bound = "true";
+
+      homeBannerModalBackdrop.addEventListener("click", () => {
+        cancelBannerEdit();
+      });
+    }
+
     if (bannerActionType && bannerActionType.dataset.bound !== "true") {
       bannerActionType.dataset.bound = "true";
 
@@ -4158,35 +4193,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       toggleBannerFormBtn.dataset.bound = "true";
 
       toggleBannerFormBtn.addEventListener("click", () => {
-        if (!homeBannerForm) return;
+        if (!homeBannerForm || isBannerSaving) return;
 
-        const isOpen = !homeBannerForm.classList.contains("hidden");
-
-        if (isOpen) {
-          homeBannerForm.reset();
-          setBannerFormCreateMode();
-          hideBannerForm();
-          return;
-        }
-
-        homeBannerForm.reset();
         setBannerFormCreateMode();
         showBannerForm();
-
-        setTimeout(() => {
-          homeBannerForm.scrollIntoView({
-            behavior: "smooth",
-            block: "start"
-          });
-        }, 180);
-      });
-    }
-
-    if (cancelBannerEditBtn && cancelBannerEditBtn.dataset.bound !== "true") {
-      cancelBannerEditBtn.dataset.bound = "true";
-
-      cancelBannerEditBtn.addEventListener("click", () => {
-        cancelBannerEdit();
       });
     }
 
@@ -4195,7 +4205,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       cancelBannerEditBtnBottom.addEventListener("click", () => {
         cancelBannerEdit();
-        hideBannerForm();
       });
     }
   }
@@ -4349,10 +4358,20 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         if (isAdminActionModalOpen()) {
           closeAdminActionModal(false);
+          return;
+        }
+
+        if (isHomeBannerModalOpen()) {
+          if (!isBannerSaving) {
+            cancelBannerEdit();
+          }
+
+          return;
         }
 
         if (isCreateClientModalOpen()) {
           hideCreateClientForm();
+          return;
         }
       }
     });
