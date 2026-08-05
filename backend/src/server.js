@@ -256,6 +256,17 @@ async function validateAdminAccess(req, res) {
   };
 }
 
+async function requireAdminAccess(req, res, next) {
+  const adminAccess = await validateAdminAccess(req, res);
+
+  if (!adminAccess || res.headersSent) {
+    return;
+  }
+
+  req.adminAccess = adminAccess;
+  next();
+}
+
 function generateTemporaryPassword() {
   const random = Math.random().toString(36).slice(-6);
   return `Caseg@${random}1`;
@@ -1622,7 +1633,7 @@ app.get("/admin/documents/renewal-alerts", async (req, res) => {
   }
 });
 
-app.post("/admin/documents/upload", (req, res, next) => {
+app.post("/admin/documents/upload", requireAdminAccess, (req, res, next) => {
   upload.single("file")(req, res, function (err) {
     if (err) {
       console.error("ERRO NO MULTER:", err);
@@ -1642,7 +1653,7 @@ app.post("/admin/documents/upload", (req, res, next) => {
   });
 }, async (req, res) => {
   try {
-    const adminAccess = await validateAdminAccess(req, res);
+    const adminAccess = req.adminAccess;
 
     if (!adminAccess) {
       return;
@@ -1790,7 +1801,7 @@ app.post("/admin/documents/upload", (req, res, next) => {
   }
 });
 
-app.put("/admin/documents/:documentId/replace", (req, res, next) => {
+app.put("/admin/documents/:documentId/replace", requireAdminAccess, (req, res, next) => {
   upload.single("file")(req, res, function (err) {
     if (err) {
       console.error("ERRO NO MULTER (SUBSTITUIR):", err);
@@ -1810,7 +1821,7 @@ app.put("/admin/documents/:documentId/replace", (req, res, next) => {
   });
 }, async (req, res) => {
   try {
-    const adminAccess = await validateAdminAccess(req, res);
+    const adminAccess = req.adminAccess;
 
     if (!adminAccess) {
       return;
@@ -2295,7 +2306,7 @@ app.get("/admin/notices", async (req, res) => {
   }
 });
 
-app.post("/admin/notices/upload", (req, res, next) => {
+app.post("/admin/notices/upload", requireAdminAccess, (req, res, next) => {
   upload.single("image")(req, res, function (err) {
     if (err) {
       console.error("ERRO NO MULTER (BANNER):", err);
@@ -2315,7 +2326,7 @@ app.post("/admin/notices/upload", (req, res, next) => {
   });
 }, async (req, res) => {
   try {
-    const adminAccess = await validateAdminAccess(req, res);
+    const adminAccess = req.adminAccess;
 
     if (!adminAccess) {
       return;
@@ -2589,7 +2600,7 @@ app.put("/admin/notices/reorder", async (req, res) => {
   }
 });
 
-app.put("/admin/notices/:noticeId", (req, res, next) => {
+app.put("/admin/notices/:noticeId", requireAdminAccess, (req, res, next) => {
   upload.single("image")(req, res, function (err) {
     if (err) {
       console.error("ERRO NO MULTER (EDITAR BANNER):", err);
@@ -2609,7 +2620,7 @@ app.put("/admin/notices/:noticeId", (req, res, next) => {
   });
 }, async (req, res) => {
   try {
-    const adminAccess = await validateAdminAccess(req, res);
+    const adminAccess = req.adminAccess;
 
     if (!adminAccess) {
       return;
