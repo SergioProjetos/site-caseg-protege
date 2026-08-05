@@ -931,8 +931,8 @@ app.post("/login", async (req, res) => {
     }
 
     if (profile.role === "client" && profile.is_active !== true) {
-      return res.status(403).json({
-        error: "Cliente inativo. Entre em contato com a administração."
+      return res.status(401).json({
+        error: "CPF/CNPJ ou senha inválidos."
       });
     }
 
