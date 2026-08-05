@@ -894,6 +894,78 @@
     </section>
   </div>
 
+  <div
+    id="clientDocumentsModal"
+    class="admin-modal admin-documents-modal hidden"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="clientDocumentsModalTitle"
+    aria-hidden="true"
+  >
+    <div id="clientDocumentsModalBackdrop" class="admin-modal-backdrop"></div>
+
+    <section class="admin-modal-panel admin-documents-modal-panel">
+      <header class="admin-modal-header">
+        <div class="admin-modal-title-group">
+          <span class="section-kicker">Documentos</span>
+
+          <h2 id="clientDocumentsModalTitle">Documentos do cliente</h2>
+
+          <p>
+            Consulte os documentos cadastrados e utilize os filtros e ações disponíveis.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          id="closeClientDocumentsModalBtn"
+          class="admin-modal-close-btn"
+          aria-label="Fechar documentos do cliente"
+        >
+          <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+        </button>
+      </header>
+
+      <div id="clientDocumentsModalBody" class="admin-modal-body"></div>
+    </section>
+  </div>
+
+  <div
+    id="clientUploadModal"
+    class="admin-modal admin-upload-modal hidden"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="clientUploadModalTitle"
+    aria-hidden="true"
+  >
+    <div id="clientUploadModalBackdrop" class="admin-modal-backdrop"></div>
+
+    <section class="admin-modal-panel admin-upload-modal-panel">
+      <header class="admin-modal-header">
+        <div class="admin-modal-title-group">
+          <span class="section-kicker">Documentos</span>
+
+          <h2 id="clientUploadModalTitle">Upload de documentos</h2>
+
+          <p>
+            Envie um documento mantendo os dados e validações atuais do cliente.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          id="closeClientUploadModalBtn"
+          class="admin-modal-close-btn"
+          aria-label="Fechar upload de documentos"
+        >
+          <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+        </button>
+      </header>
+
+      <div id="clientUploadModalBody" class="admin-modal-body"></div>
+    </section>
+  </div>
+
   <template id="clientCardTemplate">
     <article class="client-card" data-client-card>
       <div class="client-card-content">

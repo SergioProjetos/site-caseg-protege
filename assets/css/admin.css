@@ -54,6 +54,10 @@ body.admin-panel-page {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+body.admin-panel-page.document-popout-open {
+  overflow: hidden;
+}
+
 body.admin-panel-page::selection {
   background: rgba(0, 107, 47, 0.18);
 }
@@ -1683,6 +1687,34 @@ body.admin-panel-page::selection {
     opacity: 1;
     transform: translateY(0) scale(1);
   }
+}
+
+.admin-documents-modal-panel {
+  width: min(1180px, 100%);
+  max-height: calc(100vh - 56px);
+}
+
+.admin-upload-modal-panel {
+  width: min(920px, 100%);
+  max-height: calc(100vh - 56px);
+}
+
+.admin-documents-modal .admin-modal-body,
+.admin-upload-modal .admin-modal-body {
+  padding-top: 20px;
+}
+
+.admin-documents-modal .documents-panel {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.admin-documents-modal .documents-list-scroll-area {
+  max-height: none;
+  overflow: visible;
+  padding-right: 0;
+  padding-bottom: 0;
 }
 
 /* =========================

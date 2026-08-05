@@ -45,6 +45,18 @@ document.addEventListener("DOMContentLoaded", async () => {
   const closeCreateClientModalBtn = document.getElementById("closeCreateClientModalBtn");
   const cancelCreateClientModalBtn = document.getElementById("cancelCreateClientModalBtn");
 
+  const clientDocumentsModal = document.getElementById("clientDocumentsModal");
+  const clientDocumentsModalBackdrop = document.getElementById("clientDocumentsModalBackdrop");
+  const clientDocumentsModalTitle = document.getElementById("clientDocumentsModalTitle");
+  const clientDocumentsModalBody = document.getElementById("clientDocumentsModalBody");
+  const closeClientDocumentsModalBtn = document.getElementById("closeClientDocumentsModalBtn");
+
+  const clientUploadModal = document.getElementById("clientUploadModal");
+  const clientUploadModalBackdrop = document.getElementById("clientUploadModalBackdrop");
+  const clientUploadModalTitle = document.getElementById("clientUploadModalTitle");
+  const clientUploadModalBody = document.getElementById("clientUploadModalBody");
+  const closeClientUploadModalBtn = document.getElementById("closeClientUploadModalBtn");
+
   const toggleCreateClientBtn = document.getElementById("toggleCreateClientBtn");
   const toggleClientsListBtn = document.getElementById("toggleClientsListBtn");
   const toggleHomeBannersBtn = document.getElementById("toggleHomeBannersBtn");
@@ -149,6 +161,13 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   let adminActionModalResolver = null;
   let adminActionModalBackdropResult = true;
+
+  let activeDocumentsClientId = "";
+  let activeUploadClientId = "";
+  let clientDocumentsModalTrigger = null;
+  let clientUploadModalTrigger = null;
+  let clientDocumentsRequestId = 0;
+  let isClientDocumentUploadActive = false;
 
   function cloneTemplate(templateElement) {
     if (!templateElement) {
@@ -326,6 +345,10 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   function getClientId(client) {
     return client?.user_id || client?.id || "";
+  }
+
+  function getClientModalDisplayName(client) {
+    return client?.company_name || client?.full_name || "Cliente";
   }
 
   function getClientInitials(client) {
@@ -2212,7 +2235,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   const label = button.querySelector("[data-action-label], span");
-  const nextLabel = isOpen ? "Ocultar Documentos" : "Visualizar Documentos";
+  const nextLabel = "Visualizar Documentos";
 
   button.classList.toggle("is-open", isOpen);
   button.setAttribute("aria-expanded", String(isOpen));
@@ -2245,6 +2268,101 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
+  function isClientDocumentsModalOpen() {
+    return Boolean(clientDocumentsModal && !clientDocumentsModal.classList.contains("hidden"));
+  }
+
+  function isClientUploadModalOpen() {
+    return Boolean(clientUploadModal && !clientUploadModal.classList.contains("hidden"));
+  }
+
+  function syncClientDocumentPopoutScrollLock() {
+    document.body?.classList.toggle(
+      "document-popout-open",
+      isClientDocumentsModalOpen() || isClientUploadModalOpen()
+    );
+  }
+
+  function isClientDocumentsModalActiveFor(clientId, requestId = null) {
+    const normalizedClientId = String(clientId || "");
+
+    if (
+      !isClientDocumentsModalOpen() ||
+      !normalizedClientId ||
+      activeDocumentsClientId !== normalizedClientId
+    ) {
+      return false;
+    }
+
+    return requestId === null || requestId === clientDocumentsRequestId;
+  }
+
+  function closeClientDocumentsModal(options = {}) {
+    const shouldRestoreFocus = options.restoreFocus !== false;
+    const wasOpen = isClientDocumentsModalOpen();
+    const trigger = clientDocumentsModalTrigger;
+
+    clientDocumentsRequestId += 1;
+
+    if (clientDocumentsModal) {
+      clientDocumentsModal.classList.add("hidden");
+      clientDocumentsModal.setAttribute("aria-hidden", "true");
+      delete clientDocumentsModal.dataset.clientId;
+    }
+
+    if (clientDocumentsModalBody) {
+      clientDocumentsModalBody.replaceChildren();
+    }
+
+    if (trigger) {
+      setClientDocumentsButtonState(trigger.closest("[data-client-card], .client-card"), false);
+    }
+
+    activeDocumentsClientId = "";
+    clientDocumentsModalTrigger = null;
+    syncClientDocumentPopoutScrollLock();
+
+    if (shouldRestoreFocus && wasOpen && trigger?.isConnected) {
+      setTimeout(() => {
+        trigger.focus();
+      }, 0);
+    }
+
+    return true;
+  }
+
+  function closeClientUploadModal(options = {}) {
+    if (isClientDocumentUploadActive) {
+      return false;
+    }
+
+    const shouldRestoreFocus = options.restoreFocus !== false;
+    const wasOpen = isClientUploadModalOpen();
+    const trigger = clientUploadModalTrigger;
+
+    if (clientUploadModal) {
+      clientUploadModal.classList.add("hidden");
+      clientUploadModal.setAttribute("aria-hidden", "true");
+      delete clientUploadModal.dataset.clientId;
+    }
+
+    if (clientUploadModalBody) {
+      clientUploadModalBody.replaceChildren();
+    }
+
+    activeUploadClientId = "";
+    clientUploadModalTrigger = null;
+    syncClientDocumentPopoutScrollLock();
+
+    if (shouldRestoreFocus && wasOpen && trigger?.isConnected) {
+      setTimeout(() => {
+        trigger.focus();
+      }, 0);
+    }
+
+    return true;
+  }
+
   function closeOtherClientPanels(currentCard) {
     document.querySelectorAll("[data-client-card], .client-card").forEach((card) => {
       if (card === currentCard) return;
@@ -2257,54 +2375,68 @@ document.addEventListener("DOMContentLoaded", async () => {
   async function toggleClientDocuments(card, client) {
     if (!card || !client) return;
 
-    const wrapper = card.querySelector("[data-client-documents-wrapper], .client-documents-wrapper");
+    const clientId = String(getClientId(client) || "");
 
-    if (!wrapper) return;
+    if (!clientId || !clientDocumentsModal || !clientDocumentsModalBody) return;
+    if (!closeClientUploadModal({ restoreFocus: false })) return;
 
-    const isOpen = !wrapper.classList.contains("hidden");
+    closeClientDocumentsModal({ restoreFocus: false });
 
-    closeClientUpload(card);
+    activeDocumentsClientId = clientId;
+    clientDocumentsModalTrigger = getClientDocumentsButton(card);
+    clientDocumentsModal.dataset.clientId = clientId;
+    clientDocumentsModalTitle.textContent = `Documentos — ${getClientModalDisplayName(client)}`;
+    clientDocumentsModalBody.innerHTML = '<p class="documents-loading-message">Carregando documentos...</p>';
 
-    if (isOpen) {
-      closeClientDocuments(card);
-      return;
-    }
-
-    closeOtherClientPanels(card);
-
-    wrapper.classList.remove("hidden");
+    clientDocumentsModal.classList.remove("hidden");
+    clientDocumentsModal.setAttribute("aria-hidden", "false");
     setClientDocumentsButtonState(card, true);
-    wrapper.innerHTML = '<p class="documents-loading-message">Carregando documentos...</p>';
+    syncClientDocumentPopoutScrollLock();
 
-    await fetchClientDocuments(client, wrapper);
+    const requestId = ++clientDocumentsRequestId;
+
+    setTimeout(() => {
+      if (isClientDocumentsModalActiveFor(clientId, requestId)) {
+        closeClientDocumentsModalBtn?.focus();
+      }
+    }, 80);
+
+    await fetchClientDocuments(client, clientDocumentsModalBody, requestId);
   }
 
   function toggleClientUpload(card, client) {
     if (!card || !client) return;
 
-    const wrapper = card.querySelector("[data-client-upload-wrapper], .client-upload-wrapper");
+    const clientId = String(getClientId(client) || "");
 
-    if (!wrapper) return;
+    if (!clientId || !clientUploadModal || !clientUploadModalBody) return;
+    if (!closeClientUploadModal({ restoreFocus: false })) return;
 
-    const isOpen = !wrapper.classList.contains("hidden");
+    closeClientDocumentsModal({ restoreFocus: false });
 
-    closeClientDocuments(card);
-
-    if (isOpen) {
-      closeClientUpload(card);
-      return;
-    }
-
-    closeOtherClientPanels(card);
-
-    wrapper.classList.remove("hidden");
-    wrapper.replaceChildren();
+    activeUploadClientId = clientId;
+    clientUploadModalTrigger = card.querySelector(
+      '[data-action="upload"], .show-upload-btn, .toggle-upload-btn'
+    );
+    clientUploadModal.dataset.clientId = clientId;
+    clientUploadModalTitle.textContent = `Upload de documentos — ${getClientModalDisplayName(client)}`;
+    clientUploadModalBody.replaceChildren();
 
     const uploadPanel = renderClientUploadPanel(client);
 
     if (uploadPanel) {
-      wrapper.appendChild(uploadPanel);
+      clientUploadModalBody.appendChild(uploadPanel);
     }
+
+    clientUploadModal.classList.remove("hidden");
+    clientUploadModal.setAttribute("aria-hidden", "false");
+    syncClientDocumentPopoutScrollLock();
+
+    setTimeout(() => {
+      if (isClientUploadModalOpen() && activeUploadClientId === clientId) {
+        uploadPanel?.querySelector("[data-upload-category]")?.focus();
+      }
+    }, 80);
   }
 
   async function toggleClientStatus(client) {
@@ -2447,6 +2579,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   async function handleUploadDocument(event, client) {
     event.preventDefault();
 
+    if (isClientDocumentUploadActive) return;
+
     const form = event.currentTarget;
     const clientId = getClientId(client);
 
@@ -2484,6 +2618,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     const originalText = submitButton.textContent;
+    isClientDocumentUploadActive = true;
 
     try {
       submitButton.disabled = true;
@@ -2532,17 +2667,18 @@ document.addEventListener("DOMContentLoaded", async () => {
         yearInput.value = String(new Date().getFullYear());
       }
 
-      await fetchClientDocumentsData(clientId);
-
-      const card = getClientCardById(clientId);
-      const documentsWrapper = card?.querySelector("[data-client-documents-wrapper], .client-documents-wrapper");
+      const documents = await fetchClientDocumentsData(clientId);
       const updatedClient = allClientsCache.find((item) => getClientId(item) === clientId) || client;
 
-      if (updatedClient && documentsWrapper && !documentsWrapper.classList.contains("hidden")) {
+      if (
+        updatedClient &&
+        clientDocumentsModalBody &&
+        isClientDocumentsModalActiveFor(clientId)
+      ) {
         renderClientDocumentsPanel(
           updatedClient,
-          documentsWrapper,
-          clientDocumentsCache[clientId] || []
+          clientDocumentsModalBody,
+          documents
         );
       }
 
@@ -2563,6 +2699,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         confirmText: "OK"
       });
     } finally {
+      isClientDocumentUploadActive = false;
       submitButton.disabled = false;
       submitButton.textContent = originalText;
     }
@@ -2590,7 +2727,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     return clientDocumentsCache[clientId];
   }
 
-  async function fetchClientDocuments(client, wrapper) {
+  async function fetchClientDocuments(client, wrapper, requestId = null) {
     const clientId = getClientId(client);
 
     if (!clientId || !wrapper) return;
@@ -2600,9 +2737,23 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       const documents = await fetchClientDocumentsData(clientId);
 
+      if (
+        wrapper === clientDocumentsModalBody &&
+        !isClientDocumentsModalActiveFor(clientId, requestId)
+      ) {
+        return;
+      }
+
       renderClientDocumentsPanel(client, wrapper, documents);
     } catch (error) {
       console.error("ERRO AO CARREGAR DOCUMENTOS DO CLIENTE:", error);
+
+      if (
+        wrapper === clientDocumentsModalBody &&
+        !isClientDocumentsModalActiveFor(clientId, requestId)
+      ) {
+        return;
+      }
 
       wrapper.innerHTML = "";
 
@@ -3086,11 +3237,17 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
 
       const client = allClientsCache.find((item) => getClientId(item) === clientId);
-      const card = getClientCardById(clientId);
-      const wrapper = card?.querySelector("[data-client-documents-wrapper], .client-documents-wrapper");
 
-      if (client && wrapper && !wrapper.classList.contains("hidden")) {
-        await fetchClientDocuments(client, wrapper);
+      if (
+        client &&
+        clientDocumentsModalBody &&
+        isClientDocumentsModalActiveFor(clientId)
+      ) {
+        await fetchClientDocuments(
+          client,
+          clientDocumentsModalBody,
+          clientDocumentsRequestId
+        );
       } else {
         await fetchClientDocumentsData(clientId);
       }
@@ -3153,11 +3310,17 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
 
       const client = allClientsCache.find((item) => getClientId(item) === clientId);
-      const card = getClientCardById(clientId);
-      const wrapper = card?.querySelector("[data-client-documents-wrapper], .client-documents-wrapper");
 
-      if (client && wrapper && !wrapper.classList.contains("hidden")) {
-        await fetchClientDocuments(client, wrapper);
+      if (
+        client &&
+        clientDocumentsModalBody &&
+        isClientDocumentsModalActiveFor(clientId)
+      ) {
+        await fetchClientDocuments(
+          client,
+          clientDocumentsModalBody,
+          clientDocumentsRequestId
+        );
       } else {
         await fetchClientDocumentsData(clientId);
       }
@@ -4076,6 +4239,52 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
+  function bindClientDocumentModalEvents() {
+    if (
+      closeClientDocumentsModalBtn &&
+      closeClientDocumentsModalBtn.dataset.bound !== "true"
+    ) {
+      closeClientDocumentsModalBtn.dataset.bound = "true";
+
+      closeClientDocumentsModalBtn.addEventListener("click", () => {
+        closeClientDocumentsModal();
+      });
+    }
+
+    if (
+      clientDocumentsModalBackdrop &&
+      clientDocumentsModalBackdrop.dataset.bound !== "true"
+    ) {
+      clientDocumentsModalBackdrop.dataset.bound = "true";
+
+      clientDocumentsModalBackdrop.addEventListener("click", () => {
+        closeClientDocumentsModal();
+      });
+    }
+
+    if (
+      closeClientUploadModalBtn &&
+      closeClientUploadModalBtn.dataset.bound !== "true"
+    ) {
+      closeClientUploadModalBtn.dataset.bound = "true";
+
+      closeClientUploadModalBtn.addEventListener("click", () => {
+        closeClientUploadModal();
+      });
+    }
+
+    if (
+      clientUploadModalBackdrop &&
+      clientUploadModalBackdrop.dataset.bound !== "true"
+    ) {
+      clientUploadModalBackdrop.dataset.bound = "true";
+
+      clientUploadModalBackdrop.addEventListener("click", () => {
+        closeClientUploadModal();
+      });
+    }
+  }
+
   function bindClientFilters() {
     if (clientsSearchInput && clientsSearchInput.dataset.bound !== "true") {
       clientsSearchInput.dataset.bound = "true";
@@ -4373,6 +4582,16 @@ document.addEventListener("DOMContentLoaded", async () => {
           hideCreateClientForm();
           return;
         }
+
+        if (isClientDocumentsModalOpen()) {
+          closeClientDocumentsModal();
+          return;
+        }
+
+        if (isClientUploadModalOpen()) {
+          closeClientUploadModal();
+          return;
+        }
       }
     });
   }
@@ -4410,6 +4629,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     bindAdminActionModalEvents();
     bindCreateClientModalEvents();
+    bindClientDocumentModalEvents();
     bindNavigationEvents();
     bindGeneralEvents();
     bindClientFilters();
