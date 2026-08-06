@@ -911,12 +911,19 @@
         }
 
         function saveSession(data) {
+            localStorage.removeItem("refresh_token");
             localStorage.setItem("access_token", data.session.access_token);
-            localStorage.setItem("profile", JSON.stringify(data.profile));
 
-            if (data.session.refresh_token) {
+            if (
+                data.profile &&
+                data.profile.role === "admin" &&
+                typeof data.session.refresh_token === "string" &&
+                data.session.refresh_token.length > 0
+            ) {
                 localStorage.setItem("refresh_token", data.session.refresh_token);
             }
+
+            localStorage.setItem("profile", JSON.stringify(data.profile));
 
             if (data.session.expires_at) {
                 localStorage.setItem("session_expires_at", String(data.session.expires_at));
