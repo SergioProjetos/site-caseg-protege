@@ -2,9 +2,11 @@ document.addEventListener("DOMContentLoaded", function () {
   let profile = null;
   let allClientDocuments = [];
   let clientNoticeResolver = null;
+  let isClientLogoutInProgress = false;
 
   const RECENT_DOCUMENTS_PERIOD_DAYS = 7;
   const RECENT_DOCUMENTS_PERIOD_MS = RECENT_DOCUMENTS_PERIOD_DAYS * 24 * 60 * 60 * 1000;
+  const LOGOUT_REQUEST_TIMEOUT_MS = 4000;
 
   try {
     profile = JSON.parse(localStorage.getItem("profile"));
@@ -179,9 +181,44 @@ document.addEventListener("DOMContentLoaded", function () {
      SESSÃO
   ================================ */
 
-  function clearSessionAndRedirect(message = "Sua sessão expirou. Faça login novamente.") {
+  function clearClientSession() {
     localStorage.removeItem("access_token");
+    localStorage.removeItem("refresh_token");
     localStorage.removeItem("profile");
+    localStorage.removeItem("session_expires_at");
+    localStorage.removeItem("session_expires_in");
+    localStorage.removeItem("admin_session_expires_at");
+  }
+
+  async function attemptRemoteLogout(accessToken) {
+    if (!accessToken) {
+      return false;
+    }
+
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => {
+      controller.abort();
+    }, LOGOUT_REQUEST_TIMEOUT_MS);
+
+    try {
+      const response = await fetch("http://localhost:3000/logout", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`
+        },
+        signal: controller.signal
+      });
+
+      return response.ok;
+    } catch (error) {
+      return false;
+    } finally {
+      window.clearTimeout(timeoutId);
+    }
+  }
+
+  function clearSessionAndRedirect(message = "Sua sessão expirou. Faça login novamente.") {
+    clearClientSession();
 
     showClientNotice(message, {
       title: "Sessão encerrada",
@@ -604,16 +641,30 @@ document.addEventListener("DOMContentLoaded", function () {
 
   if (logoutBtn) {
     logoutBtn.addEventListener("click", async function () {
-      localStorage.removeItem("access_token");
-      localStorage.removeItem("profile");
+      if (isClientLogoutInProgress) {
+        return;
+      }
 
-      await showClientNotice("Você saiu do sistema.", {
-        title: "Sessão encerrada",
-        type: "success",
-        confirmText: "OK"
-      });
+      isClientLogoutInProgress = true;
 
-      window.location.href = "login.html";
+      const accessToken = localStorage.getItem("access_token") || "";
+
+      try {
+        await attemptRemoteLogout(accessToken);
+      } finally {
+        clearClientSession();
+      }
+
+      try {
+        await showClientNotice("Você saiu do sistema.", {
+          title: "Sessão encerrada",
+          type: "success",
+          confirmText: "OK"
+        });
+      } finally {
+        window.location.href = "login.html";
+        isClientLogoutInProgress = false;
+      }
     });
   }
 

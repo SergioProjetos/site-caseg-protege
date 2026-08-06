@@ -12,6 +12,9 @@ const eyeIconConfirmPassword = document.querySelector("#eyeIconConfirmPassword")
 const ruleMinLength = document.querySelector("#ruleMinLength");
 const ruleUppercase = document.querySelector("#ruleUppercase");
 const ruleNumber = document.querySelector("#ruleNumber");
+let isFirstAccessLogoutInProgress = false;
+
+const LOGOUT_REQUEST_TIMEOUT_MS = 4000;
 
 /* ===============================
    SESSÃO
@@ -24,9 +27,44 @@ function getSavedProfile() {
   }
 }
 
-function clearSessionAndRedirect(message = "Sessão inválida. Faça login novamente.") {
+function clearFirstAccessSession() {
   localStorage.removeItem("access_token");
+  localStorage.removeItem("refresh_token");
   localStorage.removeItem("profile");
+  localStorage.removeItem("session_expires_at");
+  localStorage.removeItem("session_expires_in");
+  localStorage.removeItem("admin_session_expires_at");
+}
+
+async function attemptRemoteLogout(accessToken) {
+  if (!accessToken) {
+    return false;
+  }
+
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => {
+    controller.abort();
+  }, LOGOUT_REQUEST_TIMEOUT_MS);
+
+  try {
+    const response = await fetch("http://localhost:3000/logout", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`
+      },
+      signal: controller.signal
+    });
+
+    return response.ok;
+  } catch (error) {
+    return false;
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+}
+
+function clearSessionAndRedirect(message = "Sessão inválida. Faça login novamente.") {
+  clearFirstAccessSession();
   alert(message);
   window.location.href = "login.html";
 }
@@ -222,6 +260,12 @@ if (firstAccessForm) {
         return;
       }
 
+      if (isFirstAccessLogoutInProgress) {
+        return;
+      }
+
+      isFirstAccessLogoutInProgress = true;
+
       const updatedProfile = {
         ...savedProfile,
         must_change_password: false
@@ -231,11 +275,18 @@ if (firstAccessForm) {
 
       setMessage("Senha atualizada com sucesso! Redirecionando para o login...", "success");
 
-      setTimeout(() => {
-        localStorage.setItem("password_updated", "true");
-        localStorage.removeItem("access_token");
-        localStorage.removeItem("profile");
-        window.location.href = "login.html";
+      setTimeout(async () => {
+        let accessToken = "";
+
+        try {
+          localStorage.setItem("password_updated", "true");
+          accessToken = localStorage.getItem("access_token") || savedAccessToken || "";
+          await attemptRemoteLogout(accessToken);
+        } finally {
+          clearFirstAccessSession();
+          window.location.href = "login.html";
+          isFirstAccessLogoutInProgress = false;
+        }
       }, 1800);
 
     } catch (error) {

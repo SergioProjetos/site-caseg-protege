@@ -1132,6 +1132,45 @@ app.post("/login", async (req, res) => {
   }
 });
 
+app.post("/logout", async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+
+    if (typeof authHeader !== "string" || !authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({
+        error: "Não foi possível encerrar a sessão."
+      });
+    }
+
+    const accessToken = authHeader.slice("Bearer ".length).trim();
+
+    if (!accessToken) {
+      return res.status(401).json({
+        error: "Não foi possível encerrar a sessão."
+      });
+    }
+
+    const { error } =
+      await adminSupabase.auth.admin.signOut(accessToken, "local");
+
+    if (error) {
+      const errorStatus = Number(error.status);
+      const responseStatus =
+        errorStatus >= 400 && errorStatus < 500 ? 401 : 502;
+
+      return res.status(responseStatus).json({
+        error: "Não foi possível encerrar a sessão."
+      });
+    }
+
+    return res.status(204).send();
+  } catch (error) {
+    return res.status(500).json({
+      error: "Não foi possível encerrar a sessão."
+    });
+  }
+});
+
 app.post("/admin/refresh-session", async (req, res) => {
   try {
     const refreshToken = normalizeText(req.body.refresh_token);

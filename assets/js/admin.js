@@ -22,6 +22,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   const SESSION_REFRESH_MARGIN_SECONDS = 5 * 60;
   const ADMIN_SESSION_EXPIRES_AT_KEY = "admin_session_expires_at";
+  const LOGOUT_REQUEST_TIMEOUT_MS = 4000;
 
   const adminNameElement = document.getElementById("adminName");
   const adminRoleElement = document.getElementById("adminRole");
@@ -158,6 +159,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   let adminSessionRefreshTimer = null;
   let adminSessionRefreshingPromise = null;
   let adminMaxSessionTimer = null;
+  let isAdminLogoutInProgress = false;
 
   let adminActionModalResolver = null;
   let adminActionModalBackdropResult = true;
@@ -938,16 +940,59 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
-  async function logoutAdmin() {
-    await showAdminActionMessage({
-      type: "success",
-      title: "Sessão encerrada",
-      message: "Você saiu do painel administrativo com segurança.",
-      confirmText: "OK"
-    });
+  async function attemptRemoteLogout(accessToken) {
+    if (!accessToken) {
+      return false;
+    }
 
-    clearAdminSession();
-    window.location.href = "login.html";
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => {
+      controller.abort();
+    }, LOGOUT_REQUEST_TIMEOUT_MS);
+
+    try {
+      const response = await fetch("http://localhost:3000/logout", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`
+        },
+        signal: controller.signal
+      });
+
+      return response.ok;
+    } catch (error) {
+      return false;
+    } finally {
+      window.clearTimeout(timeoutId);
+    }
+  }
+
+  async function logoutAdmin() {
+    if (isAdminLogoutInProgress) {
+      return;
+    }
+
+    isAdminLogoutInProgress = true;
+
+    const accessToken = localStorage.getItem("access_token") || token || "";
+
+    try {
+      await attemptRemoteLogout(accessToken);
+    } finally {
+      clearAdminSession();
+    }
+
+    try {
+      await showAdminActionMessage({
+        type: "success",
+        title: "Sessão encerrada",
+        message: "Você saiu do painel administrativo com segurança.",
+        confirmText: "OK"
+      });
+    } finally {
+      window.location.href = "login.html";
+      isAdminLogoutInProgress = false;
+    }
   }
 
   function getSidebarActionFromLink(link) {
