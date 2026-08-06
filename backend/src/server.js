@@ -4,6 +4,7 @@ console.log("ESTOU NO SERVER CERTO 🚀");
 console.log("ARQUIVO EM EXECUÇÃO:", __filename);
 
 const express = require("express");
+const crypto = require("crypto");
 const multer = require("multer");
 const sharp = require("sharp");
 const { createClient } = require("@supabase/supabase-js");
@@ -41,6 +42,135 @@ const PORT = 3000;
 const ONE_DAY_IN_MS = 24 * 60 * 60 * 1000;
 const ADMIN_ACTIVITY_RETENTION_DAYS = 7;
 const ADMIN_ACTIVITY_CLEANUP_INTERVAL_MS = ONE_DAY_IN_MS;
+const LOGIN_RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
+const LOGIN_IP_REQUEST_LIMIT = 100;
+const LOGIN_IDENTITY_FAILURE_LIMIT = 10;
+const LOGIN_RATE_LIMIT_CLEANUP_INTERVAL_MS = 60 * 1000;
+const LOGIN_RATE_LIMIT_ERROR_MESSAGE =
+  "Muitas tentativas de acesso. Aguarde alguns minutos e tente novamente.";
+
+const loginIpRequestEntries = new Map();
+const loginIdentityFailureEntries = new Map();
+const loginIdentifierHmacSecret = crypto.randomBytes(32);
+
+function getLoginRequestIp(req) {
+  return String(req.ip || req.socket?.remoteAddress || "unknown");
+}
+
+function createLoginIdentityKey(ip, cpfCnpj) {
+  const identifierHmac = crypto
+    .createHmac("sha256", loginIdentifierHmacSecret)
+    .update(cpfCnpj)
+    .digest("hex");
+
+  return `ip:${ip}|id:${identifierHmac}`;
+}
+
+function getActiveLoginRateLimitEntry(entries, key, now = Date.now()) {
+  const entry = entries.get(key);
+
+  if (!entry) {
+    return null;
+  }
+
+  if (entry.resetAt <= now) {
+    entries.delete(key);
+    return null;
+  }
+
+  return entry;
+}
+
+function getOrCreateLoginRateLimitEntry(entries, key, now = Date.now()) {
+  const activeEntry = getActiveLoginRateLimitEntry(entries, key, now);
+
+  if (activeEntry) {
+    return activeEntry;
+  }
+
+  const newEntry = {
+    count: 0,
+    resetAt: now + LOGIN_RATE_LIMIT_WINDOW_MS
+  };
+
+  entries.set(key, newEntry);
+  return newEntry;
+}
+
+function consumeLoginIpRequest(ip, now = Date.now()) {
+  const entry = getOrCreateLoginRateLimitEntry(
+    loginIpRequestEntries,
+    ip,
+    now
+  );
+
+  entry.count += 1;
+
+  return {
+    blocked: entry.count > LOGIN_IP_REQUEST_LIMIT,
+    resetAt: entry.resetAt
+  };
+}
+
+function getLoginIdentityFailureLimit(key, now = Date.now()) {
+  const entry = getActiveLoginRateLimitEntry(
+    loginIdentityFailureEntries,
+    key,
+    now
+  );
+
+  return {
+    blocked: Boolean(entry && entry.count >= LOGIN_IDENTITY_FAILURE_LIMIT),
+    resetAt: entry?.resetAt || null
+  };
+}
+
+function recordLoginIdentityFailure(key, now = Date.now()) {
+  const entry = getOrCreateLoginRateLimitEntry(
+    loginIdentityFailureEntries,
+    key,
+    now
+  );
+
+  entry.count += 1;
+}
+
+function getLoginRetryAfterSeconds(resetAt, now = Date.now()) {
+  return Math.max(1, Math.ceil((resetAt - now) / 1000));
+}
+
+function sendLoginRateLimitResponse(res, resetAt) {
+  res.setHeader(
+    "Retry-After",
+    String(getLoginRetryAfterSeconds(resetAt))
+  );
+
+  return res.status(429).json({
+    error: LOGIN_RATE_LIMIT_ERROR_MESSAGE
+  });
+}
+
+function cleanupExpiredLoginRateLimitEntries(now = Date.now()) {
+  for (const entries of [
+    loginIpRequestEntries,
+    loginIdentityFailureEntries
+  ]) {
+    for (const [key, entry] of entries) {
+      if (entry.resetAt <= now) {
+        entries.delete(key);
+      }
+    }
+  }
+}
+
+const loginRateLimitCleanupTimer = setInterval(
+  cleanupExpiredLoginRateLimitEntries,
+  LOGIN_RATE_LIMIT_CLEANUP_INTERVAL_MS
+);
+
+if (typeof loginRateLimitCleanupTimer.unref === "function") {
+  loginRateLimitCleanupTimer.unref();
+}
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -909,6 +1039,13 @@ app.get("/admin/dashboard/summary", async (req, res) => {
 
 app.post("/login", async (req, res) => {
   try {
+    const loginIp = getLoginRequestIp(req);
+    const ipRequestLimit = consumeLoginIpRequest(loginIp);
+
+    if (ipRequestLimit.blocked) {
+      return sendLoginRateLimitResponse(res, ipRequestLimit.resetAt);
+    }
+
     const cpf_cnpj = normalizeText(req.body.cpf_cnpj).replace(/\D/g, "");
     const password = normalizeText(req.body.password);
 
@@ -918,6 +1055,17 @@ app.post("/login", async (req, res) => {
       });
     }
 
+    const loginIdentityKey = createLoginIdentityKey(loginIp, cpf_cnpj);
+    const identityFailureLimit =
+      getLoginIdentityFailureLimit(loginIdentityKey);
+
+    if (identityFailureLimit.blocked) {
+      return sendLoginRateLimitResponse(
+        res,
+        identityFailureLimit.resetAt
+      );
+    }
+
     const { data: profile, error: profileError } = await adminSupabase
       .from("profiles")
       .select("*")
@@ -925,12 +1073,16 @@ app.post("/login", async (req, res) => {
       .single();
 
     if (profileError || !profile) {
+      recordLoginIdentityFailure(loginIdentityKey);
+
       return res.status(401).json({
         error: "CPF/CNPJ ou senha inválidos."
       });
     }
 
     if (profile.role === "client" && profile.is_active !== true) {
+      recordLoginIdentityFailure(loginIdentityKey);
+
       return res.status(401).json({
         error: "CPF/CNPJ ou senha inválidos."
       });
@@ -943,10 +1095,14 @@ app.post("/login", async (req, res) => {
       });
 
     if (loginError || !loginData?.session) {
+      recordLoginIdentityFailure(loginIdentityKey);
+
       return res.status(401).json({
         error: "CPF/CNPJ ou senha inválidos."
       });
     }
+
+    loginIdentityFailureEntries.delete(loginIdentityKey);
 
     if (profile.role === "client") {
       await registerSystemEvent({
