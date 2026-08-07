@@ -27,6 +27,32 @@ function getSavedProfile() {
   }
 }
 
+function createStoredProfile(profile) {
+    const storedProfile = {};
+    const allowedProperties = [
+        "role",
+        "must_change_password",
+        "full_name",
+        "name",
+        "company_name",
+        "email"
+    ];
+
+    allowedProperties.forEach((property) => {
+        const value = profile?.[property];
+
+        if (
+            value === null ||
+            typeof value === "string" ||
+            typeof value === "boolean"
+        ) {
+            storedProfile[property] = value;
+        }
+    });
+
+    return storedProfile;
+}
+
 function clearFirstAccessSession() {
   localStorage.removeItem("access_token");
   localStorage.removeItem("refresh_token");
@@ -266,10 +292,8 @@ if (firstAccessForm) {
 
       isFirstAccessLogoutInProgress = true;
 
-      const updatedProfile = {
-        ...savedProfile,
-        must_change_password: false
-      };
+      const updatedProfile = createStoredProfile(savedProfile);
+      updatedProfile.must_change_password = false;
 
       localStorage.setItem("profile", JSON.stringify(updatedProfile));
 

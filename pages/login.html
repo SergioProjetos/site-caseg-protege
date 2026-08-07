@@ -910,6 +910,32 @@
             localStorage.removeItem(ADMIN_SESSION_EXPIRES_AT_KEY);
         }
 
+        function createStoredProfile(profile) {
+            const storedProfile = {};
+            const allowedProperties = [
+                "role",
+                "must_change_password",
+                "full_name",
+                "name",
+                "company_name",
+                "email"
+            ];
+
+            allowedProperties.forEach((property) => {
+                const value = profile?.[property];
+
+                if (
+                    value === null ||
+                    typeof value === "string" ||
+                    typeof value === "boolean"
+                ) {
+                    storedProfile[property] = value;
+                }
+            });
+
+            return storedProfile;
+        }
+
         function saveSession(data) {
             localStorage.removeItem("refresh_token");
             localStorage.setItem("access_token", data.session.access_token);
@@ -923,7 +949,10 @@
                 localStorage.setItem("refresh_token", data.session.refresh_token);
             }
 
-            localStorage.setItem("profile", JSON.stringify(data.profile));
+            localStorage.setItem(
+                "profile",
+                JSON.stringify(createStoredProfile(data.profile))
+            );
 
             if (data.session.expires_at) {
                 localStorage.setItem("session_expires_at", String(data.session.expires_at));

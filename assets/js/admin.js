@@ -533,6 +533,32 @@ document.addEventListener("DOMContentLoaded", async () => {
     return expiresAt - nowInSeconds <= SESSION_REFRESH_MARGIN_SECONDS;
   }
 
+  function createStoredProfile(profile) {
+      const storedProfile = {};
+      const allowedProperties = [
+          "role",
+          "must_change_password",
+          "full_name",
+          "name",
+          "company_name",
+          "email"
+      ];
+
+      allowedProperties.forEach((property) => {
+          const value = profile?.[property];
+
+          if (
+              value === null ||
+              typeof value === "string" ||
+              typeof value === "boolean"
+          ) {
+              storedProfile[property] = value;
+          }
+      });
+
+      return storedProfile;
+  }
+
   function saveAdminSessionFromResponse(data) {
     if (!data || !data.session || !data.session.access_token) {
       throw new Error("Resposta inválida ao renovar sessão.");
@@ -556,7 +582,10 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     if (data.profile) {
       profile = data.profile;
-      localStorage.setItem("profile", JSON.stringify(data.profile));
+      localStorage.setItem(
+        "profile",
+        JSON.stringify(createStoredProfile(data.profile))
+      );
       loadAdminInfo();
     }
 
