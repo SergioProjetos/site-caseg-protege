@@ -26,10 +26,45 @@ const publicSupabase = createClient(
 const app = express();
 app.use(express.json());
 
+const CORS_ALLOWED_ORIGINS = new Set([
+  "http://localhost:5500"
+]);
+
 app.use((req, res, next) => {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  const requestOrigin = req.headers.origin;
+  const isAllowedOrigin =
+    typeof requestOrigin === "string" &&
+    CORS_ALLOWED_ORIGINS.has(requestOrigin);
+
+  res.vary("Origin");
+
+  res.setHeader(
+    "Access-Control-Allow-Methods",
+    "GET,POST,PUT,DELETE,OPTIONS"
+  );
+
+  res.setHeader(
+    "Access-Control-Allow-Headers",
+    "Content-Type, Authorization"
+  );
+
+  if (isAllowedOrigin) {
+    res.setHeader(
+      "Access-Control-Allow-Origin",
+      requestOrigin
+    );
+
+    res.setHeader(
+      "Access-Control-Allow-Credentials",
+      "true"
+    );
+  }
+
+  if (requestOrigin && !isAllowedOrigin) {
+    return res.status(403).json({
+      error: "Origem não permitida."
+    });
+  }
 
   if (req.method === "OPTIONS") {
     return res.sendStatus(200);
