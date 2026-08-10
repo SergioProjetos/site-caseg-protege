@@ -203,6 +203,7 @@ document.addEventListener("DOMContentLoaded", function () {
     try {
       const response = await fetch("http://localhost:3000/logout", {
         method: "POST",
+        credentials: "include",
         headers: {
           Authorization: `Bearer ${accessToken}`
         },

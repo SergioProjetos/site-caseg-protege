@@ -75,6 +75,7 @@ async function attemptRemoteLogout(accessToken) {
   try {
     const response = await fetch("http://localhost:3000/logout", {
       method: "POST",
+      credentials: "include",
       headers: {
         Authorization: `Bearer ${accessToken}`
       },
@@ -265,6 +266,7 @@ if (firstAccessForm) {
     try {
       const response = await fetch("http://localhost:3000/update-password", {
         method: "PUT",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${savedAccessToken}`

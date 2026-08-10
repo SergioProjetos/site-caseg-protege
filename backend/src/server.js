@@ -30,6 +30,15 @@ const CORS_ALLOWED_ORIGINS = new Set([
   "http://localhost:5500"
 ]);
 
+const CLIENT_REFRESH_COOKIE_NAME = "caseg_client_refresh";
+
+function expireClientRefreshCookie(res) {
+  res.setHeader(
+    "Set-Cookie",
+    `${CLIENT_REFRESH_COOKIE_NAME}=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT`
+  );
+}
+
 app.use((req, res, next) => {
   const requestOrigin = req.headers.origin;
   const isAllowedOrigin =
@@ -1169,6 +1178,8 @@ app.post("/login", async (req, res) => {
 
 app.post("/logout", async (req, res) => {
   try {
+    expireClientRefreshCookie(res);
+
     const authHeader = req.headers.authorization;
 
     if (typeof authHeader !== "string" || !authHeader.startsWith("Bearer ")) {
@@ -1261,6 +1272,10 @@ app.put("/update-password", async (req, res) => {
     const authResult = await getAuthenticatedUser(req);
 
     if (authResult.error) {
+      if (authResult.status === 401) {
+        expireClientRefreshCookie(res);
+      }
+
       return res.status(authResult.status).json({
         error: authResult.error
       });
@@ -1313,6 +1328,8 @@ app.put("/update-password", async (req, res) => {
           "Erro ao atualizar senha do usuário."
       });
     }
+
+    expireClientRefreshCookie(res);
 
     const { data: updatedProfile, error: updateProfileError } =
       await adminSupabase
