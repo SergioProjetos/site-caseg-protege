@@ -486,6 +486,30 @@ async function getUserProfile(userId) {
   }
 }
 
+async function getClientSessionProfile(userId) {
+  const { data, error } = await adminSupabase
+    .from("profiles")
+    .select("*")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (error) {
+    return {
+      error: "Erro ao buscar perfil do usuário.",
+      status: 502
+    };
+  }
+
+  if (!data) {
+    return {
+      error: "Perfil não encontrado.",
+      status: 404
+    };
+  }
+
+  return { profile: data };
+}
+
 async function validateAdminAccess(req, res) {
   const authResult = await getAuthenticatedUser(req);
 
