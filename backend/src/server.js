@@ -70,6 +70,66 @@ function setClientRefreshCookie(res, refreshToken, expiresAt) {
   return true;
 }
 
+function getClientRefreshCookie(req) {
+  if (typeof req.headers.cookie !== "string") {
+    return null;
+  }
+
+  let encodedRefreshToken = null;
+
+  for (const rawSegment of req.headers.cookie.split(";")) {
+    const segment = rawSegment.replace(/^[ \t]+/, "");
+    const separatorIndex = segment.indexOf("=");
+
+    if (separatorIndex < 0) {
+      continue;
+    }
+
+    const cookieName = segment.slice(0, separatorIndex);
+    const cookieValue = segment.slice(separatorIndex + 1);
+
+    if (cookieName !== CLIENT_REFRESH_COOKIE_NAME) {
+      continue;
+    }
+
+    if (encodedRefreshToken !== null) {
+      return null;
+    }
+
+    encodedRefreshToken = cookieValue;
+  }
+
+  if (!encodedRefreshToken || /[\r\n]/.test(encodedRefreshToken)) {
+    return null;
+  }
+
+  try {
+    const refreshToken = decodeURIComponent(encodedRefreshToken);
+
+    if (!refreshToken || /[\r\n]/.test(refreshToken)) {
+      return null;
+    }
+
+    return refreshToken;
+  } catch (error) {
+    return null;
+  }
+}
+
+function createClientSessionAuthClient() {
+  return createClient(
+    process.env.SUPABASE_URL,
+    process.env.SUPABASE_ANON_KEY,
+    {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+        detectSessionInUrl: false
+      }
+    }
+  );
+}
+
 app.use((req, res, next) => {
   const requestOrigin = req.headers.origin;
   const isAllowedOrigin =
