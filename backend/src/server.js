@@ -39,6 +39,37 @@ function expireClientRefreshCookie(res) {
   );
 }
 
+function setClientRefreshCookie(res, refreshToken, expiresAt) {
+  if (
+    typeof refreshToken !== "string" ||
+    refreshToken.length === 0 ||
+    /[\r\n]/.test(refreshToken) ||
+    typeof expiresAt !== "number" ||
+    !Number.isFinite(expiresAt)
+  ) {
+    return false;
+  }
+
+  const nowInSeconds = Date.now() / 1000;
+  const maxAge = Math.floor(expiresAt - nowInSeconds);
+  const expires = new Date(expiresAt * 1000);
+
+  if (
+    expiresAt <= nowInSeconds ||
+    maxAge <= 0 ||
+    !Number.isFinite(expires.getTime())
+  ) {
+    return false;
+  }
+
+  res.setHeader(
+    "Set-Cookie",
+    `${CLIENT_REFRESH_COOKIE_NAME}=${encodeURIComponent(refreshToken)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${maxAge}; Expires=${expires.toUTCString()}`
+  );
+
+  return true;
+}
+
 app.use((req, res, next) => {
   const requestOrigin = req.headers.origin;
   const isAllowedOrigin =
@@ -1083,6 +1114,8 @@ app.get("/admin/dashboard/summary", async (req, res) => {
 
 app.post("/login", async (req, res) => {
   try {
+    expireClientRefreshCookie(res);
+
     const loginIp = getLoginRequestIp(req);
     const ipRequestLimit = consumeLoginIpRequest(loginIp);
 
@@ -1148,7 +1181,14 @@ app.post("/login", async (req, res) => {
 
     loginIdentityFailureEntries.delete(loginIdentityKey);
 
+    let responseSession = loginData.session;
+
     if (profile.role === "client") {
+      const {
+        refresh_token: clientRefreshToken,
+        ...clientSession
+      } = loginData.session;
+
       await registerSystemEvent({
         eventType: "access",
         userId: profile.user_id,
@@ -1160,11 +1200,25 @@ app.post("/login", async (req, res) => {
           full_name: profile.full_name || null
         }
       });
+
+      if (
+        !setClientRefreshCookie(
+          res,
+          clientRefreshToken,
+          loginData.session.expires_at
+        )
+      ) {
+        return res.status(502).json({
+          error: "Não foi possível concluir o login."
+        });
+      }
+
+      responseSession = clientSession;
     }
 
     return res.status(200).json({
       message: "Login realizado com sucesso.",
-      session: loginData.session,
+      session: responseSession,
       profile
     });
   } catch (error) {
