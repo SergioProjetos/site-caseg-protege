@@ -7,7 +7,7 @@ const express = require("express");
 const crypto = require("crypto");
 const multer = require("multer");
 const sharp = require("sharp");
-const { createClient } = require("@supabase/supabase-js");
+const { createClient, isAuthRetryableFetchError } = require("@supabase/supabase-js");
 
 console.log("URL:", process.env.SUPABASE_URL ? "OK" : "NÃO CARREGOU");
 console.log("SERVICE ROLE KEY:", process.env.SUPABASE_SERVICE_ROLE_KEY ? "OK" : "NÃO CARREGOU");
@@ -1401,6 +1401,122 @@ app.post("/admin/refresh-session", async (req, res) => {
 
     res.status(500).json({
       error: "Erro interno ao renovar sessão."
+    });
+  }
+});
+
+app.post("/session/refresh", async (req, res) => {
+  try {
+    const clientRefreshToken = getClientRefreshCookie(req);
+
+    if (!clientRefreshToken) {
+      expireClientRefreshCookie(res);
+      return res.status(401).json({
+        error: "Sessão do cliente indisponível."
+      });
+    }
+
+    const clientSessionAuth = createClientSessionAuthClient();
+    const { data, error } = await clientSessionAuth.auth.refreshSession({
+      refresh_token: clientRefreshToken
+    });
+
+    if (error) {
+      if (isAuthRetryableFetchError(error)) {
+        return res.status(502).json({
+          error: "Não foi possível renovar a sessão."
+        });
+      }
+
+      expireClientRefreshCookie(res);
+      return res.status(401).json({
+        error: "Sessão do cliente indisponível."
+      });
+    }
+
+    const session = data?.session;
+    const userId = data?.user?.id;
+    const nowInSeconds = Date.now() / 1000;
+
+    if (
+      typeof userId !== "string" ||
+      userId.length === 0 ||
+      !session ||
+      typeof session.access_token !== "string" ||
+      session.access_token.length === 0 ||
+      typeof session.refresh_token !== "string" ||
+      session.refresh_token.length === 0 ||
+      typeof session.token_type !== "string" ||
+      session.token_type.length === 0 ||
+      typeof session.expires_in !== "number" ||
+      !Number.isFinite(session.expires_in) ||
+      session.expires_in <= 0 ||
+      typeof session.expires_at !== "number" ||
+      !Number.isFinite(session.expires_at) ||
+      session.expires_at <= nowInSeconds
+    ) {
+      expireClientRefreshCookie(res);
+      return res.status(502).json({
+        error: "Não foi possível renovar a sessão."
+      });
+    }
+
+    const profileResult = await getClientSessionProfile(userId);
+
+    if (profileResult.error) {
+      expireClientRefreshCookie(res);
+      if (profileResult.status === 404) {
+        return res.status(401).json({
+          error: "Sessão do cliente indisponível."
+        });
+      }
+
+      return res.status(502).json({
+        error: "Não foi possível renovar a sessão."
+      });
+    }
+
+    const profile = profileResult.profile;
+
+    if (profile.role !== "client" || profile.is_active !== true) {
+      expireClientRefreshCookie(res);
+      return res.status(401).json({
+        error: "Sessão do cliente indisponível."
+      });
+    }
+
+    const cookieWasSet = setClientRefreshCookie(
+      res,
+      session.refresh_token,
+      session.expires_at
+    );
+
+    if (!cookieWasSet) {
+      expireClientRefreshCookie(res);
+      return res.status(502).json({
+        error: "Não foi possível renovar a sessão."
+      });
+    }
+
+    return res.status(200).json({
+      session: {
+        access_token: session.access_token,
+        token_type: session.token_type,
+        expires_in: session.expires_in,
+        expires_at: session.expires_at
+      },
+      profile: {
+        role: profile.role,
+        must_change_password: profile.must_change_password === true,
+        full_name: profile.full_name || null,
+        company_name: profile.company_name || null,
+        email: profile.email || null
+      }
+    });
+  } catch {
+    expireClientRefreshCookie(res);
+    return res.status(500).json({
+      error: "Erro interno ao renovar a sessão."
     });
   }
 });
