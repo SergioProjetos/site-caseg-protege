@@ -7,6 +7,7 @@ document.addEventListener("DOMContentLoaded", function () {
   const RECENT_DOCUMENTS_PERIOD_DAYS = 7;
   const RECENT_DOCUMENTS_PERIOD_MS = RECENT_DOCUMENTS_PERIOD_DAYS * 24 * 60 * 60 * 1000;
   const LOGOUT_REQUEST_TIMEOUT_MS = 4000;
+  const CLIENT_SESSION_REFRESH_TIMEOUT_MS = 8000;
 
   try {
     profile = JSON.parse(localStorage.getItem("profile"));
@@ -14,7 +15,7 @@ document.addEventListener("DOMContentLoaded", function () {
     profile = null;
   }
 
-  const token = localStorage.getItem("access_token");
+  let token = localStorage.getItem("access_token");
 
   const welcomeMessage = document.querySelector("#welcomeMessage");
   const companyName = document.querySelector("#companyName");
@@ -180,6 +181,61 @@ document.addEventListener("DOMContentLoaded", function () {
   /* ===============================
      SESSÃO
   ================================ */
+
+  async function refreshClientSession() {
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => {
+      controller.abort();
+    }, CLIENT_SESSION_REFRESH_TIMEOUT_MS);
+
+    try {
+      const response = await fetch("http://localhost:3000/session/refresh", {
+        method: "POST",
+        credentials: "include",
+        signal: controller.signal
+      });
+
+      let data = null;
+
+      try {
+        data = await response.json();
+      } catch {
+        data = null;
+      }
+
+      return { status: response.status, data };
+    } catch {
+      return { status: 0, data: null };
+    } finally {
+      window.clearTimeout(timeoutId);
+    }
+  }
+
+  function isValidClientSessionRefreshData(data) {
+    const session = data?.session;
+    const refreshedProfile = data?.profile;
+
+    return (
+      data !== null &&
+      typeof data === "object" &&
+      session !== null &&
+      typeof session === "object" &&
+      typeof session.access_token === "string" &&
+      session.access_token.length > 0 &&
+      typeof session.token_type === "string" &&
+      session.token_type.length > 0 &&
+      typeof session.expires_in === "number" &&
+      Number.isFinite(session.expires_in) &&
+      session.expires_in > 0 &&
+      typeof session.expires_at === "number" &&
+      Number.isFinite(session.expires_at) &&
+      session.expires_at > Date.now() / 1000 &&
+      refreshedProfile !== null &&
+      typeof refreshedProfile === "object" &&
+      refreshedProfile.role === "client" &&
+      typeof refreshedProfile.must_change_password === "boolean"
+    );
+  }
 
   function clearClientSession() {
     localStorage.removeItem("access_token");
@@ -1071,7 +1127,39 @@ document.addEventListener("DOMContentLoaded", function () {
      INIT
   ================================ */
 
-  function initClientPanel() {
+  async function initClientPanel() {
+    const { status, data } = await refreshClientSession();
+
+    if (status === 200) {
+      if (!isValidClientSessionRefreshData(data)) {
+        clearSessionAndRedirect();
+        return;
+      }
+
+      token = data.session.access_token;
+      profile = data.profile;
+
+      localStorage.setItem("access_token", token);
+      localStorage.setItem(
+        "profile",
+        JSON.stringify(profile)
+      );
+      localStorage.setItem(
+        "session_expires_at",
+        String(data.session.expires_at)
+      );
+      localStorage.setItem(
+        "session_expires_in",
+        String(data.session.expires_in)
+      );
+    } else if (status === 401 || status === 500) {
+      clearSessionAndRedirect();
+      return;
+    } else if (status !== 0 && status !== 502) {
+      clearSessionAndRedirect();
+      return;
+    }
+
     const accessAllowed = validateClientAccess();
 
     if (!accessAllowed) {
