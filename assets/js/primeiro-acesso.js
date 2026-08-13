@@ -15,10 +15,66 @@ const ruleNumber = document.querySelector("#ruleNumber");
 let isFirstAccessLogoutInProgress = false;
 
 const LOGOUT_REQUEST_TIMEOUT_MS = 4000;
+const CLIENT_SESSION_REFRESH_TIMEOUT_MS = 8000;
 
 /* ===============================
    SESSÃO
 ================================ */
+async function refreshClientSession() {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => {
+    controller.abort();
+  }, CLIENT_SESSION_REFRESH_TIMEOUT_MS);
+
+  try {
+    const response = await fetch("http://localhost:3000/session/refresh", {
+      method: "POST",
+      credentials: "include",
+      signal: controller.signal
+    });
+
+    let data = null;
+
+    try {
+      data = await response.json();
+    } catch {
+      data = null;
+    }
+
+    return { status: response.status, data };
+  } catch {
+    return { status: 0, data: null };
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+}
+
+function isValidClientSessionRefreshData(data) {
+  const session = data?.session;
+  const refreshedProfile = data?.profile;
+
+  return (
+    data !== null &&
+    typeof data === "object" &&
+    session !== null &&
+    typeof session === "object" &&
+    typeof session.access_token === "string" &&
+    session.access_token.length > 0 &&
+    typeof session.token_type === "string" &&
+    session.token_type.length > 0 &&
+    typeof session.expires_in === "number" &&
+    Number.isFinite(session.expires_in) &&
+    session.expires_in > 0 &&
+    typeof session.expires_at === "number" &&
+    Number.isFinite(session.expires_at) &&
+    session.expires_at > Date.now() / 1000 &&
+    refreshedProfile !== null &&
+    typeof refreshedProfile === "object" &&
+    refreshedProfile.role === "client" &&
+    typeof refreshedProfile.must_change_password === "boolean"
+  );
+}
+
 function getSavedProfile() {
   try {
     return JSON.parse(localStorage.getItem("profile"));
