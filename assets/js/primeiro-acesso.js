@@ -253,19 +253,64 @@ function isPasswordStrongEnough(password) {
 /* ===============================
    VALIDAÇÃO INICIAL
 ================================ */
-const savedAccessToken = localStorage.getItem("access_token");
-const savedProfile = getSavedProfile();
+let savedAccessToken = localStorage.getItem("access_token");
+let savedProfile = getSavedProfile();
+let isFirstAccessSessionReady = false;
 
-if (!savedAccessToken || !savedProfile) {
-  clearSessionAndRedirect("Sessão inválida. Faça login novamente.");
-}
+async function initializeFirstAccessSession() {
+  const { status, data } = await refreshClientSession();
 
-if (savedProfile.role !== "client") {
-  clearSessionAndRedirect("Acesso não permitido.");
-}
+  if (status === 200) {
+    if (!isValidClientSessionRefreshData(data)) {
+      clearSessionAndRedirect();
+      return false;
+    }
 
-if (savedProfile.must_change_password !== true) {
-  window.location.href = "servicos.html";
+    savedAccessToken = data.session.access_token;
+    savedProfile = data.profile;
+
+    localStorage.setItem("access_token", savedAccessToken);
+    localStorage.setItem(
+      "profile",
+      JSON.stringify(savedProfile)
+    );
+    localStorage.setItem(
+      "session_expires_at",
+      String(data.session.expires_at)
+    );
+    localStorage.setItem(
+      "session_expires_in",
+      String(data.session.expires_in)
+    );
+  } else if (status === 401 || status === 500) {
+    clearSessionAndRedirect();
+    return false;
+  } else if (status !== 0 && status !== 502) {
+    clearSessionAndRedirect();
+    return false;
+  }
+
+  if (
+    typeof savedAccessToken !== "string" ||
+    savedAccessToken.length === 0 ||
+    !savedProfile
+  ) {
+    clearSessionAndRedirect("Sessão inválida. Faça login novamente.");
+    return false;
+  }
+
+  if (savedProfile.role !== "client") {
+    clearSessionAndRedirect("Acesso não permitido.");
+    return false;
+  }
+
+  if (savedProfile.must_change_password !== true) {
+    window.location.href = "servicos.html";
+    return false;
+  }
+
+  isFirstAccessSessionReady = true;
+  return true;
 }
 
 /* ===============================
@@ -294,6 +339,10 @@ if (confirmPasswordInput) {
 if (firstAccessForm) {
   firstAccessForm.addEventListener("submit", async function (event) {
     event.preventDefault();
+
+    if (!isFirstAccessSessionReady) {
+      return;
+    }
 
     const newPassword = newPasswordInput ? newPasswordInput.value.trim() : "";
     const confirmPassword = confirmPasswordInput ? confirmPasswordInput.value.trim() : "";
@@ -383,3 +432,4 @@ if (firstAccessForm) {
 ================================ */
 updatePasswordStrengthRules();
 hidePasswordMismatch();
+initializeFirstAccessSession();
