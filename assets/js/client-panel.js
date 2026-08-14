@@ -704,7 +704,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
       isClientLogoutInProgress = true;
 
-      const accessToken = localStorage.getItem("access_token") || "";
+      const accessToken = token || "";
 
       try {
         await attemptRemoteLogout(accessToken);
