@@ -725,24 +725,6 @@
         }
     </style>
 
-    <script>
-        const accessTokenCheck = localStorage.getItem("access_token");
-        const profileCheck = JSON.parse(localStorage.getItem("profile"));
-
-        if (!accessTokenCheck || !profileCheck) {
-            alert("Sessão inválida. Faça login novamente.");
-            window.location.href = "login.html";
-        }
-
-        if (profileCheck.role !== "client") {
-            alert("Acesso não permitido.");
-            window.location.href = "login.html";
-        }
-
-        if (profileCheck.must_change_password !== true) {
-            window.location.href = "servicos.html";
-        }
-    </script>
 </head>
 
 <body class="first-access-page">
