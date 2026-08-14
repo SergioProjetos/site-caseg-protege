@@ -309,6 +309,12 @@ async function initializeFirstAccessSession() {
     return false;
   }
 
+  const clientNameElement = document.querySelector("#clientName");
+
+  if (clientNameElement) {
+    clientNameElement.textContent = savedProfile.full_name || "cliente";
+  }
+
   isFirstAccessSessionReady = true;
   return true;
 }

@@ -908,15 +908,6 @@
         </div>
     </footer>
 
-    <script>
-        const savedProfileName = JSON.parse(localStorage.getItem("profile"));
-        const clientNameElement = document.querySelector("#clientName");
-
-        if (savedProfileName && clientNameElement) {
-            clientNameElement.textContent = savedProfileName.full_name || "cliente";
-        }
-    </script>
-
     <script src="../assets/js/primeiro-acesso.js"></script>
     <script src="../assets/js/site-animations.js"></script>
 
