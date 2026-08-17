@@ -937,6 +937,11 @@
         }
 
         function saveSession(data) {
+            if (data.profile && data.profile.role === "client") {
+                clearSession();
+                return;
+            }
+
             localStorage.removeItem("refresh_token");
             localStorage.setItem("access_token", data.session.access_token);
 
