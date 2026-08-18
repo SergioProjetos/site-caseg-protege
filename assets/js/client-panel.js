@@ -1138,20 +1138,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
       token = data.session.access_token;
       profile = data.profile;
-
-      localStorage.setItem("access_token", token);
-      localStorage.setItem(
-        "profile",
-        JSON.stringify(profile)
-      );
-      localStorage.setItem(
-        "session_expires_at",
-        String(data.session.expires_at)
-      );
-      localStorage.setItem(
-        "session_expires_in",
-        String(data.session.expires_in)
-      );
     } else if (status === 401 || status === 500) {
       clearSessionAndRedirect();
       return;
