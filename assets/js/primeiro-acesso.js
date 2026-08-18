@@ -75,40 +75,6 @@ function isValidClientSessionRefreshData(data) {
   );
 }
 
-function getSavedProfile() {
-  try {
-    return JSON.parse(localStorage.getItem("profile"));
-  } catch (error) {
-    return null;
-  }
-}
-
-function createStoredProfile(profile) {
-    const storedProfile = {};
-    const allowedProperties = [
-        "role",
-        "must_change_password",
-        "full_name",
-        "name",
-        "company_name",
-        "email"
-    ];
-
-    allowedProperties.forEach((property) => {
-        const value = profile?.[property];
-
-        if (
-            value === null ||
-            typeof value === "string" ||
-            typeof value === "boolean"
-        ) {
-            storedProfile[property] = value;
-        }
-    });
-
-    return storedProfile;
-}
-
 function clearFirstAccessSession() {
   localStorage.removeItem("access_token");
   localStorage.removeItem("refresh_token");
@@ -253,8 +219,8 @@ function isPasswordStrongEnough(password) {
 /* ===============================
    VALIDAÇÃO INICIAL
 ================================ */
-let savedAccessToken = localStorage.getItem("access_token");
-let savedProfile = getSavedProfile();
+let savedAccessToken = "";
+let savedProfile = null;
 let isFirstAccessSessionReady = false;
 
 async function initializeFirstAccessSession() {
@@ -398,7 +364,7 @@ if (firstAccessForm) {
 
         try {
           localStorage.setItem("password_updated", "true");
-          accessToken = localStorage.getItem("access_token") || savedAccessToken || "";
+          accessToken = savedAccessToken || "";
           await attemptRemoteLogout(accessToken);
         } finally {
           clearFirstAccessSession();

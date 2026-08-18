@@ -9,13 +9,7 @@ document.addEventListener("DOMContentLoaded", function () {
   const LOGOUT_REQUEST_TIMEOUT_MS = 4000;
   const CLIENT_SESSION_REFRESH_TIMEOUT_MS = 8000;
 
-  try {
-    profile = JSON.parse(localStorage.getItem("profile"));
-  } catch (error) {
-    profile = null;
-  }
-
-  let token = localStorage.getItem("access_token");
+  let token = "";
 
   const welcomeMessage = document.querySelector("#welcomeMessage");
   const companyName = document.querySelector("#companyName");
