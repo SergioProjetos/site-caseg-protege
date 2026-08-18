@@ -268,20 +268,6 @@ async function initializeFirstAccessSession() {
 
     savedAccessToken = data.session.access_token;
     savedProfile = data.profile;
-
-    localStorage.setItem("access_token", savedAccessToken);
-    localStorage.setItem(
-      "profile",
-      JSON.stringify(savedProfile)
-    );
-    localStorage.setItem(
-      "session_expires_at",
-      String(data.session.expires_at)
-    );
-    localStorage.setItem(
-      "session_expires_in",
-      String(data.session.expires_in)
-    );
   } else if (status === 401 || status === 500) {
     clearSessionAndRedirect();
     return false;
@@ -404,11 +390,6 @@ if (firstAccessForm) {
       }
 
       isFirstAccessLogoutInProgress = true;
-
-      const updatedProfile = createStoredProfile(savedProfile);
-      updatedProfile.must_change_password = false;
-
-      localStorage.setItem("profile", JSON.stringify(updatedProfile));
 
       setMessage("Senha atualizada com sucesso! Redirecionando para o login...", "success");
 
