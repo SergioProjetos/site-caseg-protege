@@ -16,6 +16,7 @@ let isFirstAccessLogoutInProgress = false;
 
 const LOGOUT_REQUEST_TIMEOUT_MS = 4000;
 const CLIENT_SESSION_REFRESH_TIMEOUT_MS = 8000;
+const CLIENT_SESSION_REFRESH_RETRY_DELAY_MS = 1000;
 
 /* ===============================
    SESSÃO
@@ -224,7 +225,20 @@ let savedProfile = null;
 let isFirstAccessSessionReady = false;
 
 async function initializeFirstAccessSession() {
-  const { status, data } = await refreshClientSession();
+  let refreshResult = await refreshClientSession();
+
+  if (
+    refreshResult.status === 0 ||
+    refreshResult.status === 502
+  ) {
+    await new Promise((resolve) => {
+      window.setTimeout(resolve, CLIENT_SESSION_REFRESH_RETRY_DELAY_MS);
+    });
+
+    refreshResult = await refreshClientSession();
+  }
+
+  const { status, data } = refreshResult;
 
   if (status === 200) {
     if (!isValidClientSessionRefreshData(data)) {

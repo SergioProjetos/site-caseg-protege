@@ -8,6 +8,7 @@ document.addEventListener("DOMContentLoaded", function () {
   const RECENT_DOCUMENTS_PERIOD_MS = RECENT_DOCUMENTS_PERIOD_DAYS * 24 * 60 * 60 * 1000;
   const LOGOUT_REQUEST_TIMEOUT_MS = 4000;
   const CLIENT_SESSION_REFRESH_TIMEOUT_MS = 8000;
+  const CLIENT_SESSION_REFRESH_RETRY_DELAY_MS = 1000;
 
   let token = "";
 
@@ -1122,7 +1123,20 @@ document.addEventListener("DOMContentLoaded", function () {
   ================================ */
 
   async function initClientPanel() {
-    const { status, data } = await refreshClientSession();
+    let refreshResult = await refreshClientSession();
+
+    if (
+      refreshResult.status === 0 ||
+      refreshResult.status === 502
+    ) {
+      await new Promise((resolve) => {
+        window.setTimeout(resolve, CLIENT_SESSION_REFRESH_RETRY_DELAY_MS);
+      });
+
+      refreshResult = await refreshClientSession();
+    }
+
+    const { status, data } = refreshResult;
 
     if (status === 200) {
       if (!isValidClientSessionRefreshData(data)) {
