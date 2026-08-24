@@ -9,8 +9,21 @@ document.addEventListener("DOMContentLoaded", function () {
   const LOGOUT_REQUEST_TIMEOUT_MS = 4000;
   const CLIENT_SESSION_REFRESH_TIMEOUT_MS = 8000;
   const CLIENT_SESSION_REFRESH_RETRY_DELAY_MS = 1000;
+  const CLIENT_SESSION_REFRESH_MARGIN_RATIO = 0.10;
+  const CLIENT_SESSION_REFRESH_MIN_MARGIN_MS = 30000;
+  const CLIENT_SESSION_REFRESH_MAX_MARGIN_MS = 300000;
+  const CLIENT_SESSION_REFRESH_MIN_TIMER_DELAY_MS = 5000;
+  const CLIENT_SESSION_REFRESH_MAX_TIMER_DELAY_MS = 2147000000;
 
   let token = "";
+  let clientSessionExpiresAt = 0;
+  let clientSessionExpiresIn = 0;
+  let clientSessionEffectiveDeadlineMs = 0;
+  let clientSessionRefreshMarginMs = 0;
+  let clientSessionRefreshTimerId = null;
+  let clientSessionRefreshPromise = null;
+  let clientSessionGeneration = 0;
+  let isClientSessionTerminated = false;
 
   const welcomeMessage = document.querySelector("#welcomeMessage");
   const companyName = document.querySelector("#companyName");
@@ -232,6 +245,285 @@ document.addEventListener("DOMContentLoaded", function () {
     );
   }
 
+  function clearClientSessionRefreshTimer() {
+    if (clientSessionRefreshTimerId !== null) {
+      window.clearTimeout(clientSessionRefreshTimerId);
+      clientSessionRefreshTimerId = null;
+    }
+  }
+
+  function isCurrentClientSessionGeneration(generation) {
+    return (
+      !isClientLogoutInProgress &&
+      !isClientSessionTerminated &&
+      generation === clientSessionGeneration
+    );
+  }
+
+  function invalidateClientSessionLifecycle() {
+    if (!isClientSessionTerminated) {
+      clientSessionGeneration += 1;
+    }
+
+    isClientSessionTerminated = true;
+    clearClientSessionRefreshTimer();
+
+    token = "";
+    profile = null;
+    clientSessionExpiresAt = 0;
+    clientSessionExpiresIn = 0;
+    clientSessionEffectiveDeadlineMs = 0;
+    clientSessionRefreshMarginMs = 0;
+  }
+
+  function getClientSessionTimeUntilThreshold() {
+    return (
+      clientSessionEffectiveDeadlineMs -
+      Date.now() -
+      clientSessionRefreshMarginMs
+    );
+  }
+
+  function scheduleClientSessionRefresh() {
+    clearClientSessionRefreshTimer();
+
+    if (
+      isClientLogoutInProgress ||
+      isClientSessionTerminated ||
+      !Number.isFinite(clientSessionEffectiveDeadlineMs) ||
+      clientSessionEffectiveDeadlineMs <= 0 ||
+      !Number.isFinite(clientSessionRefreshMarginMs) ||
+      clientSessionRefreshMarginMs <= 0
+    ) {
+      return false;
+    }
+
+    const timeUntilThresholdMs = getClientSessionTimeUntilThreshold();
+
+    if (
+      !Number.isFinite(timeUntilThresholdMs) ||
+      timeUntilThresholdMs < CLIENT_SESSION_REFRESH_MIN_TIMER_DELAY_MS
+    ) {
+      return false;
+    }
+
+    const setTimeoutDelayMs = Math.min(
+      CLIENT_SESSION_REFRESH_MAX_TIMER_DELAY_MS,
+      Math.floor(timeUntilThresholdMs)
+    );
+    const scheduledGeneration = clientSessionGeneration;
+
+    clientSessionRefreshTimerId = window.setTimeout(function () {
+      clientSessionRefreshTimerId = null;
+
+      if (!isCurrentClientSessionGeneration(scheduledGeneration)) {
+        return;
+      }
+
+      handleClientSessionRefreshThreshold(scheduledGeneration);
+    }, setTimeoutDelayMs);
+
+    return true;
+  }
+
+  function applyClientSessionRefreshData(data, refreshGeneration) {
+    const receivedAtMs = Date.now();
+    const expiresAtMs = data.session.expires_at * 1000;
+    const expiresInMs = data.session.expires_in * 1000;
+    const effectiveDeadlineMs = Math.min(
+      expiresAtMs,
+      receivedAtMs + expiresInMs
+    );
+    const initialRemainingMs = effectiveDeadlineMs - receivedAtMs;
+    const proportionalMarginMs = Math.floor(
+      expiresInMs * CLIENT_SESSION_REFRESH_MARGIN_RATIO
+    );
+    const boundedMarginMs = Math.min(
+      CLIENT_SESSION_REFRESH_MAX_MARGIN_MS,
+      Math.max(
+        CLIENT_SESSION_REFRESH_MIN_MARGIN_MS,
+        proportionalMarginMs
+      )
+    );
+    const marginMs = Math.min(
+      boundedMarginMs,
+      Math.floor(initialRemainingMs / 2)
+    );
+    const timeUntilThresholdMs =
+      effectiveDeadlineMs - Date.now() - marginMs;
+
+    if (
+      !Number.isFinite(expiresAtMs) ||
+      expiresAtMs <= 0 ||
+      !Number.isFinite(expiresInMs) ||
+      expiresInMs <= 0 ||
+      !Number.isFinite(effectiveDeadlineMs) ||
+      effectiveDeadlineMs <= receivedAtMs ||
+      !Number.isFinite(initialRemainingMs) ||
+      initialRemainingMs <= 0 ||
+      !Number.isFinite(marginMs) ||
+      marginMs <= 0 ||
+      !Number.isFinite(timeUntilThresholdMs) ||
+      timeUntilThresholdMs < CLIENT_SESSION_REFRESH_MIN_TIMER_DELAY_MS ||
+      !isCurrentClientSessionGeneration(refreshGeneration)
+    ) {
+      return false;
+    }
+
+    token = data.session.access_token;
+    profile = data.profile;
+    clientSessionExpiresAt = data.session.expires_at;
+    clientSessionExpiresIn = data.session.expires_in;
+    clientSessionEffectiveDeadlineMs = effectiveDeadlineMs;
+    clientSessionRefreshMarginMs = marginMs;
+
+    return scheduleClientSessionRefresh();
+  }
+
+  async function refreshClientSessionWithRetry(refreshGeneration) {
+    let refreshResult = await refreshClientSession();
+
+    if (!isCurrentClientSessionGeneration(refreshGeneration)) {
+      return null;
+    }
+
+    if (
+      refreshResult.status === 0 ||
+      refreshResult.status === 502
+    ) {
+      await new Promise((resolve) => {
+        window.setTimeout(resolve, CLIENT_SESSION_REFRESH_RETRY_DELAY_MS);
+      });
+
+      if (!isCurrentClientSessionGeneration(refreshGeneration)) {
+        return null;
+      }
+
+      refreshResult = await refreshClientSession();
+    }
+
+    if (!isCurrentClientSessionGeneration(refreshGeneration)) {
+      return null;
+    }
+
+    return refreshResult;
+  }
+
+  async function coordinateClientSessionRefresh() {
+    if (isClientLogoutInProgress || isClientSessionTerminated) {
+      return false;
+    }
+
+    if (clientSessionRefreshPromise) {
+      return clientSessionRefreshPromise;
+    }
+
+    const refreshGeneration = clientSessionGeneration;
+
+    const pendingRefresh = (async function () {
+      const refreshResult =
+        await refreshClientSessionWithRetry(refreshGeneration);
+
+      if (
+        !refreshResult ||
+        !isCurrentClientSessionGeneration(refreshGeneration)
+      ) {
+        return false;
+      }
+
+      const { status, data } = refreshResult;
+
+      if (status !== 200) {
+        if (status === 0 || status === 502) {
+          clearSessionAndRedirect("Sessão inválida. Faça login novamente.");
+        } else {
+          clearSessionAndRedirect();
+        }
+
+        return false;
+      }
+
+      if (!isValidClientSessionRefreshData(data)) {
+        clearSessionAndRedirect();
+        return false;
+      }
+
+      const sessionWasApplied =
+        applyClientSessionRefreshData(data, refreshGeneration);
+
+      if (!sessionWasApplied) {
+        if (isCurrentClientSessionGeneration(refreshGeneration)) {
+          clearSessionAndRedirect();
+        }
+
+        return false;
+      }
+
+      return true;
+    })();
+
+    clientSessionRefreshPromise = pendingRefresh;
+
+    try {
+      return await pendingRefresh;
+    } finally {
+      if (clientSessionRefreshPromise === pendingRefresh) {
+        clientSessionRefreshPromise = null;
+      }
+    }
+  }
+
+  function handleClientSessionRefreshThreshold(expectedGeneration) {
+    if (!isCurrentClientSessionGeneration(expectedGeneration)) {
+      return;
+    }
+
+    const timeUntilThresholdMs = getClientSessionTimeUntilThreshold();
+
+    if (!Number.isFinite(timeUntilThresholdMs)) {
+      clearSessionAndRedirect();
+      return;
+    }
+
+    if (timeUntilThresholdMs > CLIENT_SESSION_REFRESH_MIN_TIMER_DELAY_MS) {
+      if (!scheduleClientSessionRefresh()) {
+        clearSessionAndRedirect();
+      }
+
+      return;
+    }
+
+    clearClientSessionRefreshTimer();
+    coordinateClientSessionRefresh();
+  }
+
+  function handleClientSessionVisibilityChange() {
+    if (
+      document.visibilityState !== "visible" ||
+      isClientLogoutInProgress ||
+      isClientSessionTerminated ||
+      !Number.isFinite(clientSessionEffectiveDeadlineMs) ||
+      clientSessionEffectiveDeadlineMs <= 0
+    ) {
+      return;
+    }
+
+    const remainingMs = clientSessionEffectiveDeadlineMs - Date.now();
+    const timeUntilThresholdMs =
+      remainingMs - clientSessionRefreshMarginMs;
+
+    if (timeUntilThresholdMs > CLIENT_SESSION_REFRESH_MIN_TIMER_DELAY_MS) {
+      if (!scheduleClientSessionRefresh()) {
+        clearSessionAndRedirect();
+      }
+
+      return;
+    }
+
+    clearClientSessionRefreshTimer();
+    coordinateClientSessionRefresh();
+  }
+
   function clearClientSession() {
     localStorage.removeItem("access_token");
     localStorage.removeItem("refresh_token");
@@ -270,6 +562,7 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   function clearSessionAndRedirect(message = "Sua sessão expirou. Faça login novamente.") {
+    invalidateClientSessionLifecycle();
     clearClientSession();
 
     showClientNotice(message, {
@@ -700,6 +993,7 @@ document.addEventListener("DOMContentLoaded", function () {
       isClientLogoutInProgress = true;
 
       const accessToken = token || "";
+      invalidateClientSessionLifecycle();
 
       try {
         await attemptRemoteLogout(accessToken);
@@ -1122,35 +1416,15 @@ document.addEventListener("DOMContentLoaded", function () {
      INIT
   ================================ */
 
+  document.addEventListener(
+    "visibilitychange",
+    handleClientSessionVisibilityChange
+  );
+
   async function initClientPanel() {
-    let refreshResult = await refreshClientSession();
+    const sessionWasRefreshed = await coordinateClientSessionRefresh();
 
-    if (
-      refreshResult.status === 0 ||
-      refreshResult.status === 502
-    ) {
-      await new Promise((resolve) => {
-        window.setTimeout(resolve, CLIENT_SESSION_REFRESH_RETRY_DELAY_MS);
-      });
-
-      refreshResult = await refreshClientSession();
-    }
-
-    const { status, data } = refreshResult;
-
-    if (status === 200) {
-      if (!isValidClientSessionRefreshData(data)) {
-        clearSessionAndRedirect();
-        return;
-      }
-
-      token = data.session.access_token;
-      profile = data.profile;
-    } else if (status === 401 || status === 500) {
-      clearSessionAndRedirect();
-      return;
-    } else if (status !== 0 && status !== 502) {
-      clearSessionAndRedirect();
+    if (!sessionWasRefreshed) {
       return;
     }
 

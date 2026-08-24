@@ -1249,8 +1249,9 @@ app.post("/login", async (req, res) => {
       });
     }
 
+    const loginSupabase = createClientSessionAuthClient();
     const { data: loginData, error: loginError } =
-      await publicSupabase.auth.signInWithPassword({
+      await loginSupabase.auth.signInWithPassword({
         email: profile.email,
         password
       });
@@ -1365,7 +1366,8 @@ app.post("/admin/refresh-session", async (req, res) => {
       });
     }
 
-    const { data, error } = await publicSupabase.auth.refreshSession({
+    const adminSessionSupabase = createClientSessionAuthClient();
+    const { data, error } = await adminSessionSupabase.auth.refreshSession({
       refresh_token: refreshToken
     });
 
