@@ -557,7 +557,13 @@ async function requireAdminAccess(req, res, next) {
 }
 
 function generateTemporaryPassword() {
-  const random = Math.random().toString(36).slice(-6);
+  const alphabet = "abcdefghijklmnopqrstuvwxyz0123456789";
+  let random = "";
+
+  for (let index = 0; index < 10; index += 1) {
+    random += alphabet[crypto.randomInt(0, alphabet.length)];
+  }
+
   return `Caseg@${random}1`;
 }
 
