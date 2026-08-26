@@ -437,7 +437,6 @@ async function getAuthenticatedUser(req) {
 
     const { data, error } = await publicSupabase.auth.getUser(token);
 
-    console.log("RESPOSTA getUser:", data);
     console.log("ERRO getUser:", error);
 
     if (error || !data || !data.user) {
