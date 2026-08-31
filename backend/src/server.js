@@ -175,6 +175,24 @@ app.use((req, res, next) => {
 
 const PORT = 3000;
 const ONE_DAY_IN_MS = 24 * 60 * 60 * 1000;
+const TEMPORARY_PASSWORD_TTL_MS = 24 * 60 * 60 * 1000;
+const TEMPORARY_PASSWORD_EXPIRED_CODE = "TEMPORARY_PASSWORD_EXPIRED";
+const TEMPORARY_PASSWORD_EXPIRED_MESSAGE =
+  "Sua senha temporária expirou. Solicite um novo acesso ao administrador.";
+const FIRST_ACCESS_SESSION_INVALID_CODE = "FIRST_ACCESS_SESSION_INVALID";
+const FIRST_ACCESS_SESSION_INVALID_MESSAGE =
+  "A troca de senha não está disponível para esta sessão.";
+const FIRST_ACCESS_STATE_CHANGED_CODE = "FIRST_ACCESS_STATE_CHANGED";
+const FIRST_ACCESS_STATE_CHANGED_MESSAGE =
+  "O estado do primeiro acesso foi alterado. Tente novamente.";
+const FIRST_ACCESS_ALREADY_COMPLETED_CODE =
+  "FIRST_ACCESS_ALREADY_COMPLETED";
+const FIRST_ACCESS_ALREADY_COMPLETED_MESSAGE =
+  "O primeiro acesso deste cliente já foi concluído.";
+const FIRST_ACCESS_RECOVERY_REQUIRED_CODE =
+  "FIRST_ACCESS_RECOVERY_REQUIRED";
+const FIRST_ACCESS_RECOVERY_REQUIRED_MESSAGE =
+  "O primeiro acesso está bloqueado e requer recuperação técnica.";
 const ADMIN_ACTIVITY_RETENTION_DAYS = 7;
 const ADMIN_ACTIVITY_CLEANUP_INTERVAL_MS = ONE_DAY_IN_MS;
 const LOGIN_RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
@@ -447,7 +465,8 @@ async function getAuthenticatedUser(req) {
     }
 
     return {
-      user: data.user
+      user: data.user,
+      accessToken: token
     };
   } catch (err) {
     console.error("ERRO EM getAuthenticatedUser:", err);
@@ -564,6 +583,149 @@ function generateTemporaryPassword() {
   }
 
   return `Caseg@${random}1`;
+}
+
+function createTemporaryPasswordExpiresAt(nowMs = Date.now()) {
+  return new Date(nowMs + TEMPORARY_PASSWORD_TTL_MS).toISOString();
+}
+
+function isTemporaryPasswordExpired(profile, nowMs = Date.now()) {
+  if (
+    profile?.role !== "client" ||
+    profile.must_change_password !== true
+  ) {
+    return false;
+  }
+
+  const expiresAt = profile.temporary_password_expires_at;
+
+  if (typeof expiresAt !== "string" || expiresAt.trim().length === 0) {
+    return true;
+  }
+
+  const expirationMs = Date.parse(expiresAt);
+
+  if (!Number.isFinite(nowMs) || !Number.isFinite(expirationMs)) {
+    return true;
+  }
+
+  return nowMs >= expirationMs;
+}
+
+function normalizeUuid(value) {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const normalizedValue = value.trim().toLowerCase();
+
+  if (
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(
+      normalizedValue
+    )
+  ) {
+    return null;
+  }
+
+  return normalizedValue;
+}
+
+function extractSessionIdFromAccessToken(accessToken) {
+  if (typeof accessToken !== "string" || accessToken.length === 0) {
+    return null;
+  }
+
+  const tokenParts = accessToken.split(".");
+
+  if (
+    tokenParts.length !== 3 ||
+    tokenParts.some((tokenPart) => tokenPart.length === 0)
+  ) {
+    return null;
+  }
+
+  try {
+    const payloadJson = Buffer.from(tokenParts[1], "base64url").toString("utf8");
+    const payload = JSON.parse(payloadJson);
+
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+      return null;
+    }
+
+    return normalizeUuid(payload.session_id);
+  } catch {
+    return null;
+  }
+}
+
+async function signOutAuthenticatedClientSession(accessToken) {
+  if (typeof accessToken !== "string" || accessToken.length === 0) {
+    return;
+  }
+
+  try {
+    const { error } =
+      await adminSupabase.auth.admin.signOut(accessToken, "local");
+
+    if (error) {
+      console.error("ERRO AO ENCERRAR SESSÃO DE PRIMEIRO ACESSO.");
+    }
+  } catch {
+    console.error("ERRO AO ENCERRAR SESSÃO DE PRIMEIRO ACESSO.");
+  }
+}
+
+function getProfileForResponse(profile) {
+  if (!profile || typeof profile !== "object" || Array.isArray(profile)) {
+    return profile;
+  }
+
+  const responseProfile = { ...profile };
+  delete responseProfile.temporary_password_session_id;
+  delete responseProfile.temporary_password_generation_id;
+  return responseProfile;
+}
+
+async function compareAndSetFirstAccessProfile({
+  userId,
+  expectedGenerationId,
+  expectedExpiresAt,
+  expectedSessionId,
+  updates,
+  unexpiredAfter = null,
+  selectColumns = "user_id"
+}) {
+  let query = adminSupabase
+    .from("profiles")
+    .update(updates)
+    .eq("user_id", userId)
+    .eq("role", "client")
+    .eq("is_active", true)
+    .eq("must_change_password", true)
+    .eq("temporary_password_expires_at", expectedExpiresAt);
+
+  if (expectedGenerationId === null) {
+    query = query.is("temporary_password_generation_id", null);
+  } else {
+    query = query.eq(
+      "temporary_password_generation_id",
+      expectedGenerationId
+    );
+  }
+
+  if (expectedSessionId === null) {
+    query = query.is("temporary_password_session_id", null);
+  } else {
+    query = query.eq("temporary_password_session_id", expectedSessionId);
+  }
+
+  if (typeof unexpiredAfter === "string") {
+    query = query.gt("temporary_password_expires_at", unexpiredAfter);
+  }
+
+  return query
+    .select(selectColumns)
+    .maybeSingle();
 }
 
 function sanitizeFileName(value) {
@@ -1271,6 +1433,97 @@ app.post("/login", async (req, res) => {
 
     loginIdentityFailureEntries.delete(loginIdentityKey);
 
+    if (isTemporaryPasswordExpired(profile)) {
+      try {
+        const { error: expiredSessionSignOutError } =
+          await adminSupabase.auth.admin.signOut(
+            loginData.session.access_token,
+            "local"
+          );
+
+        if (expiredSessionSignOutError) {
+          console.error(
+            "ERRO AO ENCERRAR SESSÃO DE SENHA TEMPORÁRIA EXPIRADA."
+          );
+        }
+      } catch {
+        console.error(
+          "ERRO AO ENCERRAR SESSÃO DE SENHA TEMPORÁRIA EXPIRADA."
+        );
+      }
+
+      return res.status(403).json({
+        error: TEMPORARY_PASSWORD_EXPIRED_MESSAGE,
+        code: TEMPORARY_PASSWORD_EXPIRED_CODE
+      });
+    }
+
+    if (
+      profile.role === "client" &&
+      profile.must_change_password === true
+    ) {
+      const observedGenerationId = normalizeUuid(
+        profile.temporary_password_generation_id
+      );
+      const rawObservedSessionId =
+        profile.temporary_password_session_id;
+      const observedSessionId =
+        rawObservedSessionId === null
+          ? null
+          : normalizeUuid(rawObservedSessionId);
+      const newSessionId = extractSessionIdFromAccessToken(
+        loginData.session.access_token
+      );
+
+      if (
+        !observedGenerationId ||
+        (rawObservedSessionId !== null && !observedSessionId) ||
+        !newSessionId
+      ) {
+        await signOutAuthenticatedClientSession(
+          loginData.session.access_token
+        );
+
+        return res.status(403).json({
+          error: FIRST_ACCESS_SESSION_INVALID_MESSAGE,
+          code: FIRST_ACCESS_SESSION_INVALID_CODE
+        });
+      }
+
+      const { data: sessionBinding, error: sessionBindingError } =
+        await compareAndSetFirstAccessProfile({
+          userId: profile.user_id,
+          expectedGenerationId: observedGenerationId,
+          expectedExpiresAt: profile.temporary_password_expires_at,
+          expectedSessionId: observedSessionId,
+          updates: {
+            temporary_password_session_id: newSessionId
+          },
+          unexpiredAfter: new Date().toISOString()
+        });
+
+      if (sessionBindingError) {
+        await signOutAuthenticatedClientSession(
+          loginData.session.access_token
+        );
+
+        return res.status(500).json({
+          error: "Não foi possível concluir o login."
+        });
+      }
+
+      if (!sessionBinding) {
+        await signOutAuthenticatedClientSession(
+          loginData.session.access_token
+        );
+
+        return res.status(409).json({
+          error: FIRST_ACCESS_STATE_CHANGED_MESSAGE,
+          code: FIRST_ACCESS_STATE_CHANGED_CODE
+        });
+      }
+    }
+
     let responseSession = loginData.session;
 
     if (profile.role === "client") {
@@ -1309,7 +1562,7 @@ app.post("/login", async (req, res) => {
     return res.status(200).json({
       message: "Login realizado com sucesso.",
       session: responseSession,
-      profile
+      profile: getProfileForResponse(profile)
     });
   } catch (error) {
     console.error("ERRO EM /login:", error);
@@ -1401,7 +1654,7 @@ app.post("/admin/refresh-session", async (req, res) => {
     return res.status(200).json({
       message: "Sessão renovada com sucesso.",
       session: data.session,
-      profile
+      profile: getProfileForResponse(profile)
     });
   } catch (error) {
     console.error("ERRO EM POST /admin/refresh-session:", error);
@@ -1492,6 +1745,39 @@ app.post("/session/refresh", async (req, res) => {
       });
     }
 
+    if (isTemporaryPasswordExpired(profile)) {
+      expireClientRefreshCookie(res);
+      return res.status(403).json({
+        error: TEMPORARY_PASSWORD_EXPIRED_MESSAGE,
+        code: TEMPORARY_PASSWORD_EXPIRED_CODE
+      });
+    }
+
+    if (profile.must_change_password === true) {
+      const profileGenerationId = normalizeUuid(
+        profile.temporary_password_generation_id
+      );
+      const profileSessionId = normalizeUuid(
+        profile.temporary_password_session_id
+      );
+      const refreshedSessionId = extractSessionIdFromAccessToken(
+        session.access_token
+      );
+
+      if (
+        !profileGenerationId ||
+        !profileSessionId ||
+        !refreshedSessionId ||
+        refreshedSessionId !== profileSessionId
+      ) {
+        expireClientRefreshCookie(res);
+        return res.status(403).json({
+          error: FIRST_ACCESS_SESSION_INVALID_MESSAGE,
+          code: FIRST_ACCESS_SESSION_INVALID_CODE
+        });
+      }
+    }
+
     const cookieWasSet = setClientRefreshCookie(
       res,
       session.refresh_token,
@@ -1563,6 +1849,14 @@ app.put("/update-password", async (req, res) => {
       });
     }
 
+    if (isTemporaryPasswordExpired(profile)) {
+      expireClientRefreshCookie(res);
+      return res.status(403).json({
+        error: TEMPORARY_PASSWORD_EXPIRED_MESSAGE,
+        code: TEMPORARY_PASSWORD_EXPIRED_CODE
+      });
+    }
+
     const newPassword = normalizeText(req.body.new_password);
 
     if (!newPassword) {
@@ -1577,12 +1871,67 @@ app.put("/update-password", async (req, res) => {
       });
     }
 
+    const expectedGenerationId = normalizeUuid(
+      profile.temporary_password_generation_id
+    );
+    const expectedSessionId = normalizeUuid(
+      profile.temporary_password_session_id
+    );
+    const accessTokenSessionId = extractSessionIdFromAccessToken(
+      authResult.accessToken
+    );
+
+    if (
+      !expectedGenerationId ||
+      !expectedSessionId ||
+      !accessTokenSessionId ||
+      accessTokenSessionId !== expectedSessionId
+    ) {
+      expireClientRefreshCookie(res);
+      return res.status(403).json({
+        error: FIRST_ACCESS_SESSION_INVALID_MESSAGE,
+        code: FIRST_ACCESS_SESSION_INVALID_CODE
+      });
+    }
+
+    const casNowMs = Date.now();
+    const lockExpiresAt = new Date(casNowMs - 1000).toISOString();
+    const { data: acquiredProfile, error: acquireError } =
+      await compareAndSetFirstAccessProfile({
+        userId,
+        expectedGenerationId,
+        expectedExpiresAt: profile.temporary_password_expires_at,
+        expectedSessionId,
+        updates: {
+          temporary_password_generation_id: null,
+          temporary_password_session_id: null,
+          temporary_password_expires_at: lockExpiresAt
+        },
+        unexpiredAfter: new Date(casNowMs).toISOString()
+      });
+
+    if (acquireError) {
+      expireClientRefreshCookie(res);
+      return res.status(500).json({
+        error: "Erro ao preparar a atualização da senha."
+      });
+    }
+
+    if (!acquiredProfile) {
+      expireClientRefreshCookie(res);
+      return res.status(409).json({
+        error: FIRST_ACCESS_STATE_CHANGED_MESSAGE,
+        code: FIRST_ACCESS_STATE_CHANGED_CODE
+      });
+    }
+
     const { error: updateAuthError } =
       await adminSupabase.auth.admin.updateUserById(userId, {
         password: newPassword
       });
 
     if (updateAuthError) {
+      expireClientRefreshCookie(res);
       return res.status(500).json({
         error:
           updateAuthError.message ||
@@ -1590,31 +1939,36 @@ app.put("/update-password", async (req, res) => {
       });
     }
 
+    const { data: updatedProfile, error: updateProfileError } =
+      await compareAndSetFirstAccessProfile({
+        userId,
+        expectedGenerationId: null,
+        expectedExpiresAt: lockExpiresAt,
+        expectedSessionId: null,
+        updates: {
+          must_change_password: false,
+          temporary_password_expires_at: null,
+          temporary_password_session_id: null,
+          temporary_password_generation_id: null
+        },
+        selectColumns: "*"
+      });
+
     expireClientRefreshCookie(res);
 
-    const { data: updatedProfile, error: updateProfileError } =
-      await adminSupabase
-        .from("profiles")
-        .update({
-          must_change_password: false
-        })
-        .eq("user_id", userId)
-        .select("*")
-        .single();
-
-    if (updateProfileError) {
+    if (updateProfileError || !updatedProfile) {
       return res.status(500).json({
         error:
-          updateProfileError.message ||
-          "Senha atualizada, mas houve erro ao atualizar o perfil."
+          "Senha atualizada, mas não foi possível concluir o primeiro acesso."
       });
     }
 
     return res.status(200).json({
       message: "Senha atualizada com sucesso.",
-      profile: updatedProfile
+      profile: getProfileForResponse(updatedProfile)
     });
   } catch (error) {
+    expireClientRefreshCookie(res);
     console.error("ERRO EM /update-password:", error);
 
     res.status(500).json({
@@ -1697,6 +2051,8 @@ app.post("/clients", async (req, res) => {
     }
 
     const clientUserId = createdUser.user.id;
+    const temporaryPasswordExpiresAt = createTemporaryPasswordExpiresAt();
+    const temporaryPasswordGenerationId = crypto.randomUUID();
 
     const { data: insertedProfile, error: insertProfileError } =
       await adminSupabase
@@ -1711,7 +2067,10 @@ app.post("/clients", async (req, res) => {
           whatsapp: whatsapp || null,
           role: "client",
           is_active: true,
-          must_change_password: true
+          must_change_password: true,
+          temporary_password_expires_at: temporaryPasswordExpiresAt,
+          temporary_password_session_id: null,
+          temporary_password_generation_id: temporaryPasswordGenerationId
         })
         .select("*")
         .single();
@@ -1745,7 +2104,7 @@ app.post("/clients", async (req, res) => {
 
     return res.status(201).json({
       message: "Cliente cadastrado com sucesso.",
-      client: insertedProfile,
+      client: getProfileForResponse(insertedProfile),
       temporary_password: temporaryPassword
     });
   } catch (error) {
@@ -1777,11 +2136,191 @@ app.get("/clients", async (req, res) => {
       });
     }
 
-    return res.status(200).json(data || []);
+    return res.status(200).json(
+      (data || []).map(getProfileForResponse)
+    );
   } catch (error) {
     console.error("ERRO EM GET /clients:", error);
 
     res.status(500).json({
+      error: "Erro interno do servidor"
+    });
+  }
+});
+
+app.post("/admin/clients/:clientId/reissue-temporary-password", async (req, res) => {
+  let lockWasAcquired = false;
+
+  try {
+    const adminAccess = await validateAdminAccess(req, res);
+
+    if (!adminAccess) {
+      return;
+    }
+
+    const { clientId } = req.params;
+
+    if (!clientId) {
+      return res.status(400).json({
+        error: "clientId é obrigatório."
+      });
+    }
+
+    const { data: currentClient, error: currentClientError } =
+      await adminSupabase
+        .from("profiles")
+        .select(
+          "user_id, role, is_active, must_change_password, temporary_password_expires_at, temporary_password_session_id, temporary_password_generation_id"
+        )
+        .eq("user_id", clientId)
+        .eq("role", "client")
+        .maybeSingle();
+
+    if (currentClientError) {
+      return res.status(500).json({
+        error: "Erro ao buscar cliente para reemissão."
+      });
+    }
+
+    if (!currentClient) {
+      return res.status(404).json({
+        error: "Cliente não encontrado."
+      });
+    }
+
+    if (currentClient.is_active !== true) {
+      return res.status(409).json({
+        error: "Cliente inativo. Ative o cliente antes de reemitir o primeiro acesso."
+      });
+    }
+
+    if (currentClient.must_change_password !== true) {
+      return res.status(409).json({
+        error: FIRST_ACCESS_ALREADY_COMPLETED_MESSAGE,
+        code: FIRST_ACCESS_ALREADY_COMPLETED_CODE
+      });
+    }
+
+    const expectedGenerationId = normalizeUuid(
+      currentClient.temporary_password_generation_id
+    );
+
+    if (!expectedGenerationId) {
+      return res.status(409).json({
+        error: FIRST_ACCESS_RECOVERY_REQUIRED_MESSAGE,
+        code: FIRST_ACCESS_RECOVERY_REQUIRED_CODE
+      });
+    }
+
+    const expectedExpiresAt = currentClient.temporary_password_expires_at;
+    const expectedExpiresAtMs =
+      typeof expectedExpiresAt === "string"
+        ? Date.parse(expectedExpiresAt)
+        : Number.NaN;
+
+    if (!Number.isFinite(expectedExpiresAtMs)) {
+      return res.status(409).json({
+        error: FIRST_ACCESS_RECOVERY_REQUIRED_MESSAGE,
+        code: FIRST_ACCESS_RECOVERY_REQUIRED_CODE
+      });
+    }
+
+    const observedSessionId = currentClient.temporary_password_session_id;
+    const expectedSessionId =
+      observedSessionId === null ? null : normalizeUuid(observedSessionId);
+
+    if (observedSessionId !== null && !expectedSessionId) {
+      return res.status(409).json({
+        error: FIRST_ACCESS_RECOVERY_REQUIRED_MESSAGE,
+        code: FIRST_ACCESS_RECOVERY_REQUIRED_CODE
+      });
+    }
+
+    const temporaryPassword = generateTemporaryPassword();
+    const temporaryPasswordExpiresAt = createTemporaryPasswordExpiresAt();
+    const temporaryPasswordGenerationId = crypto.randomUUID();
+    const casNowMs = Date.now();
+    const lockExpiresAt = new Date(casNowMs - 1000).toISOString();
+
+    const { data: acquiredClient, error: acquisitionError } =
+      await compareAndSetFirstAccessProfile({
+        userId: clientId,
+        expectedGenerationId,
+        expectedExpiresAt,
+        expectedSessionId,
+        updates: {
+          temporary_password_generation_id: null,
+          temporary_password_session_id: null,
+          temporary_password_expires_at: lockExpiresAt
+        }
+      });
+
+    if (acquisitionError) {
+      return res.status(500).json({
+        error: "Erro ao preparar a reemissão da senha temporária."
+      });
+    }
+
+    if (!acquiredClient) {
+      return res.status(409).json({
+        error: FIRST_ACCESS_STATE_CHANGED_MESSAGE,
+        code: FIRST_ACCESS_STATE_CHANGED_CODE
+      });
+    }
+
+    lockWasAcquired = true;
+
+    const { error: updateAuthError } =
+      await adminSupabase.auth.admin.updateUserById(clientId, {
+        password: temporaryPassword
+      });
+
+    if (updateAuthError) {
+      return res.status(500).json({
+        error: FIRST_ACCESS_RECOVERY_REQUIRED_MESSAGE,
+        code: FIRST_ACCESS_RECOVERY_REQUIRED_CODE
+      });
+    }
+
+    const { data: finalizedClient, error: finalizationError } =
+      await compareAndSetFirstAccessProfile({
+        userId: clientId,
+        expectedGenerationId: null,
+        expectedExpiresAt: lockExpiresAt,
+        expectedSessionId: null,
+        updates: {
+          must_change_password: true,
+          temporary_password_expires_at: temporaryPasswordExpiresAt,
+          temporary_password_session_id: null,
+          temporary_password_generation_id: temporaryPasswordGenerationId
+        }
+      });
+
+    if (finalizationError || !finalizedClient) {
+      return res.status(500).json({
+        error: FIRST_ACCESS_RECOVERY_REQUIRED_MESSAGE,
+        code: FIRST_ACCESS_RECOVERY_REQUIRED_CODE
+      });
+    }
+
+    return res.status(200).json({
+      message: "Senha temporária reemitida com sucesso.",
+      temporary_password: temporaryPassword,
+      temporary_password_expires_at: temporaryPasswordExpiresAt
+    });
+  } catch (error) {
+    console.error(
+      "ERRO EM POST /admin/clients/:clientId/reissue-temporary-password."
+    );
+
+    if (lockWasAcquired) {
+      return res.status(500).json({
+        error: FIRST_ACCESS_RECOVERY_REQUIRED_MESSAGE,
+        code: FIRST_ACCESS_RECOVERY_REQUIRED_CODE
+      });
+    }
+
+    return res.status(500).json({
       error: "Erro interno do servidor"
     });
   }
@@ -1860,7 +2399,7 @@ app.put("/admin/clients/:clientId/status", async (req, res) => {
 
     return res.status(200).json({
       message: "Status do cliente atualizado com sucesso.",
-      client: updatedClient
+      client: getProfileForResponse(updatedClient)
     });
   } catch (error) {
     console.error("ERRO EM PUT /admin/clients/:clientId/status:", error);
@@ -3533,6 +4072,7 @@ console.log("POST /admin/refresh-session");
 console.log("PUT /update-password");
 console.log("POST /clients");
 console.log("GET /clients");
+console.log("POST /admin/clients/:clientId/reissue-temporary-password");
 console.log("PUT /admin/clients/:clientId/status");
 console.log("DELETE /admin/clients/:clientId");
 console.log("GET /clients/:clientId/documents");

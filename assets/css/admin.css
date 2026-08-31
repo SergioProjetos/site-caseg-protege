@@ -1493,13 +1493,25 @@ body.admin-panel-page::selection {
   line-height: 1.45;
 }
 
+.temporary-password-expiration {
+  margin: 12px 0 0;
+  color: #166534;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.temporary-password-expiration strong {
+  font-weight: 950;
+}
+
 .temporary-password-row {
   display: flex;
   gap: 11px;
   align-items: center;
 }
 
-#temporaryPasswordField {
+#temporaryPasswordField,
+#reissuedTemporaryPasswordField {
   flex: 1;
   height: 46px;
   border: 1px solid #86efac;
@@ -1513,7 +1525,8 @@ body.admin-panel-page::selection {
     inset 0 1px 0 rgba(255, 255, 255, 0.95);
 }
 
-#copyTemporaryPasswordBtn {
+#copyTemporaryPasswordBtn,
+#copyReissuedTemporaryPasswordBtn {
   min-height: 46px;
   background: linear-gradient(135deg, #087f38, #006b2f);
   color: #ffffff;
@@ -1531,10 +1544,19 @@ body.admin-panel-page::selection {
     filter 220ms ease;
 }
 
-#copyTemporaryPasswordBtn:hover {
+#copyTemporaryPasswordBtn:hover,
+#copyReissuedTemporaryPasswordBtn:hover {
   transform: translateY(-2px);
   filter: brightness(1.05);
   box-shadow: 0 13px 26px rgba(0, 107, 47, 0.21);
+}
+
+.temporary-password-result-modal-panel {
+  width: min(620px, 100%);
+}
+
+.temporary-password-result-actions {
+  justify-content: flex-end;
 }
 
 /* =========================
@@ -2295,6 +2317,13 @@ body.admin-panel-page::selection {
   background: #ffffff;
 }
 
+.client-action-btn.reissue {
+  width: 88px;
+  border-color: rgba(0, 107, 47, 0.42);
+  color: #08773a;
+  background: #ffffff;
+}
+
 .client-action-btn.success,
 .client-action-btn.warning,
 .client-action-btn.danger {
@@ -2332,6 +2361,7 @@ body.admin-panel-page::selection {
 
 .client-action-btn.documents:hover,
 .client-action-btn.upload:hover,
+.client-action-btn.reissue:hover,
 .client-action-btn.success:hover {
   background: #f0fdf4;
   border-color: rgba(0, 107, 47, 0.56);
@@ -3728,7 +3758,8 @@ body.admin-panel-page .admin-footer::after {
     align-items: stretch;
   }
 
-  #copyTemporaryPasswordBtn {
+  #copyTemporaryPasswordBtn,
+  #copyReissuedTemporaryPasswordBtn {
     width: 100%;
   }
 
@@ -3822,6 +3853,7 @@ body.admin-panel-page .admin-footer::after {
   .client-action-btn,
   .client-action-btn.documents,
   .client-action-btn.upload,
+  .client-action-btn.reissue,
   .client-action-btn.success,
   .client-action-btn.warning,
   .client-action-btn.danger,

@@ -100,6 +100,34 @@ document.addEventListener("DOMContentLoaded", async () => {
   const temporaryPasswordBox = document.getElementById("temporaryPasswordBox");
   const temporaryPasswordField = document.getElementById("temporaryPasswordField");
   const copyTemporaryPasswordBtn = document.getElementById("copyTemporaryPasswordBtn");
+  const temporaryPasswordExpiration = document.getElementById(
+    "temporaryPasswordExpiration"
+  );
+  const temporaryPasswordExpiresAtValue = document.getElementById(
+    "temporaryPasswordExpiresAtValue"
+  );
+
+  const temporaryPasswordResultModal = document.getElementById(
+    "temporaryPasswordResultModal"
+  );
+  const temporaryPasswordResultModalBackdrop = document.getElementById(
+    "temporaryPasswordResultModalBackdrop"
+  );
+  const closeTemporaryPasswordResultModalBtn = document.getElementById(
+    "closeTemporaryPasswordResultModalBtn"
+  );
+  const closeTemporaryPasswordResultModalBottomBtn = document.getElementById(
+    "closeTemporaryPasswordResultModalBottomBtn"
+  );
+  const reissuedTemporaryPasswordField = document.getElementById(
+    "reissuedTemporaryPasswordField"
+  );
+  const reissuedTemporaryPasswordExpiresAtValue = document.getElementById(
+    "reissuedTemporaryPasswordExpiresAtValue"
+  );
+  const copyReissuedTemporaryPasswordBtn = document.getElementById(
+    "copyReissuedTemporaryPasswordBtn"
+  );
 
   const clientsList = document.getElementById("clientsList");
   const clientsListMessage = document.getElementById("clientsListMessage");
@@ -149,6 +177,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   let clientsLoaded = false;
   let homeBannersLoaded = false;
+
+  const reissuingClientIds = new Set();
 
   let clientsSearchDebounceTimer = null;
 
@@ -1772,10 +1802,73 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (temporaryPasswordField) {
       temporaryPasswordField.value = "";
     }
+
+    if (temporaryPasswordExpiration) {
+      temporaryPasswordExpiration.classList.add("hidden");
+    }
+
+    if (temporaryPasswordExpiresAtValue) {
+      temporaryPasswordExpiresAtValue.textContent = "";
+    }
   }
 
   function isCreateClientModalOpen() {
     return Boolean(createClientModal && !createClientModal.classList.contains("hidden"));
+  }
+
+  function clearTemporaryPasswordResult() {
+    if (reissuedTemporaryPasswordField) {
+      reissuedTemporaryPasswordField.value = "";
+    }
+
+    if (reissuedTemporaryPasswordExpiresAtValue) {
+      reissuedTemporaryPasswordExpiresAtValue.textContent = "";
+    }
+  }
+
+  function closeTemporaryPasswordResultModal() {
+    if (temporaryPasswordResultModal) {
+      temporaryPasswordResultModal.classList.add("hidden");
+      temporaryPasswordResultModal.setAttribute("aria-hidden", "true");
+    }
+
+    clearTemporaryPasswordResult();
+  }
+
+  function isTemporaryPasswordResultModalOpen() {
+    return Boolean(
+      temporaryPasswordResultModal &&
+      !temporaryPasswordResultModal.classList.contains("hidden")
+    );
+  }
+
+  function openTemporaryPasswordResultModal(password, expiresAt) {
+    clearTemporaryPasswordResult();
+
+    if (
+      !temporaryPasswordResultModal ||
+      !reissuedTemporaryPasswordField ||
+      !reissuedTemporaryPasswordExpiresAtValue
+    ) {
+      return false;
+    }
+
+    const formattedExpiresAt = formatDateTime(expiresAt);
+
+    if (!password || formattedExpiresAt === "-") {
+      return false;
+    }
+
+    reissuedTemporaryPasswordField.value = password;
+    reissuedTemporaryPasswordExpiresAtValue.textContent = formattedExpiresAt;
+    temporaryPasswordResultModal.classList.remove("hidden");
+    temporaryPasswordResultModal.setAttribute("aria-hidden", "false");
+
+    setTimeout(() => {
+      copyReissuedTemporaryPasswordBtn?.focus();
+    }, 80);
+
+    return true;
   }
 
   function showClientsList() {
@@ -2004,6 +2097,15 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
 
       const temporaryPassword = getTemporaryPasswordFromCreateClientResult(result);
+      const temporaryPasswordExpiresAt =
+        result?.temporary_password_expires_at ||
+        result?.client?.temporary_password_expires_at ||
+        "";
+      const formattedTemporaryPasswordExpiresAt = formatDateTime(
+        temporaryPasswordExpiresAt
+      );
+      const hasTemporaryPasswordExpiration =
+        formattedTemporaryPasswordExpiresAt !== "-";
 
       createClientForm.reset();
 
@@ -2016,14 +2118,27 @@ document.addEventListener("DOMContentLoaded", async () => {
         temporaryPasswordField.value = temporaryPassword;
       }
 
+      if (temporaryPasswordExpiresAtValue) {
+        temporaryPasswordExpiresAtValue.textContent =
+          hasTemporaryPasswordExpiration
+            ? formattedTemporaryPasswordExpiresAt
+            : "";
+      }
+
+      if (temporaryPasswordExpiration) {
+        temporaryPasswordExpiration.classList.toggle(
+          "hidden",
+          !hasTemporaryPasswordExpiration
+        );
+      }
+
       if (temporaryPasswordBox) {
         temporaryPasswordBox.classList.toggle("hidden", !temporaryPassword);
       }
 
       if (!temporaryPassword) {
         console.warn(
-          "Cliente cadastrado, mas a senha temporária não foi retornada pelo backend.",
-          result
+          "Cliente cadastrado, mas a senha temporária não foi retornada pelo backend."
         );
       }
 
@@ -2051,8 +2166,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       setButtonLoading(submitButton, false);
     }
   }
-  async function copyTemporaryPassword() {
-    const password = temporaryPasswordField?.value || "";
+  async function copyTemporaryPasswordFromField(passwordField) {
+    const password = passwordField?.value || "";
 
     if (!password) {
       await showAdminActionMessage({
@@ -2075,9 +2190,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         confirmText: "OK"
       });
     } catch (error) {
-      console.error("ERRO AO COPIAR SENHA TEMPORÁRIA:", error);
+      console.error("ERRO AO COPIAR SENHA TEMPORÁRIA.");
 
-      temporaryPasswordField?.select();
+      passwordField?.select();
 
       await showAdminActionMessage({
         type: "warning",
@@ -2086,6 +2201,14 @@ document.addEventListener("DOMContentLoaded", async () => {
         confirmText: "OK"
       });
     }
+  }
+
+  function copyTemporaryPassword() {
+    return copyTemporaryPasswordFromField(temporaryPasswordField);
+  }
+
+  function copyReissuedTemporaryPassword() {
+    return copyTemporaryPasswordFromField(reissuedTemporaryPasswordField);
   }
 
   function applyClientFilters(clients) {
@@ -2220,6 +2343,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     const documentsBtn = card.querySelector('[data-action="documents"], .show-documents-btn, .toggle-documents-btn');
     const uploadBtn = card.querySelector('[data-action="upload"], .show-upload-btn, .toggle-upload-btn');
+    const reissueBtn = card.querySelector('[data-action="reissue"], .reissue-client-access-btn');
     const statusBtn = card.querySelector('[data-action="status"], .toggle-client-status-btn');
     const deleteBtn = card.querySelector('[data-action="delete"], .delete-client-btn');
 
@@ -2232,6 +2356,21 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (uploadBtn) {
       uploadBtn.dataset.clientId = clientId;
       uploadBtn.addEventListener("click", () => toggleClientUpload(card, client));
+    }
+
+    if (reissueBtn) {
+      const canReissueFirstAccess =
+        client.must_change_password === true && isActive;
+
+      if (!canReissueFirstAccess) {
+        reissueBtn.remove();
+      } else {
+        reissueBtn.dataset.clientId = clientId;
+        reissueBtn.disabled = reissuingClientIds.has(clientId);
+        reissueBtn.addEventListener("click", () => {
+          reissueTemporaryPassword(client, reissueBtn);
+        });
+      }
     }
 
     if (statusBtn) {
@@ -2511,6 +2650,171 @@ document.addEventListener("DOMContentLoaded", async () => {
         uploadPanel?.querySelector("[data-upload-category]")?.focus();
       }
     }, 80);
+  }
+
+  async function showReissueTemporaryPasswordError(result) {
+    const code = String(result?.code || "");
+
+    if (code === "FIRST_ACCESS_ALREADY_COMPLETED") {
+      await showAdminActionMessage({
+        type: "warning",
+        title: "Primeiro acesso concluído",
+        message: "O primeiro acesso deste cliente já foi concluído.",
+        confirmText: "OK"
+      });
+
+      return true;
+    }
+
+    if (code === "FIRST_ACCESS_RECOVERY_REQUIRED") {
+      await showAdminActionMessage({
+        type: "danger",
+        title: "Recuperação técnica necessária",
+        message: "Este primeiro acesso está bloqueado e requer recuperação técnica.",
+        confirmText: "OK"
+      });
+
+      return false;
+    }
+
+    if (code === "FIRST_ACCESS_STATE_CHANGED") {
+      await showAdminActionMessage({
+        type: "warning",
+        title: "Estado alterado",
+        message: "O estado deste primeiro acesso foi alterado. Atualize os dados do cliente e tente novamente.",
+        confirmText: "OK"
+      });
+
+      return true;
+    }
+
+    const controlledMessage =
+      typeof result?.error === "string" && result.error.trim()
+        ? result.error
+        : "Não foi possível reemitir o acesso temporário.";
+
+    await showAdminActionMessage({
+      type: "danger",
+      title: "Erro ao reemitir acesso",
+      message: controlledMessage,
+      confirmText: "OK"
+    });
+
+    return false;
+  }
+
+  async function reissueTemporaryPassword(client, triggerButton) {
+    const clientId = getClientId(client);
+
+    if (!clientId || reissuingClientIds.has(clientId)) {
+      return;
+    }
+
+    clearTemporaryPasswordResult();
+    reissuingClientIds.add(clientId);
+
+    if (triggerButton) {
+      triggerButton.disabled = true;
+    }
+
+    try {
+      const confirmed = await showAdminActionConfirm({
+        type: "warning",
+        title: "Reemitir acesso",
+        message: "Uma nova senha temporária será gerada e o acesso temporário anterior deixará de ser válido. Deseja continuar?",
+        confirmText: "Reemitir",
+        cancelText: "Cancelar"
+      });
+
+      if (!confirmed) {
+        return;
+      }
+
+      const response = await adminFetch(
+        `http://localhost:3000/admin/clients/${clientId}/reissue-temporary-password`,
+        {
+          method: "POST"
+        }
+      );
+      let result = await response.json();
+
+      if (!response.ok) {
+        const shouldRefreshClients =
+          await showReissueTemporaryPasswordError(result);
+
+        result = null;
+
+        if (shouldRefreshClients) {
+          clientsLoaded = false;
+          await fetchClients();
+        }
+
+        return;
+      }
+
+      let temporaryPassword =
+        typeof result?.temporary_password === "string"
+          ? result.temporary_password
+          : "";
+      let temporaryPasswordExpiresAt =
+        typeof result?.temporary_password_expires_at === "string"
+          ? result.temporary_password_expires_at
+          : "";
+      const hasValidExpiration =
+        formatDateTime(temporaryPasswordExpiresAt) !== "-";
+
+      if (!temporaryPassword || !hasValidExpiration) {
+        result = null;
+        temporaryPassword = "";
+        temporaryPasswordExpiresAt = "";
+        throw new Error("Resposta inválida ao reemitir o acesso temporário.");
+      }
+
+      const resultModalOpened = openTemporaryPasswordResultModal(
+        temporaryPassword,
+        temporaryPasswordExpiresAt
+      );
+
+      if (result && typeof result === "object") {
+        result.temporary_password = "";
+      }
+
+      result = null;
+      temporaryPassword = "";
+      temporaryPasswordExpiresAt = "";
+
+      if (!resultModalOpened) {
+        throw new Error("Não foi possível exibir a nova senha temporária.");
+      }
+
+      clientsLoaded = false;
+      await fetchClients();
+    } catch (error) {
+      console.error("ERRO AO REEMITIR ACESSO TEMPORÁRIO.");
+
+      await showAdminActionMessage({
+        type: "danger",
+        title: "Erro ao reemitir acesso",
+        message:
+          error?.message ||
+          "Não foi possível reemitir o acesso temporário.",
+        confirmText: "OK"
+      });
+    } finally {
+      reissuingClientIds.delete(clientId);
+
+      if (triggerButton?.isConnected) {
+        triggerButton.disabled = false;
+      }
+
+      const currentReissueButton = getClientCardById(clientId)?.querySelector(
+        '[data-action="reissue"]'
+      );
+
+      if (currentReissueButton) {
+        currentReissueButton.disabled = false;
+      }
+    }
   }
 
   async function toggleClientStatus(client) {
@@ -4313,6 +4617,42 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
+  function bindTemporaryPasswordResultModalEvents() {
+    const closeButtons = [
+      closeTemporaryPasswordResultModalBtn,
+      closeTemporaryPasswordResultModalBottomBtn
+    ];
+
+    closeButtons.forEach((button) => {
+      if (button && button.dataset.bound !== "true") {
+        button.dataset.bound = "true";
+        button.addEventListener("click", closeTemporaryPasswordResultModal);
+      }
+    });
+
+    if (
+      temporaryPasswordResultModalBackdrop &&
+      temporaryPasswordResultModalBackdrop.dataset.bound !== "true"
+    ) {
+      temporaryPasswordResultModalBackdrop.dataset.bound = "true";
+      temporaryPasswordResultModalBackdrop.addEventListener(
+        "click",
+        closeTemporaryPasswordResultModal
+      );
+    }
+
+    if (
+      copyReissuedTemporaryPasswordBtn &&
+      copyReissuedTemporaryPasswordBtn.dataset.bound !== "true"
+    ) {
+      copyReissuedTemporaryPasswordBtn.dataset.bound = "true";
+      copyReissuedTemporaryPasswordBtn.addEventListener(
+        "click",
+        copyReissuedTemporaryPassword
+      );
+    }
+  }
+
   function bindClientDocumentModalEvents() {
     if (
       closeClientDocumentsModalBtn &&
@@ -4644,6 +4984,11 @@ document.addEventListener("DOMContentLoaded", async () => {
           return;
         }
 
+        if (isTemporaryPasswordResultModalOpen()) {
+          closeTemporaryPasswordResultModal();
+          return;
+        }
+
         if (isHomeBannerModalOpen()) {
           if (!isBannerSaving) {
             cancelBannerEdit();
@@ -4703,6 +5048,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     bindAdminActionModalEvents();
     bindCreateClientModalEvents();
+    bindTemporaryPasswordResultModalEvents();
     bindClientDocumentModalEvents();
     bindNavigationEvents();
     bindGeneralEvents();

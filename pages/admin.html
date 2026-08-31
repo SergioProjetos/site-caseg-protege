@@ -834,8 +834,92 @@
                 Copiar senha
               </button>
             </div>
+
+            <p
+              id="temporaryPasswordExpiration"
+              class="temporary-password-expiration hidden"
+            >
+              <strong>Válida até:</strong>
+              <span id="temporaryPasswordExpiresAtValue"></span>
+            </p>
           </div>
         </form>
+      </div>
+    </section>
+  </div>
+
+  <div
+    id="temporaryPasswordResultModal"
+    class="admin-modal temporary-password-result-modal hidden"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="temporaryPasswordResultModalTitle"
+    aria-hidden="true"
+  >
+    <div
+      id="temporaryPasswordResultModalBackdrop"
+      class="admin-modal-backdrop"
+    ></div>
+
+    <section class="admin-modal-panel temporary-password-result-modal-panel">
+      <header class="admin-modal-header">
+        <div class="admin-modal-title-group">
+          <span class="section-kicker">Clientes</span>
+
+          <h2 id="temporaryPasswordResultModalTitle">Nova senha temporária</h2>
+
+          <p>
+            Envie esta senha ao cliente para o novo Primeiro Acesso.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          id="closeTemporaryPasswordResultModalBtn"
+          class="admin-modal-close-btn"
+          aria-label="Fechar nova senha temporária"
+        >
+          <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+        </button>
+      </header>
+
+      <div class="admin-modal-body">
+        <div class="temporary-password-box">
+          <h3>Nova senha temporária</h3>
+
+          <p class="temporary-password-info">
+            Esta senha será exibida somente até o fechamento deste modal.
+          </p>
+
+          <div class="temporary-password-row">
+            <input
+              type="text"
+              id="reissuedTemporaryPasswordField"
+              readonly
+              autocomplete="off"
+              value=""
+            />
+
+            <button type="button" id="copyReissuedTemporaryPasswordBtn">
+              Copiar senha
+            </button>
+          </div>
+
+          <p class="temporary-password-expiration">
+            <strong>Válida até:</strong>
+            <span id="reissuedTemporaryPasswordExpiresAtValue"></span>
+          </p>
+        </div>
+
+        <div class="form-actions temporary-password-result-actions">
+          <button
+            type="button"
+            id="closeTemporaryPasswordResultModalBottomBtn"
+            class="secondary-action-btn"
+          >
+            Fechar
+          </button>
+        </div>
       </div>
     </section>
   </div>
@@ -1028,6 +1112,16 @@
           >
             <i class="fa-solid fa-upload" aria-hidden="true"></i>
             <span data-action-label>Upload de Documento</span>
+          </button>
+
+          <button
+            type="button"
+            class="client-action-btn reissue reissue-client-access-btn"
+            data-action="reissue"
+            data-client-id=""
+          >
+            <i class="fa-solid fa-key" aria-hidden="true"></i>
+            <span data-action-label>Reemitir acesso</span>
           </button>
 
           <button
