@@ -96,6 +96,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const cpfCnpjInput = document.getElementById("cpfCnpj");
   const phoneInput = document.getElementById("phone");
   const whatsappInput = document.getElementById("whatsapp");
+  let lastValidCpfCnpjValue = "";
 
   const temporaryPasswordBox = document.getElementById("temporaryPasswordBox");
   const temporaryPasswordField = document.getElementById("temporaryPasswordField");
@@ -237,25 +238,183 @@ document.addEventListener("DOMContentLoaded", async () => {
     return String(value || "").replace(/\D/g, "");
   }
 
-  function formatCpfCnpj(value) {
-    const digits = onlyDigits(value);
+  function hasOnlyFiscalInputCharacters(value) {
+    return /^[A-Za-z0-9./-]+$/.test(value);
+  }
 
-    if (!digits) return "";
-
-    if (digits.length <= 11) {
-      return digits
-        .replace(/^(\d{3})(\d)/, "$1.$2")
-        .replace(/^(\d{3})\.(\d{3})(\d)/, "$1.$2.$3")
-        .replace(/\.(\d{3})(\d)/, ".$1-$2")
-        .slice(0, 14);
+  function getSafeFiscalDisplayValue(value) {
+    if (value === null || value === undefined) {
+      return "";
     }
 
-    return digits
-      .replace(/^(\d{2})(\d)/, "$1.$2")
-      .replace(/^(\d{2})\.(\d{3})(\d)/, "$1.$2.$3")
-      .replace(/\.(\d{3})(\d)/, ".$1/$2")
-      .replace(/(\d{4})(\d)/, "$1-$2")
-      .slice(0, 18);
+    return String(value).trim();
+  }
+
+  function normalizeFiscalIdentity(value) {
+    const invalidResult = {
+      state: "INVALID",
+      canonical: null
+    };
+
+    if (typeof value !== "string") {
+      return invalidResult;
+    }
+
+    const rawValue = value.trim();
+
+    if (!rawValue || !hasOnlyFiscalInputCharacters(rawValue)) {
+      return invalidResult;
+    }
+
+    const canonical = rawValue.toUpperCase().replace(/[./-]/g, "");
+
+    if (/^[0-9]{11}$/.test(canonical)) {
+      return {
+        state: "CPF_VALID_STRUCTURE",
+        canonical
+      };
+    }
+
+    if (/^[A-Z0-9]{12}[0-9]{2}$/.test(canonical)) {
+      return {
+        state: "CNPJ_VALID_STRUCTURE",
+        canonical
+      };
+    }
+
+    return invalidResult;
+  }
+
+  function normalizePartialFiscalIdentity(value) {
+    const invalidResult = {
+      isValid: false,
+      canonical: null,
+      mode: null
+    };
+
+    if (typeof value !== "string") {
+      return invalidResult;
+    }
+
+    const rawValue = value.trim();
+
+    if (!rawValue) {
+      return {
+        isValid: true,
+        canonical: "",
+        mode: "cpf"
+      };
+    }
+
+    if (!hasOnlyFiscalInputCharacters(rawValue)) {
+      return invalidResult;
+    }
+
+    const canonical = rawValue.toUpperCase().replace(/[./-]/g, "");
+
+    if (canonical.length > 14 || /[A-Z]/.test(canonical.slice(12))) {
+      return invalidResult;
+    }
+
+    const mode =
+      /[A-Z]/.test(canonical) || canonical.length >= 12 ? "cnpj" : "cpf";
+
+    return {
+      isValid: true,
+      canonical,
+      mode
+    };
+  }
+
+  function normalizeFiscalSearchFragment(value) {
+    return getSafeFiscalDisplayValue(value)
+      .toUpperCase()
+      .replace(/[./-]/g, "");
+  }
+
+  function formatPartialCpf(canonical) {
+    return canonical
+      .replace(/^(\d{3})(\d)/, "$1.$2")
+      .replace(/^(\d{3})\.(\d{3})(\d)/, "$1.$2.$3")
+      .replace(/\.(\d{3})(\d)/, ".$1-$2")
+      .slice(0, 14);
+  }
+
+  function formatPartialCnpj(canonical) {
+    let formatted = canonical.slice(0, 2);
+
+    if (canonical.length > 2) {
+      formatted += `.${canonical.slice(2, 5)}`;
+    }
+
+    if (canonical.length > 5) {
+      formatted += `.${canonical.slice(5, 8)}`;
+    }
+
+    if (canonical.length > 8) {
+      formatted += `/${canonical.slice(8, 12)}`;
+    }
+
+    if (canonical.length > 12) {
+      formatted += `-${canonical.slice(12, 14)}`;
+    }
+
+    return formatted;
+  }
+
+  function formatPartialFiscalIdentity(value) {
+    const partialIdentity = normalizePartialFiscalIdentity(value);
+
+    if (!partialIdentity.isValid) {
+      return {
+        isValid: false,
+        canonical: null,
+        mode: null,
+        value: ""
+      };
+    }
+
+    const formattedValue =
+      partialIdentity.mode === "cnpj"
+        ? formatPartialCnpj(partialIdentity.canonical)
+        : formatPartialCpf(partialIdentity.canonical);
+
+    return {
+      ...partialIdentity,
+      value: formattedValue
+    };
+  }
+
+  function syncCpfCnpjInputState(value = "") {
+    if (!cpfCnpjInput) {
+      lastValidCpfCnpjValue = "";
+      return;
+    }
+
+    const formattedIdentity = formatPartialFiscalIdentity(value);
+
+    if (!formattedIdentity.isValid) {
+      cpfCnpjInput.value = "";
+      lastValidCpfCnpjValue = "";
+      return;
+    }
+
+    cpfCnpjInput.value = formattedIdentity.value;
+    lastValidCpfCnpjValue = formattedIdentity.value;
+  }
+
+  function formatCpfCnpj(value) {
+    const fiscalIdentity = normalizeFiscalIdentity(value);
+
+    if (fiscalIdentity.state === "CPF_VALID_STRUCTURE") {
+      return formatPartialCpf(fiscalIdentity.canonical);
+    }
+
+    if (fiscalIdentity.state === "CNPJ_VALID_STRUCTURE") {
+      return formatPartialCnpj(fiscalIdentity.canonical);
+    }
+
+    return getSafeFiscalDisplayValue(value);
   }
 
   function formatPhone(value) {
@@ -366,13 +525,31 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function getClientEntityType(client) {
-    const digits = onlyDigits(client?.cpf_cnpj || "");
+    const fiscalIdentity = normalizeFiscalIdentity(client?.cpf_cnpj);
 
-    return digits.length > 11 ? "pj" : "pf";
+    if (fiscalIdentity.state === "CPF_VALID_STRUCTURE") {
+      return "pf";
+    }
+
+    if (fiscalIdentity.state === "CNPJ_VALID_STRUCTURE") {
+      return "pj";
+    }
+
+    return "unknown";
   }
 
   function getClientEntityLabel(client) {
-    return getClientEntityType(client) === "pj" ? "CNPJ" : "CPF";
+    const entityType = getClientEntityType(client);
+
+    if (entityType === "pf") {
+      return "CPF";
+    }
+
+    if (entityType === "pj") {
+      return "CNPJ";
+    }
+
+    return "CPF/CNPJ";
   }
 
   function getClientId(client) {
@@ -1788,6 +1965,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     if (createClientForm) {
       createClientForm.reset();
+      syncCpfCnpjInputState();
     }
 
     if (createClientMessage) {
@@ -1976,14 +2154,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     delete button.dataset.originalText;
   }
 
-  function getCreateClientPayload() {
+  function getCreateClientPayload(canonicalCpfCnpj = "") {
     return {
       company_name: document.getElementById("companyName")?.value?.trim() || "",
       full_name:
         document.getElementById("fullName")?.value?.trim() ||
         document.getElementById("responsibleName")?.value?.trim() ||
         "",
-      cpf_cnpj: onlyDigits(cpfCnpjInput?.value || ""),
+      cpf_cnpj: canonicalCpfCnpj,
       email:
         document.getElementById("email")?.value?.trim() ||
         document.getElementById("clientEmail")?.value?.trim() ||
@@ -2013,7 +2191,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       return "Informe o CPF ou CNPJ.";
     }
 
-    if (![11, 14].includes(payload.cpf_cnpj.length)) {
+    if (normalizeFiscalIdentity(payload.cpf_cnpj).state === "INVALID") {
       return "Informe um CPF ou CNPJ válido.";
     }
 
@@ -2060,7 +2238,19 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     if (!createClientForm) return;
 
-    const payload = getCreateClientPayload();
+    const fiscalInput = cpfCnpjInput?.value || "";
+    const fiscalIdentity = normalizeFiscalIdentity(fiscalInput);
+
+    if (fiscalInput.trim() && fiscalIdentity.state === "INVALID") {
+      if (createClientMessage) {
+        createClientMessage.textContent = "Informe um CPF ou CNPJ válido.";
+        createClientMessage.className = "form-message error";
+      }
+
+      return;
+    }
+
+    const payload = getCreateClientPayload(fiscalIdentity.canonical || "");
     const validationError = validateCreateClientPayload(payload);
 
     if (validationError) {
@@ -2108,6 +2298,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         formattedTemporaryPasswordExpiresAt !== "-";
 
       createClientForm.reset();
+      syncCpfCnpjInputState();
 
       if (createClientMessage) {
         createClientMessage.textContent = "Cliente cadastrado com sucesso.";
@@ -2213,17 +2404,24 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   function applyClientFilters(clients) {
     const safeClients = Array.isArray(clients) ? clients : [];
-    const search = normalizeText(clientsSearchInput?.value || "");
-    const searchDigits = onlyDigits(clientsSearchInput?.value || "");
+    const rawSearchValue = clientsSearchInput?.value || "";
+    const search = normalizeText(rawSearchValue);
+    const fiscalSearch = normalizeFiscalSearchFragment(rawSearchValue);
+    const hasOnlyNumericSearchCharacters =
+      /^[0-9()+\s-]+$/.test(rawSearchValue.trim());
+    const contactSearchDigits = hasOnlyNumericSearchCharacters
+      ? onlyDigits(rawSearchValue)
+      : "";
     const status = clientsStatusFilter?.value || "all";
     const type = clientsTypeFilter?.value || "all";
 
     return safeClients.filter((client) => {
       const clientStatus = client.is_active === false ? "inactive" : "active";
       const clientType = getClientEntityType(client);
-
-      const clientDocumentDigits = onlyDigits(client.cpf_cnpj || "");
-      const clientDocumentFormatted = formatCpfCnpj(clientDocumentDigits);
+      const fiscalIdentity = normalizeFiscalIdentity(client.cpf_cnpj);
+      const clientDocumentCanonical =
+        fiscalIdentity.state === "INVALID" ? "" : fiscalIdentity.canonical;
+      const clientDocumentFormatted = formatCpfCnpj(client.cpf_cnpj);
 
       const searchSource = normalizeText(
         [
@@ -2231,9 +2429,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           client.full_name,
           client.email,
           client.cpf_cnpj,
-          clientDocumentDigits,
           clientDocumentFormatted,
-          formatCpfCnpj(client.cpf_cnpj),
           client.phone,
           client.whatsapp,
           formatPhone(client.phone),
@@ -2242,13 +2438,22 @@ document.addEventListener("DOMContentLoaded", async () => {
       );
 
       const matchesTextSearch = !search || searchSource.includes(search);
+      const matchesDocumentSearch = Boolean(
+        fiscalSearch &&
+          clientDocumentCanonical &&
+          clientDocumentCanonical.includes(fiscalSearch)
+      );
+      const matchesContactSearch = Boolean(
+        contactSearchDigits &&
+          (onlyDigits(client.phone).includes(contactSearchDigits) ||
+            onlyDigits(client.whatsapp).includes(contactSearchDigits))
+      );
 
-      const matchesDocumentSearch =
-        !searchDigits ||
-        clientDocumentDigits.includes(searchDigits) ||
-        onlyDigits(clientDocumentFormatted).includes(searchDigits);
-
-      const matchesSearch = matchesTextSearch || matchesDocumentSearch;
+      const matchesSearch =
+        !search ||
+        matchesTextSearch ||
+        matchesDocumentSearch ||
+        matchesContactSearch;
       const matchesStatus = status === "all" || clientStatus === status;
       const matchesType = type === "all" || clientType === type;
 
@@ -4947,9 +5152,18 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     if (cpfCnpjInput && cpfCnpjInput.dataset.bound !== "true") {
       cpfCnpjInput.dataset.bound = "true";
+      syncCpfCnpjInputState(cpfCnpjInput.value);
 
       cpfCnpjInput.addEventListener("input", () => {
-        cpfCnpjInput.value = formatCpfCnpj(cpfCnpjInput.value);
+        const formattedIdentity = formatPartialFiscalIdentity(cpfCnpjInput.value);
+
+        if (!formattedIdentity.isValid) {
+          cpfCnpjInput.value = lastValidCpfCnpjValue;
+          return;
+        }
+
+        cpfCnpjInput.value = formattedIdentity.value;
+        lastValidCpfCnpjValue = formattedIdentity.value;
       });
     }
 

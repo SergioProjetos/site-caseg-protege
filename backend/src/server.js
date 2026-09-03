@@ -210,10 +210,54 @@ function getLoginRequestIp(req) {
   return String(req.ip || req.socket?.remoteAddress || "unknown");
 }
 
+function normalizeFiscalIdentity(value) {
+  if (typeof value !== "string") {
+    return {
+      state: "INVALID",
+      canonical: null
+    };
+  }
+
+  const trimmedValue = value.trim();
+
+  if (!trimmedValue || !/^[A-Za-z0-9./-]+$/.test(trimmedValue)) {
+    return {
+      state: "INVALID",
+      canonical: null
+    };
+  }
+
+  const canonical = trimmedValue
+    .toUpperCase()
+    .replace(/[./-]/g, "");
+
+  if (/^[0-9]{11}$/.test(canonical)) {
+    return {
+      state: "CPF_VALID_STRUCTURE",
+      canonical
+    };
+  }
+
+  if (/^[A-Z0-9]{12}[0-9]{2}$/.test(canonical)) {
+    return {
+      state: "CNPJ_VALID_STRUCTURE",
+      canonical
+    };
+  }
+
+  return {
+    state: "INVALID",
+    canonical: null
+  };
+}
+
 function createLoginIdentityKey(ip, cpfCnpj) {
+  const fiscalIdentity = normalizeFiscalIdentity(cpfCnpj);
+  const rateLimitIdentity =
+    fiscalIdentity.canonical || "INVALID_FISCAL_IDENTITY";
   const identifierHmac = crypto
     .createHmac("sha256", loginIdentifierHmacSecret)
-    .update(cpfCnpj)
+    .update(rateLimitIdentity)
     .digest("hex");
 
   return `ip:${ip}|id:${identifierHmac}`;
@@ -1374,16 +1418,22 @@ app.post("/login", async (req, res) => {
       return sendLoginRateLimitResponse(res, ipRequestLimit.resetAt);
     }
 
-    const cpf_cnpj = normalizeText(req.body.cpf_cnpj).replace(/\D/g, "");
+    const rawCpfCnpj = req.body.cpf_cnpj;
     const password = normalizeText(req.body.password);
 
-    if (!cpf_cnpj || !password) {
+    if (
+      rawCpfCnpj === undefined ||
+      rawCpfCnpj === null ||
+      (typeof rawCpfCnpj === "string" && !rawCpfCnpj.trim()) ||
+      !password
+    ) {
       return res.status(400).json({
         error: "CPF/CNPJ e senha são obrigatórios."
       });
     }
 
-    const loginIdentityKey = createLoginIdentityKey(loginIp, cpf_cnpj);
+    const fiscalIdentity = normalizeFiscalIdentity(rawCpfCnpj);
+    const loginIdentityKey = createLoginIdentityKey(loginIp, rawCpfCnpj);
     const identityFailureLimit =
       getLoginIdentityFailureLimit(loginIdentityKey);
 
@@ -1393,6 +1443,16 @@ app.post("/login", async (req, res) => {
         identityFailureLimit.resetAt
       );
     }
+
+    if (fiscalIdentity.state === "INVALID") {
+      recordLoginIdentityFailure(loginIdentityKey);
+
+      return res.status(401).json({
+        error: "CPF/CNPJ ou senha inválidos."
+      });
+    }
+
+    const cpf_cnpj = fiscalIdentity.canonical;
 
     const { data: profile, error: profileError } = await adminSupabase
       .from("profiles")
@@ -1987,22 +2047,32 @@ app.post("/clients", async (req, res) => {
 
     const full_name = normalizeText(req.body.full_name);
     const company_name = normalizeText(req.body.company_name);
-    const cpf_cnpj = normalizeText(req.body.cpf_cnpj).replace(/\D/g, "");
+    const rawCpfCnpj = req.body.cpf_cnpj;
+    const fiscalIdentity = normalizeFiscalIdentity(rawCpfCnpj);
     const email = normalizeText(req.body.email).toLowerCase();
     const phone = normalizeText(req.body.phone).replace(/\D/g, "");
     const whatsapp = normalizeText(req.body.whatsapp).replace(/\D/g, "");
 
-    if (!full_name || !company_name || !cpf_cnpj || !email) {
+    if (
+      !full_name ||
+      !company_name ||
+      rawCpfCnpj === undefined ||
+      rawCpfCnpj === null ||
+      (typeof rawCpfCnpj === "string" && !rawCpfCnpj.trim()) ||
+      !email
+    ) {
       return res.status(400).json({
         error: "Campos obrigatórios: nome do cliente, empresa, CPF/CNPJ e e-mail."
       });
     }
 
-    if (![11, 14].includes(cpf_cnpj.length)) {
+    if (fiscalIdentity.state === "INVALID") {
       return res.status(400).json({
         error: "CPF/CNPJ inválido."
       });
     }
+
+    const cpf_cnpj = fiscalIdentity.canonical;
 
     const { data: existingCpfCnpj } = await adminSupabase
       .from("profiles")

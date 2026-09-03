@@ -897,8 +897,145 @@
         const ADMIN_SESSION_DURATION_MS = 10 * 60 * 60 * 1000;
         const ADMIN_SESSION_EXPIRES_AT_KEY = "admin_session_expires_at";
 
-        function onlyDigits(value) {
-            return (value || "").replace(/\D/g, "");
+        function hasOnlyFiscalInputCharacters(value) {
+            return /^[A-Za-z0-9./-]+$/.test(value);
+        }
+
+        function normalizeFiscalIdentity(value) {
+            if (typeof value !== "string") {
+                return {
+                    state: "INVALID",
+                    canonical: null
+                };
+            }
+
+            const trimmedValue = value.trim();
+
+            if (
+                !trimmedValue ||
+                !hasOnlyFiscalInputCharacters(trimmedValue)
+            ) {
+                return {
+                    state: "INVALID",
+                    canonical: null
+                };
+            }
+
+            const canonical = trimmedValue
+                .toUpperCase()
+                .replace(/[./-]/g, "");
+
+            if (/^[0-9]{11}$/.test(canonical)) {
+                return {
+                    state: "CPF_VALID_STRUCTURE",
+                    canonical
+                };
+            }
+
+            if (/^[A-Z0-9]{12}[0-9]{2}$/.test(canonical)) {
+                return {
+                    state: "CNPJ_VALID_STRUCTURE",
+                    canonical
+                };
+            }
+
+            return {
+                state: "INVALID",
+                canonical: null
+            };
+        }
+
+        function normalizePartialFiscalIdentity(value) {
+            if (typeof value !== "string") {
+                return {
+                    isValid: false,
+                    canonical: null,
+                    mode: null
+                };
+            }
+
+            const trimmedValue = value.trim();
+
+            if (
+                trimmedValue &&
+                !hasOnlyFiscalInputCharacters(trimmedValue)
+            ) {
+                return {
+                    isValid: false,
+                    canonical: null,
+                    mode: null
+                };
+            }
+
+            const canonical = trimmedValue
+                .toUpperCase()
+                .replace(/[./-]/g, "");
+
+            if (
+                canonical.length > 14 ||
+                /[A-Z]/.test(canonical.slice(12))
+            ) {
+                return {
+                    isValid: false,
+                    canonical: null,
+                    mode: null
+                };
+            }
+
+            const isCnpj =
+                /[A-Z]/.test(canonical) || canonical.length >= 12;
+
+            return {
+                isValid: true,
+                canonical,
+                mode: isCnpj ? "CNPJ" : "CPF"
+            };
+        }
+
+        function formatPartialCpf(canonical) {
+            if (canonical.length <= 3) {
+                return canonical;
+            }
+
+            if (canonical.length <= 6) {
+                return `${canonical.slice(0, 3)}.${canonical.slice(3)}`;
+            }
+
+            if (canonical.length <= 9) {
+                return `${canonical.slice(0, 3)}.${canonical.slice(3, 6)}.${canonical.slice(6)}`;
+            }
+
+            return `${canonical.slice(0, 3)}.${canonical.slice(3, 6)}.${canonical.slice(6, 9)}-${canonical.slice(9)}`;
+        }
+
+        function formatPartialCnpj(canonical) {
+            let formattedValue = canonical.slice(0, 2);
+
+            if (canonical.length > 2) {
+                formattedValue += `.${canonical.slice(2, 5)}`;
+            }
+
+            if (canonical.length > 5) {
+                formattedValue += `.${canonical.slice(5, 8)}`;
+            }
+
+            if (canonical.length > 8) {
+                formattedValue += `/${canonical.slice(8, 12)}`;
+            }
+
+            if (canonical.length > 12) {
+                formattedValue += `-${canonical.slice(12, 14)}`;
+            }
+
+            return formattedValue;
+        }
+
+        function formatPartialFiscalIdentity(partialIdentity) {
+            if (partialIdentity.mode === "CNPJ") {
+                return formatPartialCnpj(partialIdentity.canonical);
+            }
+
+            return formatPartialCpf(partialIdentity.canonical);
         }
 
         function clearSession() {
@@ -1024,24 +1161,24 @@
         }
 
         const cpfInput = document.querySelector("#cpf_cnpj");
+        const initialPartialIdentity = normalizePartialFiscalIdentity(cpfInput.value);
+        let lastValidCpfCnpjValue = initialPartialIdentity.isValid
+            ? formatPartialFiscalIdentity(initialPartialIdentity)
+            : "";
+
+        cpfInput.value = lastValidCpfCnpjValue;
 
         cpfInput.addEventListener("input", function () {
-            let value = onlyDigits(cpfInput.value);
+            const partialIdentity = normalizePartialFiscalIdentity(cpfInput.value);
 
-            if (value.length <= 11) {
-                value = value
-                    .replace(/(\d{3})(\d)/, "$1.$2")
-                    .replace(/(\d{3})(\d)/, "$1.$2")
-                    .replace(/(\d{3})(\d{1,2})$/, "$1-$2");
-            } else {
-                value = value
-                    .replace(/^(\d{2})(\d)/, "$1.$2")
-                    .replace(/^(\d{2})\.(\d{3})(\d)/, "$1.$2.$3")
-                    .replace(/\.(\d{3})(\d)/, ".$1/$2")
-                    .replace(/(\d{4})(\d)/, "$1-$2");
+            if (!partialIdentity.isValid) {
+                cpfInput.value = lastValidCpfCnpjValue;
+                return;
             }
 
-            cpfInput.value = value;
+            const formattedValue = formatPartialFiscalIdentity(partialIdentity);
+            cpfInput.value = formattedValue;
+            lastValidCpfCnpjValue = formattedValue;
         });
 
         const passwordInput = document.querySelector("#password");
@@ -1071,13 +1208,22 @@
         loginForm.addEventListener("submit", async function (event) {
             event.preventDefault();
 
-            const cpf_cnpj = onlyDigits(document.querySelector("#cpf_cnpj").value.trim());
-            const password = document.querySelector("#password").value.trim();
+            const rawCpfCnpj = cpfInput.value;
+            const password = passwordInput.value.trim();
 
-            if (!cpf_cnpj || !password) {
+            if (!rawCpfCnpj.trim() || !password) {
                 setLoginMessage("Preencha CPF/CNPJ e senha.", "red");
                 return;
             }
+
+            const fiscalIdentity = normalizeFiscalIdentity(rawCpfCnpj);
+
+            if (fiscalIdentity.state === "INVALID") {
+                setLoginMessage("Informe um CPF ou CNPJ válido.", "red");
+                return;
+            }
+
+            const cpf_cnpj = fiscalIdentity.canonical;
 
             hideForgotPasswordLink();
             setLoginMessage("Entrando...", "#0b6b79");
