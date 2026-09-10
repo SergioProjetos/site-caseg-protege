@@ -980,9 +980,10 @@
         </div>
     </footer>
 
+    <script src="../assets/js/api-config.js"></script>
     <script>
         const RECOVERY_RESET_ENDPOINT =
-            "http://localhost:3000/password-recovery/reset";
+            `${window.CASEG_CONFIG.API_BASE_URL}/password-recovery/reset`;
         const SUCCESS_REDIRECT_DELAY_MS = 1500;
         const INVALID_PASSWORD_MESSAGE =
             "A senha deve ter no mínimo 8 caracteres, 1 letra maiúscula e 1 número.";

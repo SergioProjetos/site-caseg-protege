@@ -197,7 +197,7 @@ document.addEventListener("DOMContentLoaded", function () {
     }, CLIENT_SESSION_REFRESH_TIMEOUT_MS);
 
     try {
-      const response = await fetch("http://localhost:3000/session/refresh", {
+      const response = await fetch(`${window.CASEG_CONFIG.API_BASE_URL}/session/refresh`, {
         method: "POST",
         credentials: "include",
         signal: controller.signal
@@ -544,7 +544,7 @@ document.addEventListener("DOMContentLoaded", function () {
     }, LOGOUT_REQUEST_TIMEOUT_MS);
 
     try {
-      const response = await fetch("http://localhost:3000/logout", {
+      const response = await fetch(`${window.CASEG_CONFIG.API_BASE_URL}/logout`, {
         method: "POST",
         credentials: "include",
         headers: {
@@ -1041,7 +1041,7 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     try {
-      const response = await fetch("http://localhost:3000/documents", {
+      const response = await fetch(`${window.CASEG_CONFIG.API_BASE_URL}/documents`, {
         method: "GET",
         headers: {
           Authorization: `Bearer ${token}`
@@ -1365,7 +1365,7 @@ document.addEventListener("DOMContentLoaded", function () {
     setDownloadLoadingState(triggerElement, true);
 
     try {
-      const response = await fetch("http://localhost:3000/documents/download", {
+      const response = await fetch(`${window.CASEG_CONFIG.API_BASE_URL}/documents/download`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

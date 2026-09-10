@@ -715,11 +715,12 @@
         </div>
     </footer>
 
+    <script src="../assets/js/api-config.js"></script>
     <script>
         const RECOVERY_REQUEST_ENDPOINT =
-            "http://localhost:3000/password-recovery/request";
+            `${window.CASEG_CONFIG.API_BASE_URL}/password-recovery/request`;
         const RECOVERY_VERIFY_ENDPOINT =
-            "http://localhost:3000/password-recovery/verify";
+            `${window.CASEG_CONFIG.API_BASE_URL}/password-recovery/verify`;
         const GENERIC_REQUEST_ACCEPTED_MESSAGE =
             "Se os dados informados estiverem vinculados a uma conta elegível, um código de recuperação será enviado ao e-mail cadastrado.";
         const INVALID_IDENTITY_MESSAGE = "Informe um CPF ou CNPJ válido.";

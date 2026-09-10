@@ -28,7 +28,7 @@ async function refreshClientSession() {
   }, CLIENT_SESSION_REFRESH_TIMEOUT_MS);
 
   try {
-    const response = await fetch("http://localhost:3000/session/refresh", {
+    const response = await fetch(`${window.CASEG_CONFIG.API_BASE_URL}/session/refresh`, {
       method: "POST",
       credentials: "include",
       signal: controller.signal
@@ -96,7 +96,7 @@ async function attemptRemoteLogout(accessToken) {
   }, LOGOUT_REQUEST_TIMEOUT_MS);
 
   try {
-    const response = await fetch("http://localhost:3000/logout", {
+    const response = await fetch(`${window.CASEG_CONFIG.API_BASE_URL}/logout`, {
       method: "POST",
       credentials: "include",
       headers: {
@@ -341,7 +341,7 @@ if (firstAccessForm) {
     setMessage("Salvando nova senha...", "info");
 
     try {
-      const response = await fetch("http://localhost:3000/update-password", {
+      const response = await fetch(`${window.CASEG_CONFIG.API_BASE_URL}/update-password`, {
         method: "PUT",
         credentials: "include",
         headers: {

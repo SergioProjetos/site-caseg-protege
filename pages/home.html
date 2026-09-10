@@ -2138,6 +2138,7 @@
         </div>
     </footer>
 
+    <script src="../assets/js/api-config.js"></script>
     <script>
         document.addEventListener("DOMContentLoaded", function () {
             const homeCarousel = document.getElementById("homeCarousel");
@@ -2539,7 +2540,7 @@
 
             async function loadHomeBanners() {
                 try {
-                    const response = await fetch("http://localhost:3000/notices", {
+                    const response = await fetch(`${window.CASEG_CONFIG.API_BASE_URL}/notices`, {
                         method: "GET",
                         headers: {
                             "Content-Type": "application/json",

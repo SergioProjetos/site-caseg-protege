@@ -816,7 +816,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         throw new Error("Refresh token não encontrado.");
       }
 
-      const response = await fetch("http://localhost:3000/admin/refresh-session", {
+      const response = await fetch(`${window.CASEG_CONFIG.API_BASE_URL}/admin/refresh-session`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -1187,7 +1187,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }, LOGOUT_REQUEST_TIMEOUT_MS);
 
     try {
-      const response = await fetch("http://localhost:3000/logout", {
+      const response = await fetch(`${window.CASEG_CONFIG.API_BASE_URL}/logout`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${accessToken}`
@@ -1601,7 +1601,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   async function fetchDashboardSummary() {
     try {
-      const response = await adminFetch("http://localhost:3000/admin/dashboard/summary");
+      const response = await adminFetch(`${window.CASEG_CONFIG.API_BASE_URL}/admin/dashboard/summary`);
       const result = await response.json();
 
       if (!response.ok) {
@@ -1751,7 +1751,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       loadingRow.appendChild(loadingCell);
       dashboardRenewalAlertsBody.replaceChildren(loadingRow);
 
-      const response = await adminFetch("http://localhost:3000/admin/documents/renewal-alerts");
+      const response = await adminFetch(`${window.CASEG_CONFIG.API_BASE_URL}/admin/documents/renewal-alerts`);
       const result = await response.json();
 
       if (!response.ok) {
@@ -1868,7 +1868,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       loadingRow.appendChild(loadingCell);
       dashboardRecentActivitiesList.replaceChildren(loadingRow);
 
-      const response = await adminFetch("http://localhost:3000/admin/activities?limit=20");
+      const response = await adminFetch(`${window.CASEG_CONFIG.API_BASE_URL}/admin/activities?limit=20`);
       const result = await response.json();
 
       if (!response.ok) {
@@ -1900,7 +1900,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   async function refreshRecentActivitiesSilently() {
     try {
-      const response = await adminFetch("http://localhost:3000/admin/activities?limit=20");
+      const response = await adminFetch(`${window.CASEG_CONFIG.API_BASE_URL}/admin/activities?limit=20`);
       const result = await response.json();
 
       if (!response.ok) {
@@ -2272,7 +2272,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         createClientMessage.className = "form-message info";
       }
 
-      const response = await adminFetch("http://localhost:3000/clients", {
+      const response = await adminFetch(`${window.CASEG_CONFIG.API_BASE_URL}/clients`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -2606,7 +2606,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       renderClientsMessage("Carregando clientes...", "info");
       clearClientsList();
 
-      const response = await adminFetch("http://localhost:3000/clients");
+      const response = await adminFetch(`${window.CASEG_CONFIG.API_BASE_URL}/clients`);
       const result = await response.json();
 
       if (!response.ok) {
@@ -2936,7 +2936,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
 
       const response = await adminFetch(
-        `http://localhost:3000/admin/clients/${clientId}/reissue-temporary-password`,
+        `${window.CASEG_CONFIG.API_BASE_URL}/admin/clients/${clientId}/reissue-temporary-password`,
         {
           method: "POST"
         }
@@ -3042,7 +3042,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (!confirmed) return;
 
     try {
-      const response = await adminFetch(`http://localhost:3000/admin/clients/${clientId}/status`, {
+      const response = await adminFetch(`${window.CASEG_CONFIG.API_BASE_URL}/admin/clients/${clientId}/status`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json"
@@ -3098,7 +3098,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (!confirmed) return;
 
     try {
-      const response = await adminFetch(`http://localhost:3000/admin/clients/${clientId}`, {
+      const response = await adminFetch(`${window.CASEG_CONFIG.API_BASE_URL}/admin/clients/${clientId}`, {
         method: "DELETE"
       });
 
@@ -3218,7 +3218,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       formData.append("expiration_date", expirationDate);
       formData.append("file", fileInput.files[0]);
 
-      const response = await adminFetch("http://localhost:3000/admin/documents/upload", {
+      const response = await adminFetch(`${window.CASEG_CONFIG.API_BASE_URL}/admin/documents/upload`, {
         method: "POST",
         body: formData
       });
@@ -3292,7 +3292,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (!clientId) return [];
 
     const response = await adminFetch(
-      `http://localhost:3000/clients/${clientId}/documents`
+      `${window.CASEG_CONFIG.API_BASE_URL}/clients/${clientId}/documents`
     );
 
     const result = await response.json();
@@ -3746,7 +3746,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         buttonElement.textContent = "Baixando...";
       }
 
-      const response = await adminFetch("http://localhost:3000/admin/documents/download", {
+      const response = await adminFetch(`${window.CASEG_CONFIG.API_BASE_URL}/admin/documents/download`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -3806,7 +3806,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       formData.append("file", file);
 
       const response = await adminFetch(
-        `http://localhost:3000/admin/documents/${documentId}/replace`,
+        `${window.CASEG_CONFIG.API_BASE_URL}/admin/documents/${documentId}/replace`,
         {
           method: "PUT",
           body: formData
@@ -3880,7 +3880,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
 
       const response = await adminFetch(
-        `http://localhost:3000/admin/documents/${documentId}`,
+        `${window.CASEG_CONFIG.API_BASE_URL}/admin/documents/${documentId}`,
         {
           method: "DELETE"
         }
@@ -4357,7 +4357,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       renderHomeBannersMessage("Carregando banners...", "info");
       clearHomeBannersList();
 
-      const response = await adminFetch("http://localhost:3000/admin/notices");
+      const response = await adminFetch(`${window.CASEG_CONFIG.API_BASE_URL}/admin/notices`);
       const result = await response.json();
 
       if (!response.ok) {
@@ -4393,7 +4393,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     try {
       showAdminFeedback("Salvando nova ordem dos banners...", "info", false);
 
-      const response = await adminFetch("http://localhost:3000/admin/notices/reorder", {
+      const response = await adminFetch(`${window.CASEG_CONFIG.API_BASE_URL}/admin/notices/reorder`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json"
@@ -4612,8 +4612,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     const endpoint = isEditing
-      ? `http://localhost:3000/admin/notices/${bannerEditId.value}`
-      : "http://localhost:3000/admin/notices/upload";
+      ? `${window.CASEG_CONFIG.API_BASE_URL}/admin/notices/${bannerEditId.value}`
+      : `${window.CASEG_CONFIG.API_BASE_URL}/admin/notices/upload`;
 
     const method = isEditing ? "PUT" : "POST";
     const loadingText = isEditing ? "Salvando..." : "Cadastrando...";
@@ -4710,7 +4710,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (!confirmed) return;
 
     try {
-      const response = await adminFetch(`http://localhost:3000/admin/notices/${bannerId}/toggle`, {
+      const response = await adminFetch(`${window.CASEG_CONFIG.API_BASE_URL}/admin/notices/${bannerId}/toggle`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json"
@@ -4765,7 +4765,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (!confirmed) return;
 
     try {
-      const response = await adminFetch(`http://localhost:3000/admin/notices/${bannerId}`, {
+      const response = await adminFetch(`${window.CASEG_CONFIG.API_BASE_URL}/admin/notices/${bannerId}`, {
         method: "DELETE"
       });
 

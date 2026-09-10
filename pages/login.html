@@ -889,6 +889,7 @@
         </div>
     </footer>
 
+    <script src="../assets/js/api-config.js"></script>
     <script>
         const ADMIN_SESSION_DURATION_MS = 10 * 60 * 60 * 1000;
         const ADMIN_SESSION_EXPIRES_AT_KEY = "admin_session_expires_at";
@@ -1207,7 +1208,7 @@
             setLoginMessage("Entrando...", "#0b6b79");
 
             try {
-                const response = await fetch("http://localhost:3000/login", {
+                const response = await fetch(`${window.CASEG_CONFIG.API_BASE_URL}/login`, {
                     method: "POST",
                     credentials: "include",
                     headers: {
