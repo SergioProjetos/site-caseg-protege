@@ -8,6 +8,9 @@ const crypto = require("crypto");
 const multer = require("multer");
 const sharp = require("sharp");
 const { createClient, isAuthRetryableFetchError } = require("@supabase/supabase-js");
+const {
+  createPasswordRecoveryEmailService
+} = require("./services/password-recovery-email");
 
 console.log("URL:", process.env.SUPABASE_URL ? "OK" : "NÃO CARREGOU");
 console.log("SERVICE ROLE KEY:", process.env.SUPABASE_SERVICE_ROLE_KEY ? "OK" : "NÃO CARREGOU");
@@ -201,10 +204,22 @@ const LOGIN_IDENTITY_FAILURE_LIMIT = 10;
 const LOGIN_RATE_LIMIT_CLEANUP_INTERVAL_MS = 60 * 1000;
 const LOGIN_RATE_LIMIT_ERROR_MESSAGE =
   "Muitas tentativas de acesso. Aguarde alguns minutos e tente novamente.";
+const RECOVERY_IDENTITY_HMAC_DOMAIN =
+  "caseg/recovery/identity/v1\0";
+const RECOVERY_FLOW_HASH_DOMAIN = "caseg/recovery/flow/v1\0";
+const RECOVERY_FLOW_TTL_MS = 10 * 60 * 1000;
+const RECOVERY_VERIFIED_FLOW_TTL_MS = 5 * 60 * 1000;
+const RECOVERY_REQUEST_IP_WINDOW_MS = 15 * 60 * 1000;
+const RECOVERY_REQUEST_IP_MAX = 20;
+const RECOVERY_REQUEST_IP_CLEANUP_INTERVAL_MS = 60 * 1000;
+const RECOVERY_FLOW_COOKIE_NAME = "caseg_recovery_flow";
+const RECOVERY_FLOW_COOKIE_PATH = "/password-recovery";
 
 const loginIpRequestEntries = new Map();
 const loginIdentityFailureEntries = new Map();
 const loginIdentifierHmacSecret = crypto.randomBytes(32);
+const recoveryRequestIpAttempts = new Map();
+let passwordRecoveryEmailService;
 
 function getLoginRequestIp(req) {
   return String(req.ip || req.socket?.remoteAddress || "unknown");
@@ -249,6 +264,850 @@ function normalizeFiscalIdentity(value) {
     state: "INVALID",
     canonical: null
   };
+}
+
+function getRecoveryIdentityHmacKey() {
+  const configuredKey =
+    process.env.CASEG_RECOVERY_IDENTITY_HMAC_KEY;
+
+  if (
+    typeof configuredKey !== "string" ||
+    !/^[0-9a-fA-F]{64}$/.test(configuredKey)
+  ) {
+    throw new Error(
+      "Recovery identity HMAC key is not configured correctly."
+    );
+  }
+
+  const key = Buffer.from(configuredKey, "hex");
+
+  if (key.length !== 32) {
+    throw new Error(
+      "Recovery identity HMAC key is not configured correctly."
+    );
+  }
+
+  return key;
+}
+
+function createRecoveryIdentityHmac(canonicalIdentity) {
+  if (
+    typeof canonicalIdentity !== "string" ||
+    canonicalIdentity.length === 0
+  ) {
+    throw new TypeError("Recovery canonical identity is invalid.");
+  }
+
+  return crypto
+    .createHmac("sha256", getRecoveryIdentityHmacKey())
+    .update(RECOVERY_IDENTITY_HMAC_DOMAIN, "utf8")
+    .update(canonicalIdentity, "utf8")
+    .digest("hex");
+}
+
+function createRecoveryFlowToken() {
+  return crypto.randomBytes(32).toString("base64url");
+}
+
+function createRecoveryFlowHash(flowToken) {
+  if (typeof flowToken !== "string" || flowToken.length === 0) {
+    throw new TypeError("Recovery flow token is invalid.");
+  }
+
+  return crypto
+    .createHash("sha256")
+    .update(RECOVERY_FLOW_HASH_DOMAIN, "utf8")
+    .update(flowToken, "utf8")
+    .digest("hex");
+}
+
+function getRecoveryFlowCookie(req) {
+  try {
+    if (
+      !req ||
+      typeof req !== "object" ||
+      typeof req.headers?.cookie !== "string"
+    ) {
+      return null;
+    }
+
+    let recoveryFlowToken = null;
+
+    for (const rawSegment of req.headers.cookie.split(";")) {
+      const segment = rawSegment.replace(/^[ \t]+/, "");
+      const separatorIndex = segment.indexOf("=");
+
+      if (separatorIndex < 0) {
+        continue;
+      }
+
+      const cookieName = segment.slice(0, separatorIndex);
+      const cookieValue = segment.slice(separatorIndex + 1);
+
+      if (cookieName !== RECOVERY_FLOW_COOKIE_NAME) {
+        continue;
+      }
+
+      if (recoveryFlowToken !== null) {
+        return null;
+      }
+
+      recoveryFlowToken = cookieValue;
+    }
+
+    if (
+      typeof recoveryFlowToken !== "string" ||
+      recoveryFlowToken.length === 0 ||
+      /[^A-Za-z0-9_-]/.test(recoveryFlowToken)
+    ) {
+      return null;
+    }
+
+    return recoveryFlowToken;
+  } catch {
+    return null;
+  }
+}
+
+function getPasswordRecoveryVerificationCode(value) {
+  if (
+    typeof value !== "string" ||
+    value.length === 0 ||
+    !/\S/.test(value) ||
+    /[\r\n]/.test(value)
+  ) {
+    return null;
+  }
+
+  return value;
+}
+
+async function preparePasswordRecoveryVerification(flowHash) {
+  if (
+    typeof flowHash !== "string" ||
+    !/^[0-9a-f]{64}$/.test(flowHash)
+  ) {
+    return { state: "TECHNICAL_FAILURE" };
+  }
+
+  async function invalidateAmbiguousPreparation() {
+    try {
+      await adminSupabase
+        .rpc("caseg_recovery_invalidate", {
+          p_flow_token_hash: flowHash
+        })
+        .single();
+    } catch {
+      // A falha técnica original permanece fechada.
+    }
+  }
+
+  let preparationResult;
+
+  try {
+    preparationResult = await adminSupabase
+      .rpc("caseg_recovery_prepare_verify", {
+        p_flow_token_hash: flowHash
+      })
+      .single();
+  } catch {
+    await invalidateAmbiguousPreparation();
+    return { state: "TECHNICAL_FAILURE" };
+  }
+
+  const data = preparationResult?.data;
+
+  if (
+    preparationResult?.error !== null ||
+    !data ||
+    typeof data !== "object" ||
+    Array.isArray(data)
+  ) {
+    await invalidateAmbiguousPreparation();
+    return { state: "TECHNICAL_FAILURE" };
+  }
+
+  const resultKeys = Object.keys(data).sort();
+  const expectedResultKeys = [
+    "allowed",
+    "expires_at",
+    "result_code",
+    "user_id"
+  ];
+
+  if (
+    resultKeys.length !== expectedResultKeys.length ||
+    resultKeys.some(
+      (resultKey, index) => resultKey !== expectedResultKeys[index]
+    )
+  ) {
+    await invalidateAmbiguousPreparation();
+    return { state: "TECHNICAL_FAILURE" };
+  }
+
+  if (
+    data.result_code === "OK" &&
+    data.allowed === true &&
+    typeof data.user_id === "string" &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      data.user_id
+    ) &&
+    typeof data.expires_at === "string" &&
+    Number.isFinite(Date.parse(data.expires_at))
+  ) {
+    return {
+      state: "PREPARED",
+      userId: data.user_id,
+      expiresAt: data.expires_at
+    };
+  }
+
+  const rejectedResultCodes = new Set([
+    "INVALID_STATE",
+    "NOT_FOUND",
+    "USED",
+    "EXPIRED",
+    "ATTEMPTS_EXCEEDED"
+  ]);
+
+  if (
+    data.allowed === false &&
+    rejectedResultCodes.has(data.result_code) &&
+    data.user_id === null &&
+    data.expires_at === null
+  ) {
+    return { state: "FLOW_REJECTED" };
+  }
+
+  await invalidateAmbiguousPreparation();
+  return { state: "TECHNICAL_FAILURE" };
+}
+
+async function verifyPasswordRecoveryOtp(userId, code) {
+  if (
+    typeof userId !== "string" ||
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      userId
+    )
+  ) {
+    return "TECHNICAL_FAILURE";
+  }
+
+  const recoveryCode = getPasswordRecoveryVerificationCode(code);
+
+  if (recoveryCode === null) {
+    return "TECHNICAL_FAILURE";
+  }
+
+  let authUserResult;
+
+  try {
+    authUserResult = await adminSupabase.auth.admin.getUserById(userId);
+  } catch {
+    return "TECHNICAL_FAILURE";
+  }
+
+  const authUser = authUserResult?.data?.user;
+
+  if (
+    authUserResult?.error !== null ||
+    !authUser ||
+    authUser.id !== userId ||
+    typeof authUser.email !== "string" ||
+    !/\S/.test(authUser.email)
+  ) {
+    return "TECHNICAL_FAILURE";
+  }
+
+  let verificationSupabase;
+
+  try {
+    verificationSupabase = createClientSessionAuthClient();
+  } catch {
+    return "TECHNICAL_FAILURE";
+  }
+
+  let verificationResult;
+
+  try {
+    verificationResult = await verificationSupabase.auth.verifyOtp({
+      email: authUser.email,
+      token: recoveryCode,
+      type: "recovery"
+    });
+  } catch {
+    try {
+      await verificationSupabase.auth.signOut({ scope: "local" });
+    } catch {
+      // A validação falha fechada mesmo se a revogação local falhar.
+    }
+
+    return "TECHNICAL_FAILURE";
+  }
+
+  if (
+    verificationResult?.error?.code === "otp_expired" &&
+    verificationResult?.data?.user === null &&
+    verificationResult?.data?.session === null
+  ) {
+    return "OTP_REJECTED";
+  }
+
+  const verificationSession = verificationResult?.data?.session;
+  const otpVerified =
+    verificationResult?.error === null &&
+    verificationResult?.data?.user?.id === userId &&
+    verificationSession &&
+    typeof verificationSession.access_token === "string" &&
+    /\S/.test(verificationSession.access_token);
+
+  try {
+    const signOutResult = await verificationSupabase.auth.signOut({
+      scope: "local"
+    });
+
+    if (
+      !signOutResult ||
+      typeof signOutResult !== "object" ||
+      signOutResult.error !== null
+    ) {
+      return "TECHNICAL_FAILURE";
+    }
+  } catch {
+    return "TECHNICAL_FAILURE";
+  }
+
+  return otpVerified === true ? "VERIFIED" : "TECHNICAL_FAILURE";
+}
+
+async function rotateVerifiedPasswordRecoveryFlow(oldFlowHash) {
+  if (
+    typeof oldFlowHash !== "string" ||
+    !/^[0-9a-f]{64}$/.test(oldFlowHash)
+  ) {
+    return { state: "TECHNICAL_FAILURE" };
+  }
+
+  let newFlowToken;
+  let newFlowHash;
+  let newExpiresAt;
+
+  try {
+    newFlowToken = createRecoveryFlowToken();
+    newFlowHash = createRecoveryFlowHash(newFlowToken);
+    newExpiresAt = new Date(
+      Date.now() + RECOVERY_VERIFIED_FLOW_TTL_MS
+    ).toISOString();
+  } catch {
+    await invalidateAmbiguousFlow(oldFlowHash);
+    return { state: "TECHNICAL_FAILURE" };
+  }
+
+  if (
+    typeof newFlowToken !== "string" ||
+    newFlowToken.length === 0 ||
+    /[^A-Za-z0-9_-]/.test(newFlowToken) ||
+    typeof newFlowHash !== "string" ||
+    !/^[0-9a-f]{64}$/.test(newFlowHash) ||
+    newFlowHash === oldFlowHash ||
+    typeof newExpiresAt !== "string" ||
+    !Number.isFinite(Date.parse(newExpiresAt))
+  ) {
+    await invalidateAmbiguousFlow(oldFlowHash);
+    return { state: "TECHNICAL_FAILURE" };
+  }
+
+  async function invalidateAmbiguousFlow(flowHash) {
+    try {
+      await adminSupabase
+        .rpc("caseg_recovery_invalidate", {
+          p_flow_token_hash: flowHash
+        })
+        .single();
+    } catch {
+      // A outra compensação ainda deve ser tentada.
+    }
+  }
+
+  async function invalidateAmbiguousRotation() {
+    await invalidateAmbiguousFlow(oldFlowHash);
+    await invalidateAmbiguousFlow(newFlowHash);
+  }
+
+  let markVerifiedResponse;
+
+  try {
+    markVerifiedResponse = await adminSupabase
+      .rpc("caseg_recovery_mark_verified", {
+        p_old_flow_token_hash: oldFlowHash,
+        p_new_flow_token_hash: newFlowHash,
+        p_new_expires_at: newExpiresAt
+      })
+      .single();
+  } catch {
+    await invalidateAmbiguousRotation();
+    return { state: "TECHNICAL_FAILURE" };
+  }
+
+  if (
+    !markVerifiedResponse ||
+    typeof markVerifiedResponse !== "object" ||
+    markVerifiedResponse.error !== null ||
+    !markVerifiedResponse.data ||
+    typeof markVerifiedResponse.data !== "object" ||
+    Array.isArray(markVerifiedResponse.data)
+  ) {
+    await invalidateAmbiguousRotation();
+    return { state: "TECHNICAL_FAILURE" };
+  }
+
+  const markVerifiedResult = markVerifiedResponse.data;
+  const resultKeys = Object.keys(markVerifiedResult).sort();
+  const expectedResultKeys = [
+    "allowed",
+    "expires_at",
+    "result_code",
+    "user_id"
+  ];
+
+  if (
+    resultKeys.length !== expectedResultKeys.length ||
+    resultKeys.some(
+      (resultKey, index) =>
+        resultKey !== expectedResultKeys[index]
+    )
+  ) {
+    await invalidateAmbiguousRotation();
+    return { state: "TECHNICAL_FAILURE" };
+  }
+
+  switch (markVerifiedResult.result_code) {
+    case "NOT_FOUND":
+    case "USED":
+    case "EXPIRED":
+    case "INVALID_STATE":
+      if (
+        markVerifiedResult.allowed !== false ||
+        markVerifiedResult.user_id !== null ||
+        markVerifiedResult.expires_at !== null
+      ) {
+        await invalidateAmbiguousRotation();
+        return { state: "TECHNICAL_FAILURE" };
+      }
+
+      await invalidateAmbiguousFlow(oldFlowHash);
+      return { state: "FLOW_REJECTED" };
+    case "OK":
+      if (
+        markVerifiedResult.allowed !== true ||
+        typeof markVerifiedResult.user_id !== "string" ||
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+          markVerifiedResult.user_id
+        ) ||
+        typeof markVerifiedResult.expires_at !== "string" ||
+        !Number.isFinite(
+          Date.parse(markVerifiedResult.expires_at)
+        ) ||
+        Date.parse(markVerifiedResult.expires_at) !==
+          Date.parse(newExpiresAt)
+      ) {
+        await invalidateAmbiguousRotation();
+        return { state: "TECHNICAL_FAILURE" };
+      }
+
+      return { state: "ROTATED", newFlowToken };
+    default:
+      await invalidateAmbiguousRotation();
+      return { state: "TECHNICAL_FAILURE" };
+  }
+}
+
+async function claimPasswordRecoveryReset(flowHash) {
+  if (
+    typeof flowHash !== "string" ||
+    !/^[0-9a-f]{64}$/.test(flowHash)
+  ) {
+    return { state: "TECHNICAL_FAILURE" };
+  }
+
+  let claimResponse;
+
+  try {
+    claimResponse = await adminSupabase
+      .rpc("caseg_recovery_claim_reset", {
+        p_flow_token_hash: flowHash
+      })
+      .single();
+  } catch {
+    return { state: "TECHNICAL_FAILURE" };
+  }
+
+  if (
+    !claimResponse ||
+    typeof claimResponse !== "object" ||
+    claimResponse.error !== null ||
+    !claimResponse.data ||
+    typeof claimResponse.data !== "object" ||
+    Array.isArray(claimResponse.data)
+  ) {
+    return { state: "TECHNICAL_FAILURE" };
+  }
+
+  const claimResult = claimResponse.data;
+  const resultKeys = Object.keys(claimResult).sort();
+  const expectedResultKeys = [
+    "allowed",
+    "expires_at",
+    "reset_started_at",
+    "result_code",
+    "user_id"
+  ];
+
+  if (
+    resultKeys.length !== expectedResultKeys.length ||
+    resultKeys.some(
+      (resultKey, index) => resultKey !== expectedResultKeys[index]
+    )
+  ) {
+    return { state: "TECHNICAL_FAILURE" };
+  }
+
+  if (
+    claimResult.result_code === "OK" &&
+    claimResult.allowed === true &&
+    typeof claimResult.user_id === "string" &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      claimResult.user_id
+    ) &&
+    typeof claimResult.expires_at === "string" &&
+    Number.isFinite(Date.parse(claimResult.expires_at)) &&
+    typeof claimResult.reset_started_at === "string" &&
+    Number.isFinite(Date.parse(claimResult.reset_started_at))
+  ) {
+    return {
+      state: "CLAIMED",
+      userId: claimResult.user_id,
+      expiresAt: claimResult.expires_at,
+      resetStartedAt: claimResult.reset_started_at
+    };
+  }
+
+  const successFieldsAreNull =
+    claimResult.user_id === null &&
+    claimResult.expires_at === null &&
+    claimResult.reset_started_at === null;
+
+  if (claimResult.allowed === false && successFieldsAreNull) {
+    if (claimResult.result_code === "BUSY") {
+      return { state: "BUSY" };
+    }
+
+    if (
+      [
+        "INVALID_STATE",
+        "NOT_FOUND",
+        "USED",
+        "EXPIRED",
+        "ATTEMPTS_EXCEEDED"
+      ].includes(claimResult.result_code)
+    ) {
+      return { state: "FLOW_REJECTED" };
+    }
+  }
+
+  return { state: "TECHNICAL_FAILURE" };
+}
+
+async function releasePasswordRecoveryReset(
+  flowHash,
+  resetStartedAt
+) {
+  if (
+    typeof flowHash !== "string" ||
+    !/^[0-9a-f]{64}$/.test(flowHash) ||
+    typeof resetStartedAt !== "string" ||
+    !Number.isFinite(Date.parse(resetStartedAt))
+  ) {
+    return { state: "TECHNICAL_FAILURE" };
+  }
+
+  let releaseResponse;
+
+  try {
+    releaseResponse = await adminSupabase
+      .rpc("caseg_recovery_release_reset", {
+        p_flow_token_hash: flowHash,
+        p_reset_started_at: resetStartedAt
+      })
+      .single();
+  } catch {
+    return { state: "TECHNICAL_FAILURE" };
+  }
+
+  if (
+    !releaseResponse ||
+    typeof releaseResponse !== "object" ||
+    releaseResponse.error !== null ||
+    !releaseResponse.data ||
+    typeof releaseResponse.data !== "object" ||
+    Array.isArray(releaseResponse.data)
+  ) {
+    return { state: "TECHNICAL_FAILURE" };
+  }
+
+  const releaseResult = releaseResponse.data;
+  const resultKeys = Object.keys(releaseResult).sort();
+  const expectedResultKeys = ["allowed", "result_code"];
+
+  if (
+    resultKeys.length !== expectedResultKeys.length ||
+    resultKeys.some(
+      (resultKey, index) => resultKey !== expectedResultKeys[index]
+    )
+  ) {
+    return { state: "TECHNICAL_FAILURE" };
+  }
+
+  if (
+    releaseResult.result_code === "OK" &&
+    releaseResult.allowed === true
+  ) {
+    return { state: "RELEASED" };
+  }
+
+  if (
+    releaseResult.allowed === false &&
+    ["INVALID_STATE", "NOT_FOUND", "USED", "EXPIRED"].includes(
+      releaseResult.result_code
+    )
+  ) {
+    return { state: "FLOW_REJECTED" };
+  }
+
+  return { state: "TECHNICAL_FAILURE" };
+}
+
+async function markPasswordRecoveryResetUsed(
+  flowHash,
+  resetStartedAt
+) {
+  if (
+    typeof flowHash !== "string" ||
+    !/^[0-9a-f]{64}$/.test(flowHash) ||
+    typeof resetStartedAt !== "string" ||
+    !Number.isFinite(Date.parse(resetStartedAt))
+  ) {
+    return { state: "TECHNICAL_FAILURE" };
+  }
+
+  let markUsedResponse;
+
+  try {
+    markUsedResponse = await adminSupabase
+      .rpc("caseg_recovery_mark_used", {
+        p_flow_token_hash: flowHash,
+        p_reset_started_at: resetStartedAt
+      })
+      .single();
+  } catch {
+    return { state: "TECHNICAL_FAILURE" };
+  }
+
+  if (
+    !markUsedResponse ||
+    typeof markUsedResponse !== "object" ||
+    markUsedResponse.error !== null ||
+    !markUsedResponse.data ||
+    typeof markUsedResponse.data !== "object" ||
+    Array.isArray(markUsedResponse.data)
+  ) {
+    return { state: "TECHNICAL_FAILURE" };
+  }
+
+  const markUsedResult = markUsedResponse.data;
+  const resultKeys = Object.keys(markUsedResult).sort();
+  const expectedResultKeys = ["allowed", "result_code"];
+
+  if (
+    resultKeys.length !== expectedResultKeys.length ||
+    resultKeys.some(
+      (resultKey, index) => resultKey !== expectedResultKeys[index]
+    )
+  ) {
+    return { state: "TECHNICAL_FAILURE" };
+  }
+
+  if (
+    markUsedResult.result_code === "OK" &&
+    markUsedResult.allowed === true
+  ) {
+    return { state: "USED" };
+  }
+
+  if (
+    markUsedResult.allowed === false &&
+    ["INVALID_STATE", "NOT_FOUND"].includes(
+      markUsedResult.result_code
+    )
+  ) {
+    return { state: "FLOW_REJECTED" };
+  }
+
+  return { state: "TECHNICAL_FAILURE" };
+}
+
+function shouldUseSecureRecoveryCookie(req) {
+  try {
+    return !(
+      req &&
+      typeof req === "object" &&
+      req.hostname === "localhost" &&
+      req.protocol === "http"
+    );
+  } catch (error) {
+    return true;
+  }
+}
+
+function serializeRecoveryFlowCookie(
+  flowToken,
+  {
+    secure,
+    now = Date.now(),
+    ttlMs = RECOVERY_FLOW_TTL_MS
+  } = {}
+) {
+  if (
+    typeof flowToken !== "string" ||
+    flowToken.length === 0 ||
+    /[^A-Za-z0-9_-]/.test(flowToken)
+  ) {
+    throw new TypeError("Recovery flow token is invalid.");
+  }
+
+  if (typeof secure !== "boolean") {
+    throw new TypeError("Recovery flow cookie secure option is invalid.");
+  }
+
+  if (typeof now !== "number" || !Number.isFinite(now)) {
+    throw new TypeError("Recovery flow cookie time is invalid.");
+  }
+
+  if (
+    typeof ttlMs !== "number" ||
+    !Number.isFinite(ttlMs) ||
+    ttlMs <= 0 ||
+    !Number.isInteger(ttlMs / 1000)
+  ) {
+    throw new TypeError("Recovery flow cookie TTL is invalid.");
+  }
+
+  const expires = new Date(now + ttlMs);
+
+  if (!Number.isFinite(expires.getTime())) {
+    throw new TypeError("Recovery flow cookie time is invalid.");
+  }
+
+  const attributes = [
+    `${RECOVERY_FLOW_COOKIE_NAME}=${flowToken}`,
+    `Path=${RECOVERY_FLOW_COOKIE_PATH}`,
+    "HttpOnly",
+    "SameSite=Strict",
+    `Max-Age=${ttlMs / 1000}`,
+    `Expires=${expires.toUTCString()}`
+  ];
+
+  if (secure === true) {
+    attributes.push("Secure");
+  }
+
+  return attributes.join("; ");
+}
+
+function serializeExpiredRecoveryFlowCookie(req) {
+  const attributes = [
+    `${RECOVERY_FLOW_COOKIE_NAME}=`,
+    `Path=${RECOVERY_FLOW_COOKIE_PATH}`,
+    "HttpOnly",
+    "SameSite=Strict",
+    "Max-Age=0",
+    "Expires=Thu, 01 Jan 1970 00:00:00 GMT"
+  ];
+
+  if (shouldUseSecureRecoveryCookie(req)) {
+    attributes.push("Secure");
+  }
+
+  return attributes.join("; ");
+}
+
+function sendDummyPasswordRecoveryResponse(req, res) {
+  try {
+    const dummyRecoveryFlowToken = createRecoveryFlowToken();
+    const dummyRecoveryFlowCookie = serializeRecoveryFlowCookie(
+      dummyRecoveryFlowToken,
+      {
+        secure: shouldUseSecureRecoveryCookie(req)
+      }
+    );
+
+    res.setHeader("Set-Cookie", dummyRecoveryFlowCookie);
+  } catch {
+    // A resposta pública permanece indistinguível sem expor a falha.
+  }
+
+  return res.status(202).end();
+}
+
+function getPasswordRecoveryEmailService() {
+  if (passwordRecoveryEmailService) {
+    return passwordRecoveryEmailService;
+  }
+
+  const smtpUrl = process.env.CASEG_RECOVERY_SMTP_URL;
+  const fromAddress = process.env.CASEG_RECOVERY_EMAIL_FROM;
+  const configurationErrorMessage =
+    "Password recovery email service is not configured correctly.";
+
+  if (
+    typeof smtpUrl !== "string" ||
+    smtpUrl.trim().length === 0 ||
+    typeof fromAddress !== "string" ||
+    fromAddress.trim().length === 0
+  ) {
+    throw new Error(configurationErrorMessage);
+  }
+
+  let parsedSmtpUrl;
+
+  try {
+    parsedSmtpUrl = new URL(smtpUrl);
+  } catch {
+    throw new Error(configurationErrorMessage);
+  }
+
+  if (
+    parsedSmtpUrl.protocol !== "smtp:" &&
+    parsedSmtpUrl.protocol !== "smtps:"
+  ) {
+    throw new Error(configurationErrorMessage);
+  }
+
+  parsedSmtpUrl.searchParams.set("logger", "false");
+  parsedSmtpUrl.searchParams.set("debug", "false");
+
+  const nodemailer = require("nodemailer");
+  const transport = nodemailer.createTransport(
+    parsedSmtpUrl.toString()
+  );
+
+  passwordRecoveryEmailService =
+    createPasswordRecoveryEmailService({
+      transport,
+      fromAddress
+    });
+
+  return passwordRecoveryEmailService;
 }
 
 function createLoginIdentityKey(ip, cpfCnpj) {
@@ -309,6 +1168,40 @@ function consumeLoginIpRequest(ip, now = Date.now()) {
   };
 }
 
+function consumeRecoveryRequestIp(ip, now = Date.now()) {
+  if (typeof ip !== "string" || ip.length === 0) {
+    throw new TypeError("Recovery request IP key is invalid.");
+  }
+
+  let entry = recoveryRequestIpAttempts.get(ip);
+
+  if (!entry || entry.resetAt <= now) {
+    entry = {
+      count: 0,
+      resetAt: now + RECOVERY_REQUEST_IP_WINDOW_MS
+    };
+    recoveryRequestIpAttempts.set(ip, entry);
+  }
+
+  entry.count += 1;
+
+  return {
+    allowed: entry.count <= RECOVERY_REQUEST_IP_MAX,
+    retryAfterSeconds: Math.max(
+      1,
+      Math.ceil((entry.resetAt - now) / 1000)
+    )
+  };
+}
+
+function cleanupRecoveryRequestIpAttempts(now = Date.now()) {
+  for (const [ip, entry] of recoveryRequestIpAttempts) {
+    if (entry.resetAt <= now) {
+      recoveryRequestIpAttempts.delete(ip);
+    }
+  }
+}
+
 function getLoginIdentityFailureLimit(key, now = Date.now()) {
   const entry = getActiveLoginRateLimitEntry(
     loginIdentityFailureEntries,
@@ -367,6 +1260,14 @@ const loginRateLimitCleanupTimer = setInterval(
 
 if (typeof loginRateLimitCleanupTimer.unref === "function") {
   loginRateLimitCleanupTimer.unref();
+}
+
+const recoveryRequestIpCleanupTimer = setInterval(() => {
+  cleanupRecoveryRequestIpAttempts(Date.now());
+}, RECOVERY_REQUEST_IP_CLEANUP_INTERVAL_MS);
+
+if (typeof recoveryRequestIpCleanupTimer.unref === "function") {
+  recoveryRequestIpCleanupTimer.unref();
 }
 
 const upload = multer({
@@ -1405,6 +2306,498 @@ app.get("/admin/dashboard/summary", async (req, res) => {
       error: "Erro interno ao buscar resumo do dashboard."
     });
   }
+});
+
+app.post("/password-recovery/request", async (req, res) => {
+  const ipRequestLimit = consumeRecoveryRequestIp(req.ip);
+
+  if (!ipRequestLimit.allowed) {
+    return res.status(429).end();
+  }
+
+  const identity = req.body?.identity;
+
+  if (typeof identity !== "string") {
+    return res.status(400).end();
+  }
+
+  const fiscalIdentity = normalizeFiscalIdentity(identity);
+
+  if (fiscalIdentity.state === "INVALID") {
+    return res.status(400).end();
+  }
+
+  let recoveryFlowToken;
+
+  try {
+    recoveryFlowToken = createRecoveryFlowToken();
+  } catch {
+    return sendDummyPasswordRecoveryResponse(req, res);
+  }
+
+  const { data: profile, error: profileError } = await adminSupabase
+    .from("profiles")
+    .select("user_id, role, is_active")
+    .eq("cpf_cnpj", fiscalIdentity.canonical)
+    .maybeSingle();
+
+  if (
+    profileError ||
+    !profile ||
+    profile.role !== "client" ||
+    profile.is_active !== true
+  ) {
+    return sendDummyPasswordRecoveryResponse(req, res);
+  }
+
+  let authUserResult;
+
+  try {
+    authUserResult =
+      await adminSupabase.auth.admin.getUserById(profile.user_id);
+  } catch {
+    return sendDummyPasswordRecoveryResponse(req, res);
+  }
+
+  const authEmail = authUserResult.data?.user?.email;
+
+  if (
+    authUserResult.error ||
+    typeof authEmail !== "string" ||
+    authEmail.trim().length === 0
+  ) {
+    return sendDummyPasswordRecoveryResponse(req, res);
+  }
+
+  const recoveryEmail = authEmail.trim();
+
+  let recoveryIdentityHmac;
+  let recoveryFlowHash;
+
+  try {
+    recoveryIdentityHmac =
+      createRecoveryIdentityHmac(fiscalIdentity.canonical);
+    recoveryFlowHash = createRecoveryFlowHash(recoveryFlowToken);
+  } catch {
+    return sendDummyPasswordRecoveryResponse(req, res);
+  }
+
+  const recoveryExpiresAt = new Date(
+    Date.now() + RECOVERY_FLOW_TTL_MS
+  ).toISOString();
+
+  let recoveryBeginRequest;
+
+  try {
+    const { data, error } = await adminSupabase
+      .rpc("caseg_recovery_begin_request", {
+        p_user_id: profile.user_id,
+        p_flow_token_hash: recoveryFlowHash,
+        p_identity_hmac: recoveryIdentityHmac,
+        p_expires_at: recoveryExpiresAt
+      })
+      .single();
+
+    if (error) {
+      return sendDummyPasswordRecoveryResponse(req, res);
+    }
+
+    recoveryBeginRequest = data;
+  } catch {
+    return sendDummyPasswordRecoveryResponse(req, res);
+  }
+
+  if (
+    !recoveryBeginRequest ||
+    typeof recoveryBeginRequest !== "object" ||
+    Array.isArray(recoveryBeginRequest) ||
+    typeof recoveryBeginRequest.allowed !== "boolean" ||
+    typeof recoveryBeginRequest.result_code !== "string"
+  ) {
+    return sendDummyPasswordRecoveryResponse(req, res);
+  }
+
+  switch (recoveryBeginRequest.result_code) {
+    case "COOLDOWN":
+    case "DAILY_LIMIT":
+    case "BUSY":
+    case "NOT_FOUND":
+    case "INVALID_STATE":
+      if (recoveryBeginRequest.allowed !== false) {
+        return sendDummyPasswordRecoveryResponse(req, res);
+      }
+
+      return sendDummyPasswordRecoveryResponse(req, res);
+    case "OK":
+      if (recoveryBeginRequest.allowed !== true) {
+        return sendDummyPasswordRecoveryResponse(req, res);
+      }
+      break;
+    default:
+      return sendDummyPasswordRecoveryResponse(req, res);
+  }
+
+  let recoveryEmailOtp;
+
+  try {
+    const { data, error } =
+      await adminSupabase.auth.admin.generateLink({
+        type: "recovery",
+        email: recoveryEmail
+      });
+
+    recoveryEmailOtp = data?.properties?.email_otp;
+
+    if (
+      error ||
+      typeof recoveryEmailOtp !== "string" ||
+      recoveryEmailOtp.length === 0
+    ) {
+      recoveryEmailOtp = undefined;
+    }
+  } catch {
+    recoveryEmailOtp = undefined;
+  }
+
+  if (typeof recoveryEmailOtp !== "string") {
+    try {
+      await adminSupabase
+        .rpc("caseg_recovery_invalidate", {
+          p_flow_token_hash: recoveryFlowHash
+        })
+        .single();
+    } catch {
+      return sendDummyPasswordRecoveryResponse(req, res);
+    }
+
+    return sendDummyPasswordRecoveryResponse(req, res);
+  }
+
+  let recoveryEmailDeliverySucceeded = false;
+
+  try {
+    const emailService = getPasswordRecoveryEmailService();
+    const deliveryResult =
+      await emailService.sendPasswordRecoveryCode({
+        recipient: recoveryEmail,
+        code: recoveryEmailOtp
+      });
+    const deliveryResultKeys =
+      deliveryResult &&
+      typeof deliveryResult === "object" &&
+      !Array.isArray(deliveryResult)
+        ? Object.keys(deliveryResult)
+        : [];
+
+    recoveryEmailDeliverySucceeded =
+      deliveryResultKeys.length === 1 &&
+      deliveryResultKeys[0] === "ok" &&
+      deliveryResult.ok === true;
+  } catch {
+    recoveryEmailDeliverySucceeded = false;
+  }
+
+  if (!recoveryEmailDeliverySucceeded) {
+    try {
+      await adminSupabase
+        .rpc("caseg_recovery_invalidate", {
+          p_flow_token_hash: recoveryFlowHash
+        })
+        .single();
+    } catch {
+      return sendDummyPasswordRecoveryResponse(req, res);
+    }
+
+    return sendDummyPasswordRecoveryResponse(req, res);
+  }
+
+  try {
+    const recoveryFlowCookie = serializeRecoveryFlowCookie(
+      recoveryFlowToken,
+      {
+        secure: shouldUseSecureRecoveryCookie(req)
+      }
+    );
+
+    res.setHeader("Set-Cookie", recoveryFlowCookie);
+  } catch {
+    try {
+      await adminSupabase
+        .rpc("caseg_recovery_invalidate", {
+          p_flow_token_hash: recoveryFlowHash
+        })
+        .single();
+    } catch {
+      return sendDummyPasswordRecoveryResponse(req, res);
+    }
+
+    return sendDummyPasswordRecoveryResponse(req, res);
+  }
+
+  return res.status(202).end();
+});
+
+app.post("/password-recovery/verify", async (req, res) => {
+  const recoveryCode = getPasswordRecoveryVerificationCode(
+    req.body?.code
+  );
+
+  if (recoveryCode === null) {
+    return res.status(400).end();
+  }
+
+  function tryExpireRecoveryFlowCookie() {
+    try {
+      res.setHeader(
+        "Set-Cookie",
+        serializeExpiredRecoveryFlowCookie(req)
+      );
+    } catch {
+      // A resposta pública permanece fechada se o cookie não puder ser limpo.
+    }
+  }
+
+  async function tryInvalidateRecoveryFlow(flowHash) {
+    try {
+      await adminSupabase
+        .rpc("caseg_recovery_invalidate", {
+          p_flow_token_hash: flowHash
+        })
+        .single();
+    } catch {
+      // A resposta pública não expõe a falha da compensação.
+    }
+  }
+
+  const recoveryFlowToken = getRecoveryFlowCookie(req);
+
+  if (recoveryFlowToken === null) {
+    tryExpireRecoveryFlowCookie();
+    return res.status(400).end();
+  }
+
+  let oldFlowHash;
+
+  try {
+    oldFlowHash = createRecoveryFlowHash(recoveryFlowToken);
+  } catch {
+    tryExpireRecoveryFlowCookie();
+    return res.status(503).end();
+  }
+
+  let preparationResult;
+
+  try {
+    preparationResult =
+      await preparePasswordRecoveryVerification(oldFlowHash);
+  } catch {
+    tryExpireRecoveryFlowCookie();
+    return res.status(503).end();
+  }
+
+  if (preparationResult?.state === "FLOW_REJECTED") {
+    tryExpireRecoveryFlowCookie();
+    return res.status(400).end();
+  }
+
+  if (preparationResult?.state !== "PREPARED") {
+    tryExpireRecoveryFlowCookie();
+    return res.status(503).end();
+  }
+
+  let otpVerificationState;
+
+  try {
+    otpVerificationState = await verifyPasswordRecoveryOtp(
+      preparationResult.userId,
+      recoveryCode
+    );
+  } catch {
+    otpVerificationState = "TECHNICAL_FAILURE";
+  }
+
+  if (otpVerificationState === "OTP_REJECTED") {
+    return res.status(400).end();
+  }
+
+  if (otpVerificationState !== "VERIFIED") {
+    await tryInvalidateRecoveryFlow(oldFlowHash);
+    tryExpireRecoveryFlowCookie();
+    return res.status(503).end();
+  }
+
+  let rotationResult;
+
+  try {
+    rotationResult =
+      await rotateVerifiedPasswordRecoveryFlow(oldFlowHash);
+  } catch {
+    tryExpireRecoveryFlowCookie();
+    return res.status(503).end();
+  }
+
+  if (rotationResult?.state === "FLOW_REJECTED") {
+    tryExpireRecoveryFlowCookie();
+    return res.status(400).end();
+  }
+
+  if (rotationResult?.state !== "ROTATED") {
+    tryExpireRecoveryFlowCookie();
+    return res.status(503).end();
+  }
+
+  const newFlowToken = rotationResult.newFlowToken;
+
+  try {
+    const verifiedRecoveryFlowCookie = serializeRecoveryFlowCookie(
+      newFlowToken,
+      {
+        secure: shouldUseSecureRecoveryCookie(req),
+        ttlMs: RECOVERY_VERIFIED_FLOW_TTL_MS
+      }
+    );
+
+    res.setHeader("Set-Cookie", verifiedRecoveryFlowCookie);
+  } catch {
+    try {
+      const newFlowHash = createRecoveryFlowHash(newFlowToken);
+      await tryInvalidateRecoveryFlow(newFlowHash);
+    } catch {
+      // O cookie ainda deve ser limpo e a resposta permanecer fechada.
+    }
+
+    tryExpireRecoveryFlowCookie();
+    return res.status(503).end();
+  }
+
+  return res.status(204).end();
+});
+
+app.post("/password-recovery/reset", async (req, res) => {
+  const rawPassword = req.body?.password;
+
+  if (typeof rawPassword !== "string") {
+    return res.status(400).end();
+  }
+
+  const normalizedPassword = normalizeText(rawPassword);
+
+  if (!normalizedPassword || !isStrongPassword(normalizedPassword)) {
+    return res.status(400).end();
+  }
+
+  function tryExpireRecoveryFlowCookie() {
+    try {
+      res.setHeader(
+        "Set-Cookie",
+        serializeExpiredRecoveryFlowCookie(req)
+      );
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  const recoveryFlowToken = getRecoveryFlowCookie(req);
+
+  if (recoveryFlowToken === null) {
+    tryExpireRecoveryFlowCookie();
+    return res.status(400).end();
+  }
+
+  let recoveryFlowHash;
+
+  try {
+    recoveryFlowHash = createRecoveryFlowHash(recoveryFlowToken);
+  } catch {
+    tryExpireRecoveryFlowCookie();
+    return res.status(503).end();
+  }
+
+  let claimResult;
+
+  try {
+    claimResult = await claimPasswordRecoveryReset(recoveryFlowHash);
+  } catch {
+    claimResult = { state: "TECHNICAL_FAILURE" };
+  }
+
+  if (claimResult?.state === "FLOW_REJECTED") {
+    tryExpireRecoveryFlowCookie();
+    return res.status(400).end();
+  }
+
+  if (claimResult?.state === "BUSY") {
+    tryExpireRecoveryFlowCookie();
+    return res.status(409).end();
+  }
+
+  if (claimResult?.state !== "CLAIMED") {
+    tryExpireRecoveryFlowCookie();
+    return res.status(503).end();
+  }
+
+  const { userId, resetStartedAt } = claimResult;
+  let authUpdateResult;
+
+  try {
+    authUpdateResult =
+      await adminSupabase.auth.admin.updateUserById(userId, {
+        password: normalizedPassword
+      });
+  } catch {
+    tryExpireRecoveryFlowCookie();
+    return res.status(503).end();
+  }
+
+  if (
+    !authUpdateResult ||
+    typeof authUpdateResult !== "object" ||
+    authUpdateResult.error !== null ||
+    !authUpdateResult.data ||
+    typeof authUpdateResult.data !== "object" ||
+    Array.isArray(authUpdateResult.data) ||
+    !authUpdateResult.data.user ||
+    typeof authUpdateResult.data.user !== "object" ||
+    Array.isArray(authUpdateResult.data.user) ||
+    authUpdateResult.data.user.id !== userId
+  ) {
+    tryExpireRecoveryFlowCookie();
+    return res.status(503).end();
+  }
+
+  let markUsedResult;
+
+  try {
+    markUsedResult = await markPasswordRecoveryResetUsed(
+      recoveryFlowHash,
+      resetStartedAt
+    );
+  } catch {
+    markUsedResult = { state: "TECHNICAL_FAILURE" };
+  }
+
+  if (markUsedResult?.state === "TECHNICAL_FAILURE") {
+    try {
+      markUsedResult = await markPasswordRecoveryResetUsed(
+        recoveryFlowHash,
+        resetStartedAt
+      );
+    } catch {
+      markUsedResult = { state: "TECHNICAL_FAILURE" };
+    }
+  }
+
+  if (markUsedResult?.state !== "USED") {
+    tryExpireRecoveryFlowCookie();
+    return res.status(503).end();
+  }
+
+  if (!tryExpireRecoveryFlowCookie()) {
+    return res.status(503).end();
+  }
+
+  return res.status(204).end();
 });
 
 app.post("/login", async (req, res) => {

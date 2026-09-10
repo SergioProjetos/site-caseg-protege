@@ -467,6 +467,18 @@
             margin-top: 4px;
         }
 
+        #changePasswordMessage.is-info {
+            color: #0b6b79;
+        }
+
+        #changePasswordMessage.is-success {
+            color: var(--access-green);
+        }
+
+        #changePasswordMessage.is-error {
+            color: #c0392b;
+        }
+
         .change-password-footer-links {
             display: flex;
             justify-content: center;
@@ -775,21 +787,13 @@
         }
     </style>
 
-    <script>
-        const RECOVERY_RESET_TOKEN_KEY = "password_recovery_reset_token";
-        const recoveryResetTokenCheck = localStorage.getItem(RECOVERY_RESET_TOKEN_KEY);
-
-        if (!recoveryResetTokenCheck) {
-            window.location.href = "recuperar-senha.html";
-        }
-    </script>
 </head>
 
 <body class="change-password-page">
 
     <header class="site-header">
         <div class="header-container">
-            <a href="home.html" class="logo-link reveal-on-load delay-1">
+            <a href="home.html" class="logo-link">
                 <img
                     src="../assets/img/logo_transparente.png"
                     alt="Logo CASEG Protege"
@@ -797,14 +801,14 @@
                 />
             </a>
 
-            <nav class="main-nav reveal-on-load delay-2">
+            <nav class="main-nav">
                 <a href="home.html">Home</a>
                 <a href="servicos.html">Serviços</a>
                 <a href="avisos.html">Sobre</a>
                 <a href="contato.html">Contato</a>
             </nav>
 
-            <a href="login.html" class="header-login-button reveal-on-load delay-3">
+            <a href="login.html" class="header-login-button">
                 <i class="fa-regular fa-user"></i>
                 Entrar
             </a>
@@ -812,38 +816,38 @@
     </header>
 
     <main class="change-password-main">
-        <section class="change-password-hero reveal-on-load delay-2">
+        <section class="change-password-hero">
             <div class="change-password-hero-content">
                 <div class="change-password-info-area">
-                    <div class="change-password-badge reveal-on-load delay-2">
+                    <div class="change-password-badge">
                         <i class="fa-solid fa-key"></i>
-                        Código validado
+                        Recuperação de senha
                     </div>
 
-                    <h1 class="reveal-on-load delay-3">
+                    <h1>
                         Crie uma nova senha para recuperar seu acesso com
                         <span>segurança.</span>
                     </h1>
 
-                    <p class="reveal-on-load delay-4">
-                        O código de validação foi confirmado. Agora cadastre uma nova senha
-                        forte para voltar a acessar sua área exclusiva CASEG Protege.
+                    <p>
+                        Defina uma nova senha forte para proteger sua conta e voltar a
+                        acessar sua área exclusiva CASEG Protege.
                     </p>
 
                     <div class="change-password-benefits">
-                        <div class="change-password-benefit-card reveal-on-load delay-4">
+                        <div class="change-password-benefit-card">
                             <i class="fa-solid fa-shield-halved"></i>
                             <strong>Senha protegida</strong>
                             <span>Use uma senha forte e exclusiva para sua conta.</span>
                         </div>
 
-                        <div class="change-password-benefit-card reveal-on-load delay-5">
+                        <div class="change-password-benefit-card">
                             <i class="fa-regular fa-folder-open"></i>
                             <strong>Acesso restaurado</strong>
                             <span>Após salvar, você poderá entrar novamente pelo login.</span>
                         </div>
 
-                        <div class="change-password-benefit-card reveal-on-load delay-6">
+                        <div class="change-password-benefit-card">
                             <i class="fa-solid fa-user-lock"></i>
                             <strong>Conta individual</strong>
                             <span>Não compartilhe suas credenciais de acesso.</span>
@@ -851,7 +855,7 @@
                     </div>
                 </div>
 
-                <section class="change-password-panel reveal-on-load delay-3">
+                <section class="change-password-panel">
                     <div class="change-password-panel-logo">
                         <img
                             src="../assets/img/logo_transparente.png"
@@ -860,21 +864,21 @@
                     </div>
 
                     <div class="change-password-panel-title">
-                        <h2>Trocar Senha</h2>
+                        <h2>Defina sua nova senha</h2>
                         <p>
                             Cadastre sua nova senha para concluir a recuperação.
                         </p>
                     </div>
 
                     <div class="change-password-greeting">
-                        <p><strong>Validação concluída.</strong></p>
+                        <p><strong>Crie uma senha segura.</strong></p>
                         <p>
-                            Digite uma nova senha seguindo os requisitos abaixo.
-                            Depois disso, você será redirecionado para fazer login novamente.
+                            A nova senha deve ter pelo menos 8 caracteres,
+                            uma letra maiúscula e um número.
                         </p>
                     </div>
 
-                    <form id="changePasswordForm">
+                    <form id="changePasswordForm" novalidate>
                         <label for="newPassword">Nova senha</label>
 
                         <div class="password-wrapper">
@@ -925,18 +929,18 @@
                             </button>
                         </div>
 
-                        <div id="passwordMismatchMessage">As senhas não coincidem.</div>
+                        <div id="passwordMismatchMessage" role="alert">As senhas não coincidem.</div>
 
                         <button type="submit" id="saveNewPasswordBtn">
-                            <i class="fa-solid fa-check"></i>
-                            Salvar nova senha
+                            <i id="saveNewPasswordIcon" class="fa-solid fa-check" aria-hidden="true"></i>
+                            <span id="saveNewPasswordLabel">Salvar nova senha</span>
                         </button>
 
-                        <div id="changePasswordMessage"></div>
+                        <div id="changePasswordMessage" role="status" aria-live="polite"></div>
 
                         <div class="change-password-footer-links">
                             <a href="recuperar-senha.html" id="restartRecoveryLink">
-                                Refazer recuperação
+                                Reiniciar recuperação
                             </a>
 
                             <a href="login.html">
@@ -977,8 +981,19 @@
     </footer>
 
     <script>
-        const RECOVERY_IDENTIFIER_KEY = "password_recovery_identifier";
-        const RECOVERY_RESET_TOKEN_STORAGE_KEY = "password_recovery_reset_token";
+        const RECOVERY_RESET_ENDPOINT =
+            "http://localhost:3000/password-recovery/reset";
+        const SUCCESS_REDIRECT_DELAY_MS = 1500;
+        const INVALID_PASSWORD_MESSAGE =
+            "A senha deve ter no mínimo 8 caracteres, 1 letra maiúscula e 1 número.";
+        const RESET_REJECTED_MESSAGE =
+            "Não foi possível concluir a alteração. Confira a nova senha ou reinicie a recuperação.";
+        const RESET_CONFLICT_MESSAGE =
+            "Não foi possível concluir esta operação agora. Reinicie a recuperação e tente novamente.";
+        const RESET_TECHNICAL_MESSAGE =
+            "Não foi possível alterar a senha agora. Por segurança, reinicie a recuperação antes de tentar novamente.";
+        const RESET_GENERIC_FAILURE_MESSAGE =
+            "Não foi possível concluir a alteração agora. Reinicie a recuperação e tente novamente.";
 
         const changePasswordForm = document.querySelector("#changePasswordForm");
         const changePasswordMessage = document.querySelector("#changePasswordMessage");
@@ -996,46 +1011,39 @@
         const ruleNumber = document.querySelector("#ruleNumber");
 
         const saveNewPasswordBtn = document.querySelector("#saveNewPasswordBtn");
-        const restartRecoveryLink = document.querySelector("#restartRecoveryLink");
+        const saveNewPasswordIcon = document.querySelector("#saveNewPasswordIcon");
+        const saveNewPasswordLabel = document.querySelector("#saveNewPasswordLabel");
+
+        let recoveryResetPending = false;
+        let recoveryResetCompleted = false;
 
         function setMessage(message, type = "info") {
-            if (!changePasswordMessage) {
-                return;
-            }
-
-            let color = "#0b6b79";
-
-            if (type === "success") {
-                color = "green";
-            }
-
-            if (type === "error") {
-                color = "red";
-            }
-
-            changePasswordMessage.innerHTML = `<span style="color:${color};">${message}</span>`;
+            changePasswordMessage.textContent = message;
+            changePasswordMessage.className = message
+                ? "is-" + type
+                : "";
         }
 
         function showPasswordMismatch(message = "As senhas não coincidem.") {
-            if (!passwordMismatchMessage) {
-                return;
-            }
-
             passwordMismatchMessage.textContent = message;
             passwordMismatchMessage.style.display = "block";
         }
 
         function hidePasswordMismatch() {
-            if (!passwordMismatchMessage) {
-                return;
-            }
-
             passwordMismatchMessage.style.display = "none";
         }
 
+        function normalizePasswordForValidation(value) {
+            return typeof value === "string" ? value.trim() : "";
+        }
+
         function validatePasswordsMatch() {
-            const newPassword = newPasswordInput ? newPasswordInput.value.trim() : "";
-            const confirmPassword = confirmPasswordInput ? confirmPasswordInput.value.trim() : "";
+            const newPassword = normalizePasswordForValidation(
+                newPasswordInput.value
+            );
+            const confirmPassword = normalizePasswordForValidation(
+                confirmPasswordInput.value
+            );
 
             if (!confirmPassword) {
                 hidePasswordMismatch();
@@ -1051,37 +1059,38 @@
             return true;
         }
 
-        function setupPasswordToggle(button, input, icon) {
-            if (!button || !input || !icon) {
-                return;
-            }
-
+        function setupPasswordToggle(button, input, icon, fieldLabel) {
             button.addEventListener("click", function () {
                 const isPassword = input.type === "password";
                 input.type = isPassword ? "text" : "password";
                 icon.className = isPassword ? "fa-solid fa-eye-slash" : "fa-solid fa-eye";
+                button.setAttribute("aria-pressed", String(isPassword));
+                button.setAttribute(
+                    "aria-label",
+                    (isPassword ? "Ocultar " : "Mostrar ") + fieldLabel
+                );
             });
         }
 
         function updateRuleStatus(element, isValid) {
-            if (!element) {
-                return;
-            }
-
             element.classList.remove("valid", "invalid");
             element.classList.add(isValid ? "valid" : "invalid");
         }
 
         function validatePasswordStrength(password) {
+            const normalizedPassword = normalizePasswordForValidation(
+                password
+            );
+
             return {
-                minLength: password.length >= 8,
-                uppercase: /[A-Z]/.test(password),
-                number: /\d/.test(password)
+                minLength: normalizedPassword.length >= 8,
+                uppercase: /[A-Z]/.test(normalizedPassword),
+                number: /\d/.test(normalizedPassword)
             };
         }
 
         function updatePasswordStrengthRules() {
-            const password = newPasswordInput ? newPasswordInput.value : "";
+            const password = newPasswordInput.value;
             const rules = validatePasswordStrength(password);
 
             updateRuleStatus(ruleMinLength, rules.minLength);
@@ -1097,131 +1106,169 @@
         }
 
         function setButtonLoading(isLoading) {
-            if (!saveNewPasswordBtn) {
-                return;
-            }
-
             saveNewPasswordBtn.disabled = isLoading;
+            changePasswordForm.setAttribute(
+                "aria-busy",
+                String(isLoading)
+            );
+            saveNewPasswordIcon.className = isLoading
+                ? "fa-solid fa-spinner fa-spin"
+                : "fa-solid fa-check";
+            saveNewPasswordLabel.textContent = isLoading
+                ? "Alterando..."
+                : "Salvar nova senha";
+        }
 
-            if (isLoading) {
-                saveNewPasswordBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>Salvando senha...';
+        function setButtonCompleted() {
+            saveNewPasswordBtn.disabled = true;
+            changePasswordForm.setAttribute("aria-busy", "false");
+            saveNewPasswordIcon.className = "fa-solid fa-check";
+            saveNewPasswordLabel.textContent = "Senha alterada";
+        }
+
+        function clearPasswordFieldsAfterSuccess() {
+            newPasswordInput.value = "";
+            confirmPasswordInput.value = "";
+            newPasswordInput.type = "password";
+            confirmPasswordInput.type = "password";
+            eyeIconNewPassword.className = "fa-solid fa-eye";
+            eyeIconConfirmPassword.className = "fa-solid fa-eye";
+            toggleNewPasswordBtn.setAttribute("aria-pressed", "false");
+            toggleConfirmPasswordBtn.setAttribute("aria-pressed", "false");
+            updatePasswordStrengthRules();
+            hidePasswordMismatch();
+        }
+
+        setupPasswordToggle(
+            toggleNewPasswordBtn,
+            newPasswordInput,
+            eyeIconNewPassword,
+            "nova senha"
+        );
+        setupPasswordToggle(
+            toggleConfirmPasswordBtn,
+            confirmPasswordInput,
+            eyeIconConfirmPassword,
+            "confirmação de senha"
+        );
+
+        newPasswordInput.addEventListener("input", function () {
+            updatePasswordStrengthRules();
+            validatePasswordsMatch();
+
+            if (changePasswordMessage.classList.contains("is-error")) {
+                setMessage("");
+            }
+        });
+
+        confirmPasswordInput.addEventListener("input", function () {
+            validatePasswordsMatch();
+
+            if (changePasswordMessage.classList.contains("is-error")) {
+                setMessage("");
+            }
+        });
+
+        changePasswordForm.addEventListener("submit", async function (event) {
+            event.preventDefault();
+
+            if (recoveryResetPending || recoveryResetCompleted) {
                 return;
             }
 
-            saveNewPasswordBtn.innerHTML = '<i class="fa-solid fa-check"></i>Salvar nova senha';
-        }
+            const password = newPasswordInput.value;
+            const passwordConfirmation = confirmPasswordInput.value;
+            const normalizedPassword = normalizePasswordForValidation(
+                password
+            );
+            const normalizedConfirmation = normalizePasswordForValidation(
+                passwordConfirmation
+            );
 
-        function clearRecoveryStorage() {
-            localStorage.removeItem(RECOVERY_IDENTIFIER_KEY);
-            localStorage.removeItem(RECOVERY_RESET_TOKEN_STORAGE_KEY);
-        }
+            hidePasswordMismatch();
+            updatePasswordStrengthRules();
 
-        function getRecoveryResetToken() {
-            return localStorage.getItem(RECOVERY_RESET_TOKEN_STORAGE_KEY) || "";
-        }
+            if (!normalizedPassword || !normalizedConfirmation) {
+                setMessage("Preencha os dois campos de senha.", "error");
+                return;
+            }
 
-        setupPasswordToggle(toggleNewPasswordBtn, newPasswordInput, eyeIconNewPassword);
-        setupPasswordToggle(toggleConfirmPasswordBtn, confirmPasswordInput, eyeIconConfirmPassword);
+            if (!isPasswordStrongEnough(password)) {
+                setMessage(INVALID_PASSWORD_MESSAGE, "error");
+                return;
+            }
 
-        if (newPasswordInput) {
-            newPasswordInput.addEventListener("input", function () {
-                updatePasswordStrengthRules();
-                validatePasswordsMatch();
-            });
-        }
+            if (normalizedPassword !== normalizedConfirmation) {
+                showPasswordMismatch(
+                    "A confirmação da senha está diferente da nova senha."
+                );
+                setMessage(
+                    "Corrija os campos de senha para continuar.",
+                    "error"
+                );
+                return;
+            }
 
-        if (confirmPasswordInput) {
-            confirmPasswordInput.addEventListener("input", validatePasswordsMatch);
-        }
+            recoveryResetPending = true;
+            setButtonLoading(true);
+            setMessage("");
 
-        if (restartRecoveryLink) {
-            restartRecoveryLink.addEventListener("click", function () {
-                clearRecoveryStorage();
-            });
-        }
-
-        if (changePasswordForm) {
-            changePasswordForm.addEventListener("submit", async function (event) {
-                event.preventDefault();
-
-                const resetToken = getRecoveryResetToken();
-                const newPassword = newPasswordInput ? newPasswordInput.value.trim() : "";
-                const confirmPassword = confirmPasswordInput ? confirmPasswordInput.value.trim() : "";
-
-                hidePasswordMismatch();
-                updatePasswordStrengthRules();
-
-                if (!resetToken) {
-                    setMessage("Validação expirada. Solicite um novo código de recuperação.", "error");
-
-                    setTimeout(() => {
-                        clearRecoveryStorage();
-                        window.location.href = "recuperar-senha.html";
-                    }, 1600);
-
-                    return;
-                }
-
-                if (!newPassword || !confirmPassword) {
-                    setMessage("Preencha os dois campos de senha.", "error");
-                    return;
-                }
-
-                if (!isPasswordStrongEnough(newPassword)) {
-                    setMessage("A senha deve ter no mínimo 8 caracteres, 1 letra maiúscula e 1 número.", "error");
-                    return;
-                }
-
-                if (newPassword !== confirmPassword) {
-                    showPasswordMismatch("A confirmação da senha está diferente da nova senha.");
-                    setMessage("Corrija os campos de senha para continuar.", "error");
-                    return;
-                }
-
-                setButtonLoading(true);
-                setMessage("Salvando nova senha...", "info");
-
-                try {
-                    const response = await fetch("http://localhost:3000/auth/recovery/reset", {
+            try {
+                const response = await fetch(
+                    RECOVERY_RESET_ENDPOINT,
+                    {
                         method: "POST",
                         headers: {
                             "Content-Type": "application/json"
                         },
+                        credentials: "include",
                         body: JSON.stringify({
-                            reset_token: resetToken,
-                            new_password: newPassword
+                            password
                         })
-                    });
-
-                    const data = await response.json().catch(() => ({}));
-
-                    if (!response.ok) {
-                        setMessage(data.error || "Erro ao atualizar a senha.", "error");
-                        return;
                     }
+                );
 
-                    setMessage("Senha atualizada com sucesso! Redirecionando para o login...", "success");
+                if (response.status === 204) {
+                    recoveryResetCompleted = true;
+                    clearPasswordFieldsAfterSuccess();
+                    setMessage("Senha alterada com sucesso.", "success");
+                    setButtonCompleted();
 
                     setTimeout(() => {
-                        clearRecoveryStorage();
-                        localStorage.setItem("password_updated", "true");
-                        window.location.href = "login.html";
-                    }, 1800);
+                        window.location.assign("login.html");
+                    }, SUCCESS_REDIRECT_DELAY_MS);
 
-                } catch (error) {
-                    console.error("Erro ao trocar senha:", error);
-                    setMessage("Erro ao conectar com o servidor.", "error");
-                } finally {
+                    return;
+                }
+
+                if (response.status === 400) {
+                    setMessage(RESET_REJECTED_MESSAGE, "error");
+                    return;
+                }
+
+                if (response.status === 409) {
+                    setMessage(RESET_CONFLICT_MESSAGE, "error");
+                    return;
+                }
+
+                if (response.status === 503) {
+                    setMessage(RESET_TECHNICAL_MESSAGE, "error");
+                    return;
+                }
+
+                setMessage(RESET_GENERIC_FAILURE_MESSAGE, "error");
+            } catch {
+                setMessage(RESET_GENERIC_FAILURE_MESSAGE, "error");
+            } finally {
+                if (!recoveryResetCompleted) {
+                    recoveryResetPending = false;
                     setButtonLoading(false);
                 }
-            });
-        }
+            }
+        });
 
         updatePasswordStrengthRules();
         hidePasswordMismatch();
     </script>
-
-    <script src="../assets/js/site-animations.js"></script>
-
 </body>
 </html>

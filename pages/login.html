@@ -395,10 +395,6 @@
             margin-top: -4px;
         }
 
-        .login-forgot-password.hidden {
-            display: none;
-        }
-
         .login-forgot-password a {
             color: var(--login-green);
             text-decoration: none;
@@ -848,7 +844,7 @@
 
                         <div id="loginMessage"></div>
 
-                        <div id="forgotPasswordContainer" class="login-forgot-password hidden">
+                        <div id="forgotPasswordContainer" class="login-forgot-password">
                             <a href="recuperar-senha.html">
                                 <i class="fa-solid fa-key"></i>
                                 Esqueci minha senha
@@ -1118,22 +1114,6 @@
             loginMessage.innerHTML = `<span style="color:${color};">${message}</span>`;
         }
 
-        function showForgotPasswordLink() {
-            if (!forgotPasswordContainer) {
-                return;
-            }
-
-            forgotPasswordContainer.classList.remove("hidden");
-        }
-
-        function hideForgotPasswordLink() {
-            if (!forgotPasswordContainer) {
-                return;
-            }
-
-            forgotPasswordContainer.classList.add("hidden");
-        }
-
         function redirectUser(profile) {
             if (!profile || !profile.role) {
                 clearSession();
@@ -1196,7 +1176,6 @@
 
         const loginForm = document.querySelector("#loginForm");
         const loginMessage = document.querySelector("#loginMessage");
-        const forgotPasswordContainer = document.querySelector("#forgotPasswordContainer");
 
         const passwordUpdated = localStorage.getItem("password_updated");
 
@@ -1225,7 +1204,6 @@
 
             const cpf_cnpj = fiscalIdentity.canonical;
 
-            hideForgotPasswordLink();
             setLoginMessage("Entrando...", "#0b6b79");
 
             try {
@@ -1243,10 +1221,6 @@
                 if (!response.ok) {
                     clearSession();
                     setLoginMessage(data.error || "Erro ao fazer login.", "red");
-
-                    if (response.status === 401) {
-                        showForgotPasswordLink();
-                    }
 
                     return;
                 }

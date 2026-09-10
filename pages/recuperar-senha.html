@@ -1,0 +1,1187 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Inicie a recuperação de senha da sua conta CASEG Protege." />
+    <title>Recuperar senha - CASEG Protege</title>
+    <link rel="stylesheet" href="../assets/css/style.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+
+    <style>
+        .recovery-public-page {
+            --recovery-green: #176d2c;
+            --recovery-green-light: #1f8f3a;
+            --recovery-lime: #9fd117;
+            --recovery-muted: #59616d;
+            --recovery-border: #e2e5e1;
+            min-height: 100vh;
+            background: #f5f6f4;
+            color: #1a1a1a;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .recovery-public-page * {
+            box-sizing: border-box;
+        }
+
+        .recovery-public-page .site-header {
+            background: #ffffff;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+            box-shadow: 0 6px 22px rgba(0, 0, 0, 0.04);
+        }
+
+        .recovery-public-page .header-container {
+            max-width: 1500px;
+            margin: 0 auto;
+            padding: 14px 28px;
+            display: grid;
+            grid-template-columns: 260px 1fr 140px;
+            align-items: center;
+            gap: 24px;
+        }
+
+        .recovery-public-page .logo-link {
+            display: inline-flex;
+            width: fit-content;
+        }
+
+        .recovery-public-page .site-logo {
+            width: 190px;
+            height: auto;
+        }
+
+        .recovery-public-page .main-nav {
+            display: flex;
+            justify-content: center;
+            gap: 46px;
+        }
+
+
+        .recovery-public-page .main-nav a {
+            padding: 10px 0;
+            color: #111111;
+            font-size: 17px;
+            font-weight: 800;
+            text-decoration: none;
+        }
+
+        .recovery-public-page .main-nav a::before,
+        .recovery-public-page .main-nav a::after {
+            content: none !important;
+            display: none !important;
+        }
+
+        .recovery-public-page .main-nav a:hover,
+        .recovery-public-page .main-nav a:focus-visible {
+            color: var(--recovery-green);
+        }
+
+        .recovery-public-page .header-login-button {
+            min-height: 44px;
+            padding: 0 20px;
+            border-radius: 8px;
+            background: var(--recovery-green);
+            color: #ffffff;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 9px;
+            font-size: 15px;
+            font-weight: 800;
+            text-decoration: none;
+            box-shadow: 0 10px 20px rgba(23, 109, 44, 0.20);
+        }
+
+        .recovery-public-page .header-login-button:hover,
+        .recovery-public-page .header-login-button:focus-visible {
+            background: var(--recovery-green-light);
+        }
+
+        .recovery-main {
+            width: 100%;
+            max-width: 1500px;
+            margin: 0 auto;
+            padding: 0 28px 28px;
+            flex: 1;
+        }
+
+        .recovery-hero {
+            position: relative;
+            overflow: hidden;
+            border-radius: 18px;
+            background:
+                linear-gradient(90deg, rgba(0, 22, 14, 0.93), rgba(0, 38, 20, 0.80), rgba(0, 22, 14, 0.91)),
+                url("../assets/img/fundo-industrial-caseg.png") center / cover no-repeat;
+            color: #ffffff;
+            box-shadow: 0 14px 34px rgba(0, 0, 0, 0.08);
+        }
+
+        .recovery-hero::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle at 14% 18%, rgba(159, 209, 23, 0.15), transparent 32%);
+            pointer-events: none;
+        }
+
+        .recovery-hero-content {
+            position: relative;
+            z-index: 1;
+            min-height: 650px;
+            padding: 54px;
+            display: grid;
+            grid-template-columns: minmax(0, 1.1fr) minmax(360px, 0.72fr);
+            align-items: center;
+            gap: 58px;
+        }
+
+        .recovery-info-area {
+            max-width: 710px;
+        }
+
+        .recovery-badge {
+            width: fit-content;
+            margin-bottom: 24px;
+            padding: 9px 14px;
+            border: 1px solid rgba(255, 255, 255, 0.22);
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.10);
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 14px;
+            font-weight: 800;
+        }
+
+        .recovery-badge i,
+        .recovery-guidance i {
+            color: var(--recovery-lime);
+        }
+
+        .recovery-info-area h1 {
+            margin: 0;
+            color: #ffffff;
+            font-size: clamp(38px, 4.3vw, 62px);
+            line-height: 1.06;
+            letter-spacing: -0.04em;
+        }
+
+        .recovery-info-area h1 span {
+            display: block;
+            color: var(--recovery-lime);
+        }
+
+        .recovery-info-area > p {
+            max-width: 640px;
+            margin: 22px 0 0;
+            color: rgba(255, 255, 255, 0.86);
+            font-size: 18px;
+            line-height: 1.7;
+        }
+
+        .recovery-guidance {
+            margin: 34px 0 0;
+            padding: 0;
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 16px;
+            list-style: none;
+        }
+
+        .recovery-guidance li {
+            padding: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.16);
+            border-radius: 14px;
+            background: rgba(255, 255, 255, 0.09);
+        }
+
+        .recovery-guidance i,
+        .recovery-guidance strong,
+        .recovery-guidance span {
+            display: block;
+        }
+
+        .recovery-guidance i {
+            margin-bottom: 12px;
+            font-size: 22px;
+        }
+
+        .recovery-guidance strong {
+            margin-bottom: 5px;
+            font-size: 16px;
+        }
+
+        .recovery-guidance span {
+            color: rgba(255, 255, 255, 0.77);
+            font-size: 14px;
+            line-height: 1.55;
+        }
+
+        .recovery-panel {
+            width: 100%;
+            max-width: 480px;
+            justify-self: end;
+            padding: 34px;
+            border: 1px solid rgba(255, 255, 255, 0.66);
+            border-radius: 18px;
+            background: rgba(255, 255, 255, 0.98);
+            color: #1a1a1a;
+            box-shadow: 0 22px 54px rgba(0, 0, 0, 0.23);
+        }
+
+        .recovery-panel-logo {
+            margin-bottom: 18px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .recovery-panel-logo img {
+            width: 164px;
+            height: auto;
+        }
+
+        .recovery-panel-title {
+            text-align: center;
+        }
+
+        .recovery-panel-title h2 {
+            margin: 0;
+            color: var(--recovery-green);
+            font-size: 30px;
+        }
+
+        .recovery-panel-title p {
+            margin: 11px auto 0;
+            max-width: 360px;
+            color: var(--recovery-muted);
+            font-size: 16px;
+            line-height: 1.55;
+        }
+
+        .recovery-form {
+            margin-top: 28px;
+        }
+
+        .recovery-form .form-group {
+            margin-bottom: 20px;
+        }
+
+        .recovery-form label {
+            display: inline-block;
+            margin-bottom: 8px;
+            color: #24272b;
+            font-size: 15px;
+            font-weight: 800;
+        }
+
+        .recovery-form input {
+            width: 100%;
+            height: 52px;
+            padding: 0 15px;
+            border: 1px solid #cfd5cf;
+            border-radius: 9px;
+            background: #ffffff;
+            color: #1a1a1a;
+            font: inherit;
+            font-size: 16px;
+        }
+
+        .recovery-form input:focus {
+            border-color: var(--recovery-green-light);
+            outline: none;
+            box-shadow: 0 0 0 4px rgba(31, 143, 58, 0.14);
+        }
+
+        .recovery-form input[aria-invalid="true"] {
+            border-color: #a12622;
+            box-shadow: 0 0 0 3px rgba(161, 38, 34, 0.10);
+        }
+
+        .recovery-field-hint {
+            display: block;
+            margin-top: 8px;
+            color: #6b7279;
+            font-size: 14px;
+            line-height: 1.45;
+        }
+
+        .recovery-submit-button {
+            width: 100%;
+            min-height: 52px;
+            border: 0;
+            border-radius: 9px;
+            background: var(--recovery-green);
+            color: #ffffff;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            font: inherit;
+            font-size: 16px;
+            font-weight: 800;
+            cursor: pointer;
+            box-shadow: 0 12px 24px rgba(23, 109, 44, 0.22);
+        }
+
+        .recovery-submit-button:hover:not(:disabled) {
+            background: var(--recovery-green-light);
+        }
+
+        .recovery-submit-button:disabled {
+            cursor: wait;
+            opacity: 0.72;
+        }
+
+        .recovery-submit-button .fa-spinner {
+            animation: recovery-spin 0.9s linear infinite;
+        }
+
+        @keyframes recovery-spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .recovery-message {
+            display: none;
+            margin-top: 18px;
+            padding: 13px 14px;
+            border: 1px solid transparent;
+            border-radius: 9px;
+            font-size: 14px;
+            line-height: 1.55;
+        }
+
+        .recovery-message.is-visible {
+            display: block;
+        }
+
+        .recovery-message.is-success {
+            border-color: #b9dcb7;
+            background: #eaf5e5;
+            color: #155c27;
+        }
+
+        .recovery-message.is-error {
+            border-color: #f0c5c2;
+            background: #fff1f0;
+            color: #a12622;
+        }
+
+        .recovery-step[hidden] {
+            display: none;
+        }
+
+        .recovery-step-copy {
+            margin: 0 0 20px;
+            color: var(--recovery-muted);
+            font-size: 14px;
+            line-height: 1.55;
+        }
+
+        .recovery-step-actions {
+            margin-top: 22px;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            gap: 12px 20px;
+        }
+
+        .recovery-step-actions .recovery-back-link {
+            margin-top: 0;
+        }
+
+        .recovery-restart-button {
+            border: 0;
+            padding: 0;
+            background: transparent;
+            color: var(--recovery-green);
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font: inherit;
+            font-size: 15px;
+            font-weight: 800;
+        }
+
+        .recovery-restart-button:hover:not(:disabled),
+        .recovery-restart-button:focus-visible {
+            color: var(--recovery-green-light);
+            text-decoration: underline;
+        }
+
+        .recovery-restart-button:disabled {
+            cursor: wait;
+            opacity: 0.65;
+        }
+
+        .recovery-back-link {
+            margin-top: 22px;
+            text-align: center;
+        }
+
+        .recovery-back-link a {
+            color: var(--recovery-green);
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 15px;
+            font-weight: 800;
+            text-decoration: none;
+        }
+
+        .recovery-back-link a:hover,
+        .recovery-back-link a:focus-visible {
+            color: var(--recovery-green-light);
+            text-decoration: underline;
+        }
+
+        .recovery-support-note {
+            margin-top: 24px;
+            padding-top: 20px;
+            border-top: 1px solid var(--recovery-border);
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            color: var(--recovery-muted);
+        }
+
+        .recovery-support-note i {
+            margin-top: 3px;
+            color: var(--recovery-green);
+        }
+
+        .recovery-support-note p {
+            margin: 0;
+            font-size: 14px;
+            line-height: 1.55;
+        }
+
+        .recovery-support-note a {
+            color: var(--recovery-green);
+            font-weight: 800;
+        }
+
+        .recovery-public-page :focus-visible {
+            outline: 3px solid rgba(159, 209, 23, 0.72);
+            outline-offset: 3px;
+        }
+
+        .recovery-public-page .site-footer {
+            margin-top: auto;
+        }
+
+        @media (max-width: 1050px) {
+            .recovery-public-page .main-nav {
+                gap: 24px;
+            }
+
+            .recovery-hero-content {
+                min-height: auto;
+                grid-template-columns: 1fr;
+                padding: 46px;
+            }
+
+            .recovery-panel {
+                max-width: 620px;
+                justify-self: center;
+            }
+        }
+
+        @media (max-width: 760px) {
+            .recovery-public-page .header-container {
+                padding: 12px 18px;
+                grid-template-columns: 1fr auto;
+                gap: 14px;
+            }
+
+            .recovery-public-page .site-logo {
+                width: 162px;
+            }
+
+            .recovery-public-page .main-nav {
+                display: none;
+            }
+
+            .recovery-public-page .header-login-button {
+                width: 44px;
+                padding: 0;
+                font-size: 0;
+            }
+
+            .recovery-public-page .header-login-button i {
+                font-size: 17px;
+            }
+
+            .recovery-main {
+                padding: 0 14px 18px;
+            }
+
+            .recovery-hero {
+                border-radius: 14px;
+            }
+
+            .recovery-hero-content {
+                padding: 32px 20px;
+                gap: 32px;
+            }
+
+            .recovery-info-area h1 {
+                font-size: clamp(34px, 11vw, 48px);
+            }
+
+            .recovery-info-area > p {
+                font-size: 16px;
+            }
+
+            .recovery-guidance {
+                grid-template-columns: 1fr;
+            }
+
+            .recovery-panel {
+                padding: 28px 20px;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .recovery-public-page *,
+            .recovery-public-page *::before,
+            .recovery-public-page *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+    </style>
+</head>
+<body class="recovery-public-page">
+    <header class="site-header">
+        <div class="header-container">
+            <a href="home.html" class="logo-link" aria-label="CASEG Protege - Página inicial">
+                <img src="../assets/img/logo_transparente.png" alt="Logo CASEG Protege" class="site-logo" />
+            </a>
+            <nav class="main-nav" aria-label="Navegação principal">
+                <a href="home.html">Home</a>
+                <a href="servicos.html">Serviços</a>
+                <a href="avisos.html">Sobre</a>
+                <a href="contato.html">Contato</a>
+            </nav>
+            <a href="login.html" class="header-login-button">
+                <i class="fa-regular fa-user" aria-hidden="true"></i>
+                Entrar
+            </a>
+        </div>
+    </header>
+
+    <main class="recovery-main">
+        <section class="recovery-hero" aria-labelledby="recoveryHeroTitle">
+            <div class="recovery-hero-content">
+                <div class="recovery-info-area">
+                    <div class="recovery-badge">
+                        <i class="fa-solid fa-shield-halved" aria-hidden="true"></i>
+                        Recuperação protegida
+                    </div>
+                    <h1 id="recoveryHeroTitle">
+                        Recupere seu acesso com
+                        <span>segurança e privacidade.</span>
+                    </h1>
+                    <p>
+                        Informe seu CPF ou CNPJ para iniciar a recuperação. Por segurança,
+                        a confirmação sobre a conta permanecerá confidencial.
+                    </p>
+                    <ul class="recovery-guidance" aria-label="Proteções da recuperação de senha">
+                        <li>
+                            <i class="fa-regular fa-id-card" aria-hidden="true"></i>
+                            <strong>Identificação simples</strong>
+                            <span>Use o mesmo CPF ou CNPJ vinculado ao seu acesso.</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-lock" aria-hidden="true"></i>
+                            <strong>Dados protegidos</strong>
+                            <span>A página não revela se os dados informados possuem cadastro.</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <section class="recovery-panel" aria-labelledby="recoveryFormTitle">
+                    <div class="recovery-panel-logo">
+                        <img src="../assets/img/logo_transparente.png" alt="Logo CASEG Protege" />
+                    </div>
+                    <div class="recovery-panel-title">
+                        <h2 id="recoveryFormTitle">Recuperar senha</h2>
+                        <p id="recoveryPanelDescription">Informe seu CPF ou CNPJ para iniciar a recuperação da sua senha.</p>
+                    </div>
+                    <form id="recoveryRequestForm" class="recovery-form recovery-step" novalidate>
+                        <div class="form-group">
+                            <label for="recoveryIdentity">CPF ou CNPJ</label>
+                            <input
+                                type="text"
+                                id="recoveryIdentity"
+                                name="identity"
+                                placeholder="Digite seu CPF ou CNPJ"
+                                autocomplete="username"
+                                inputmode="text"
+                                autocapitalize="characters"
+                                spellcheck="false"
+                                maxlength="18"
+                                aria-describedby="recoveryIdentityHint recoveryRequestMessage"
+                                aria-invalid="false"
+                                required
+                            />
+                            <small id="recoveryIdentityHint" class="recovery-field-hint">
+                                São aceitos CPF, CNPJ numérico e CNPJ alfanumérico.
+                            </small>
+                        </div>
+                        <button type="submit" id="recoverySubmitButton" class="recovery-submit-button">
+                            <i id="recoverySubmitIcon" class="fa-solid fa-paper-plane" aria-hidden="true"></i>
+                            <span id="recoverySubmitLabel">Enviar código</span>
+                        </button>
+                        <div id="recoveryRequestMessage" class="recovery-message" role="status" aria-live="polite"></div>
+                        <div class="recovery-back-link">
+                            <a href="login.html">
+                                <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
+                                Voltar para o login
+                            </a>
+                        </div>
+                    </form>
+                    <form id="recoveryVerificationForm" class="recovery-form recovery-step" novalidate hidden>
+                        <p class="recovery-step-copy">
+                            Informe o código recebido para continuar a recuperação.
+                        </p>
+                        <div id="recoveryVerificationMessage" class="recovery-message" role="status" aria-live="polite"></div>
+                        <div class="form-group">
+                            <label for="recoveryCode">Código de recuperação</label>
+                            <input
+                                type="text"
+                                id="recoveryCode"
+                                name="code"
+                                placeholder="Digite o código de recuperação"
+                                autocomplete="one-time-code"
+                                inputmode="text"
+                                autocapitalize="none"
+                                spellcheck="false"
+                                aria-describedby="recoveryCodeHint recoveryVerificationMessage"
+                                aria-invalid="false"
+                                required
+                            />
+                            <small id="recoveryCodeHint" class="recovery-field-hint">
+                                Digite o código exatamente como foi recebido.
+                            </small>
+                        </div>
+                        <button type="submit" id="recoveryVerifyButton" class="recovery-submit-button">
+                            <i id="recoveryVerifyIcon" class="fa-solid fa-shield-halved" aria-hidden="true"></i>
+                            <span id="recoveryVerifyLabel">Validar código</span>
+                        </button>
+                        <div class="recovery-step-actions">
+                            <button type="button" id="restartRecoveryButton" class="recovery-restart-button">
+                                <i class="fa-solid fa-rotate-left" aria-hidden="true"></i>
+                                Reiniciar recuperação
+                            </button>
+                            <div class="recovery-back-link">
+                                <a href="login.html">
+                                    <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
+                                    Voltar para o login
+                                </a>
+                            </div>
+                        </div>
+                    </form>
+                    <div class="recovery-support-note">
+                        <i class="fa-regular fa-circle-question" aria-hidden="true"></i>
+                        <p>
+                            Caso precise de ajuda, fale conosco pela página
+                            <a href="contato.html">Contato</a>.
+                        </p>
+                    </div>
+                </section>
+            </div>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <div class="footer-container">
+            <div class="footer-logo">
+                <img src="../assets/img/logo_footer.png" alt="Logo CASEG Protege" />
+            </div>
+            <p>© 2025 CASEG Protege. Todos os direitos reservados.</p>
+            <div class="footer-links">
+                <a href="termos-de-uso.html">Termos de Uso</a>
+                <span>|</span>
+                <a href="politica-privacidade.html">Política de Privacidade</a>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        const RECOVERY_REQUEST_ENDPOINT =
+            "http://localhost:3000/password-recovery/request";
+        const RECOVERY_VERIFY_ENDPOINT =
+            "http://localhost:3000/password-recovery/verify";
+        const GENERIC_REQUEST_ACCEPTED_MESSAGE =
+            "Se os dados informados estiverem vinculados a uma conta elegível, um código de recuperação será enviado ao e-mail cadastrado.";
+        const INVALID_IDENTITY_MESSAGE = "Informe um CPF ou CNPJ válido.";
+        const RATE_LIMIT_MESSAGE =
+            "Muitas tentativas foram realizadas. Aguarde um momento e tente novamente.";
+        const TECHNICAL_FAILURE_MESSAGE =
+            "Não foi possível iniciar a recuperação agora. Tente novamente mais tarde.";
+        const IDENTITY_STEP_DESCRIPTION =
+            "Informe seu CPF ou CNPJ para iniciar a recuperação da sua senha.";
+        const CODE_STEP_DESCRIPTION =
+            "Digite o código de recuperação para continuar.";
+        const INVALID_CODE_MESSAGE =
+            "Informe um código de recuperação válido.";
+        const VERIFY_REJECTED_MESSAGE =
+            "Não foi possível validar o código. Confira e tente novamente. Se necessário, reinicie a recuperação.";
+        const VERIFY_TECHNICAL_FAILURE_MESSAGE =
+            "Não foi possível validar o código agora. Tente novamente ou reinicie a recuperação.";
+
+        const recoveryPanelDescription =
+            document.getElementById("recoveryPanelDescription");
+        const recoveryRequestForm =
+            document.getElementById("recoveryRequestForm");
+        const recoveryIdentityInput =
+            document.getElementById("recoveryIdentity");
+        const recoverySubmitButton =
+            document.getElementById("recoverySubmitButton");
+        const recoverySubmitIcon =
+            document.getElementById("recoverySubmitIcon");
+        const recoverySubmitLabel =
+            document.getElementById("recoverySubmitLabel");
+        const recoveryRequestMessage =
+            document.getElementById("recoveryRequestMessage");
+        const recoveryVerificationForm =
+            document.getElementById("recoveryVerificationForm");
+        const recoveryCodeInput =
+            document.getElementById("recoveryCode");
+        const recoveryVerifyButton =
+            document.getElementById("recoveryVerifyButton");
+        const recoveryVerifyIcon =
+            document.getElementById("recoveryVerifyIcon");
+        const recoveryVerifyLabel =
+            document.getElementById("recoveryVerifyLabel");
+        const recoveryVerificationMessage =
+            document.getElementById("recoveryVerificationMessage");
+        const restartRecoveryButton =
+            document.getElementById("restartRecoveryButton");
+
+        let recoveryRequestPending = false;
+        let recoveryVerificationPending = false;
+
+        function hasOnlyFiscalInputCharacters(value) {
+            return /^[A-Za-z0-9./-]+$/.test(value);
+        }
+
+        function normalizeFiscalIdentity(value) {
+            if (typeof value !== "string") {
+                return { state: "INVALID", canonical: null };
+            }
+
+            const trimmedValue = value.trim();
+
+            if (!trimmedValue || !hasOnlyFiscalInputCharacters(trimmedValue)) {
+                return { state: "INVALID", canonical: null };
+            }
+
+            const canonical = trimmedValue
+                .toUpperCase()
+                .replace(/[./-]/g, "");
+
+            if (/^[0-9]{11}$/.test(canonical)) {
+                return { state: "CPF_VALID_STRUCTURE", canonical };
+            }
+
+            if (/^[A-Z0-9]{12}[0-9]{2}$/.test(canonical)) {
+                return { state: "CNPJ_VALID_STRUCTURE", canonical };
+            }
+
+            return { state: "INVALID", canonical: null };
+        }
+
+        function normalizePartialFiscalIdentity(value) {
+            if (typeof value !== "string") {
+                return { isValid: false, canonical: null, mode: null };
+            }
+
+            const trimmedValue = value.trim();
+
+            if (
+                trimmedValue &&
+                !hasOnlyFiscalInputCharacters(trimmedValue)
+            ) {
+                return { isValid: false, canonical: null, mode: null };
+            }
+
+            const canonical = trimmedValue
+                .toUpperCase()
+                .replace(/[./-]/g, "");
+
+            if (
+                canonical.length > 14 ||
+                /[A-Z]/.test(canonical.slice(12))
+            ) {
+                return { isValid: false, canonical: null, mode: null };
+            }
+
+            const isCnpj =
+                /[A-Z]/.test(canonical) || canonical.length >= 12;
+
+            return {
+                isValid: true,
+                canonical,
+                mode: isCnpj ? "CNPJ" : "CPF"
+            };
+        }
+
+        function formatPartialCpf(canonical) {
+            if (canonical.length <= 3) {
+                return canonical;
+            }
+
+            if (canonical.length <= 6) {
+                return canonical.slice(0, 3) + "." + canonical.slice(3);
+            }
+
+            if (canonical.length <= 9) {
+                return canonical.slice(0, 3) + "." +
+                    canonical.slice(3, 6) + "." +
+                    canonical.slice(6);
+            }
+
+            return canonical.slice(0, 3) + "." +
+                canonical.slice(3, 6) + "." +
+                canonical.slice(6, 9) + "-" +
+                canonical.slice(9);
+        }
+
+        function formatPartialCnpj(canonical) {
+            let formattedValue = canonical.slice(0, 2);
+
+            if (canonical.length > 2) {
+                formattedValue += "." + canonical.slice(2, 5);
+            }
+
+            if (canonical.length > 5) {
+                formattedValue += "." + canonical.slice(5, 8);
+            }
+
+            if (canonical.length > 8) {
+                formattedValue += "/" + canonical.slice(8, 12);
+            }
+
+            if (canonical.length > 12) {
+                formattedValue += "-" + canonical.slice(12, 14);
+            }
+
+            return formattedValue;
+        }
+
+        function formatPartialFiscalIdentity(partialIdentity) {
+            return partialIdentity.mode === "CNPJ"
+                ? formatPartialCnpj(partialIdentity.canonical)
+                : formatPartialCpf(partialIdentity.canonical);
+        }
+        function setRecoveryMessage(message, state) {
+            recoveryRequestMessage.textContent = message;
+            recoveryRequestMessage.className =
+                "recovery-message is-visible is-" + state;
+        }
+
+        function clearRecoveryMessage() {
+            recoveryRequestMessage.textContent = "";
+            recoveryRequestMessage.className = "recovery-message";
+        }
+
+        function setRecoveryVerificationMessage(message, state) {
+            recoveryVerificationMessage.textContent = message;
+            recoveryVerificationMessage.className =
+                "recovery-message is-visible is-" + state;
+        }
+
+        function clearRecoveryVerificationMessage() {
+            recoveryVerificationMessage.textContent = "";
+            recoveryVerificationMessage.className = "recovery-message";
+        }
+
+        function setRecoveryRequestLoading(isLoading) {
+            recoverySubmitButton.disabled = isLoading;
+            recoveryRequestForm.setAttribute(
+                "aria-busy",
+                String(isLoading)
+            );
+            recoverySubmitIcon.className = isLoading
+                ? "fa-solid fa-spinner"
+                : "fa-solid fa-paper-plane";
+            recoverySubmitLabel.textContent = isLoading
+                ? "Enviando..."
+                : "Enviar código";
+        }
+
+        function setRecoveryVerificationLoading(isLoading) {
+            recoveryVerifyButton.disabled = isLoading;
+            restartRecoveryButton.disabled = isLoading;
+            recoveryVerificationForm.setAttribute(
+                "aria-busy",
+                String(isLoading)
+            );
+            recoveryVerifyIcon.className = isLoading
+                ? "fa-solid fa-spinner"
+                : "fa-solid fa-shield-halved";
+            recoveryVerifyLabel.textContent = isLoading
+                ? "Validando..."
+                : "Validar código";
+        }
+
+        function getRecoveryVerificationCode(value) {
+            if (
+                typeof value !== "string" ||
+                !value.trim() ||
+                /[\r\n]/.test(value)
+            ) {
+                return { isValid: false, code: null };
+            }
+
+            return { isValid: true, code: value };
+        }
+
+        function showRecoveryVerificationStep() {
+            recoveryIdentityInput.value = "";
+            recoveryIdentityInput.disabled = true;
+            recoveryRequestForm.hidden = true;
+            recoveryVerificationForm.hidden = false;
+            recoveryPanelDescription.textContent = CODE_STEP_DESCRIPTION;
+            clearRecoveryMessage();
+            setRecoveryVerificationMessage(
+                GENERIC_REQUEST_ACCEPTED_MESSAGE,
+                "success"
+            );
+            recoveryCodeInput.focus();
+        }
+
+        function showRecoveryIdentityStep() {
+            recoveryCodeInput.value = "";
+            recoveryCodeInput.setAttribute("aria-invalid", "false");
+            clearRecoveryVerificationMessage();
+            recoveryVerificationForm.hidden = true;
+            recoveryRequestForm.hidden = false;
+            recoveryIdentityInput.disabled = false;
+            recoveryPanelDescription.textContent =
+                IDENTITY_STEP_DESCRIPTION;
+            clearRecoveryMessage();
+            recoveryIdentityInput.focus();
+        }
+
+        recoveryIdentityInput.addEventListener("input", () => {
+            const partialIdentity = normalizePartialFiscalIdentity(
+                recoveryIdentityInput.value
+            );
+
+            if (!partialIdentity.isValid) {
+                recoveryIdentityInput.setAttribute(
+                    "aria-invalid",
+                    "true"
+                );
+                return;
+            }
+
+            recoveryIdentityInput.value =
+                formatPartialFiscalIdentity(partialIdentity);
+            recoveryIdentityInput.setAttribute("aria-invalid", "false");
+
+            if (
+                recoveryRequestMessage.classList.contains("is-error")
+            ) {
+                clearRecoveryMessage();
+            }
+        });
+
+        recoveryRequestForm.addEventListener("submit", async (event) => {
+            event.preventDefault();
+
+            if (recoveryRequestPending) {
+                return;
+            }
+
+            const fiscalIdentity = normalizeFiscalIdentity(
+                recoveryIdentityInput.value
+            );
+
+            if (fiscalIdentity.state === "INVALID") {
+                recoveryIdentityInput.setAttribute(
+                    "aria-invalid",
+                    "true"
+                );
+                setRecoveryMessage(
+                    INVALID_IDENTITY_MESSAGE,
+                    "error"
+                );
+                recoveryIdentityInput.focus();
+                return;
+            }
+
+            recoveryIdentityInput.setAttribute("aria-invalid", "false");
+            clearRecoveryMessage();
+            recoveryRequestPending = true;
+            setRecoveryRequestLoading(true);
+
+            try {
+                const response = await fetch(
+                    RECOVERY_REQUEST_ENDPOINT,
+                    {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json"
+                        },
+                        credentials: "include",
+                        body: JSON.stringify({
+                            identity: fiscalIdentity.canonical
+                        })
+                    }
+                );
+
+                if (response.status === 202) {
+                    showRecoveryVerificationStep();
+                    return;
+                }
+
+                if (response.status === 400) {
+                    recoveryIdentityInput.setAttribute(
+                        "aria-invalid",
+                        "true"
+                    );
+                    setRecoveryMessage(
+                        INVALID_IDENTITY_MESSAGE,
+                        "error"
+                    );
+                    return;
+                }
+
+                if (response.status === 429) {
+                    setRecoveryMessage(
+                        RATE_LIMIT_MESSAGE,
+                        "error"
+                    );
+                    return;
+                }
+
+                setRecoveryMessage(
+                    TECHNICAL_FAILURE_MESSAGE,
+                    "error"
+                );
+            } catch {
+                setRecoveryMessage(
+                    TECHNICAL_FAILURE_MESSAGE,
+                    "error"
+                );
+            } finally {
+                recoveryRequestPending = false;
+                setRecoveryRequestLoading(false);
+            }
+        });
+
+        recoveryCodeInput.addEventListener("input", () => {
+            recoveryCodeInput.setAttribute("aria-invalid", "false");
+
+            if (
+                recoveryVerificationMessage.classList.contains("is-error")
+            ) {
+                clearRecoveryVerificationMessage();
+            }
+        });
+
+        restartRecoveryButton.addEventListener("click", () => {
+            if (recoveryVerificationPending) {
+                return;
+            }
+
+            showRecoveryIdentityStep();
+        });
+
+        recoveryVerificationForm.addEventListener(
+            "submit",
+            async (event) => {
+                event.preventDefault();
+
+                if (recoveryVerificationPending) {
+                    return;
+                }
+
+                const verificationCode = getRecoveryVerificationCode(
+                    recoveryCodeInput.value
+                );
+
+                if (!verificationCode.isValid) {
+                    recoveryCodeInput.setAttribute(
+                        "aria-invalid",
+                        "true"
+                    );
+                    setRecoveryVerificationMessage(
+                        INVALID_CODE_MESSAGE,
+                        "error"
+                    );
+                    recoveryCodeInput.focus();
+                    return;
+                }
+
+                recoveryCodeInput.setAttribute(
+                    "aria-invalid",
+                    "false"
+                );
+                clearRecoveryVerificationMessage();
+                recoveryVerificationPending = true;
+                setRecoveryVerificationLoading(true);
+
+                try {
+                    const response = await fetch(
+                        RECOVERY_VERIFY_ENDPOINT,
+                        {
+                            method: "POST",
+                            headers: {
+                                "Content-Type": "application/json"
+                            },
+                            credentials: "include",
+                            body: JSON.stringify({
+                                code: verificationCode.code
+                            })
+                        }
+                    );
+
+                    if (response.status === 204) {
+                        window.location.assign("trocar-senha.html");
+                        return;
+                    }
+
+                    if (response.status === 400) {
+                        recoveryCodeInput.setAttribute(
+                            "aria-invalid",
+                            "true"
+                        );
+                        setRecoveryVerificationMessage(
+                            VERIFY_REJECTED_MESSAGE,
+                            "error"
+                        );
+                        recoveryCodeInput.focus();
+                        recoveryCodeInput.select();
+                        return;
+                    }
+
+                    setRecoveryVerificationMessage(
+                        VERIFY_TECHNICAL_FAILURE_MESSAGE,
+                        "error"
+                    );
+                } catch {
+                    setRecoveryVerificationMessage(
+                        VERIFY_TECHNICAL_FAILURE_MESSAGE,
+                        "error"
+                    );
+                } finally {
+                    recoveryVerificationPending = false;
+                    setRecoveryVerificationLoading(false);
+                }
+            }
+        );
+    </script>
+</body>
+</html>
