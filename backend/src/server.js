@@ -201,7 +201,18 @@ app.use((req, res, next) => {
   next();
 });
 
-const PORT = 3000;
+const configuredPort = process.env.PORT;
+const PORT = configuredPort === undefined ? 3000 : Number(configuredPort);
+
+if (
+  (configuredPort !== undefined &&
+    (typeof configuredPort !== "string" || !/^[0-9]+$/.test(configuredPort))) ||
+  !Number.isInteger(PORT) ||
+  PORT < 1 ||
+  PORT > 65535
+) {
+  throw new Error("PORT must be an integer between 1 and 65535.");
+}
 const ONE_DAY_IN_MS = 24 * 60 * 60 * 1000;
 const TEMPORARY_PASSWORD_TTL_MS = 24 * 60 * 60 * 1000;
 const TEMPORARY_PASSWORD_EXPIRED_CODE = "TEMPORARY_PASSWORD_EXPIRED";
