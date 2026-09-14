@@ -29,9 +29,34 @@ const publicSupabase = createClient(
 const app = express();
 app.use(express.json());
 
-const CORS_ALLOWED_ORIGINS = new Set([
-  "http://localhost:5500"
-]);
+const configuredCorsOrigin = process.env.CASEG_CORS_ORIGIN;
+const corsOrigin =
+  configuredCorsOrigin === undefined && process.env.NODE_ENV !== "production"
+    ? "http://localhost:5500"
+    : configuredCorsOrigin;
+const corsOriginPattern = /^https?:\/\/[^/?#\\@*,\s]+\/?$/i;
+let canonicalCorsOrigin;
+
+try {
+  if (
+    typeof corsOrigin !== "string" ||
+    !corsOriginPattern.test(corsOrigin.trim())
+  ) {
+    throw new Error();
+  }
+
+  canonicalCorsOrigin = new URL(corsOrigin.trim()).origin;
+
+  if (!corsOriginPattern.test(canonicalCorsOrigin)) {
+    throw new Error();
+  }
+} catch {
+  throw new Error(
+    "CASEG_CORS_ORIGIN must be a single valid HTTP(S) origin and is required in production."
+  );
+}
+
+const CORS_ALLOWED_ORIGINS = new Set([canonicalCorsOrigin]);
 
 const CLIENT_REFRESH_COOKIE_NAME = "caseg_client_refresh";
 
