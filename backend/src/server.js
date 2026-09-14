@@ -63,7 +63,7 @@ const CLIENT_REFRESH_COOKIE_NAME = "caseg_client_refresh";
 function expireClientRefreshCookie(res) {
   res.setHeader(
     "Set-Cookie",
-    `${CLIENT_REFRESH_COOKIE_NAME}=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT`
+    `${CLIENT_REFRESH_COOKIE_NAME}=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT${process.env.NODE_ENV === "production" ? "; Secure" : ""}`
   );
 }
 
@@ -92,7 +92,7 @@ function setClientRefreshCookie(res, refreshToken, expiresAt) {
 
   res.setHeader(
     "Set-Cookie",
-    `${CLIENT_REFRESH_COOKIE_NAME}=${encodeURIComponent(refreshToken)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${maxAge}; Expires=${expires.toUTCString()}`
+    `${CLIENT_REFRESH_COOKIE_NAME}=${encodeURIComponent(refreshToken)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${maxAge}; Expires=${expires.toUTCString()}${process.env.NODE_ENV === "production" ? "; Secure" : ""}`
   );
 
   return true;
