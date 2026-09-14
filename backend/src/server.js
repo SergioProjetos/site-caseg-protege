@@ -3631,7 +3631,7 @@ app.get("/clients", async (req, res) => {
 
     if (error) {
       return res.status(500).json({
-        error: error.message || "Erro ao buscar clientes."
+        error: "Erro interno do servidor"
       });
     }
 
@@ -5548,7 +5548,7 @@ app.get("/notices", async (req, res) => {
 
     if (error) {
       return res.status(500).json({
-        error: error.message
+        error: "Erro interno do servidor"
       });
     }
 
@@ -5557,7 +5557,7 @@ app.get("/notices", async (req, res) => {
     console.log("ERRO NA ROTA /notices:", err);
 
     res.status(500).json({
-      error: String(err)
+      error: "Erro interno do servidor"
     });
   }
 });
