@@ -2067,6 +2067,10 @@ body.admin-panel-page::selection {
   gap: 12px;
 }
 
+.clients-list > .client-card {
+  flex-shrink: 0;
+}
+
 .clients-list-scroll-area {
   max-height: 590px;
   overflow-y: auto;
@@ -4089,4 +4093,58 @@ body.admin-panel-page .admin-footer::after {
   .admin-action-modal-cancel {
     width: 100%;
   }
+}
+
+/* Cards de clientes em listas com scroll no mobile e tablet. */
+@media (max-width: 1024px) {
+    .clients-list > .client-card {
+        flex-shrink: 0;
+        min-width: 0;
+    }
+
+    .client-card-content,
+    .client-card-item {
+        min-width: 0;
+    }
+
+    .client-card-main {
+        overflow: visible;
+    }
+
+    .client-card-title-block h3,
+    .client-card-title-block p {
+        white-space: normal;
+        overflow: visible;
+        text-overflow: clip;
+        overflow-wrap: anywhere;
+    }
+
+    .client-status-badge {
+        max-width: 100%;
+        height: auto;
+        white-space: normal;
+        line-height: 1.25;
+    }
+
+    .client-card-item {
+        height: auto;
+        padding: 3px 7px;
+        white-space: normal;
+        line-height: 1.4;
+    }
+
+    .client-card-item span {
+        min-width: 0;
+        overflow: visible;
+        text-overflow: clip;
+        overflow-wrap: anywhere;
+    }
+
+    .client-card-actions {
+        flex-wrap: wrap;
+    }
+
+    .client-action-btn {
+        max-width: 100%;
+    }
 }

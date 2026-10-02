@@ -294,6 +294,40 @@
         </div>
     </div>
 
+    <dialog id="clientDocumentsDialog" class="client-documents-dialog" aria-labelledby="clientDocumentsTitle">
+        <header class="client-documents-modal-header">
+            <div>
+                <p class="client-documents-modal-eyebrow">Meus Documentos</p>
+                <h2 id="clientDocumentsTitle">Documentos</h2>
+            </div>
+            <button id="clientDocumentsClose" class="client-documents-modal-close" type="button" aria-label="Fechar documentos">
+                <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+            </button>
+        </header>
+        <div class="client-documents-modal-body">
+            <div class="client-documents-modal-filters">
+                <label class="client-documents-modal-search" for="clientDocumentsSearch">
+                    Buscar documento
+                    <input id="clientDocumentsSearch" type="search" placeholder="Buscar documento..." autocomplete="off" autofocus />
+                </label>
+                <label for="clientDocumentsSubcategory">
+                    Subcategoria
+                    <select id="clientDocumentsSubcategory"><option value="">Todas</option></select>
+                </label>
+                <label for="clientDocumentsYear">
+                    Ano
+                    <select id="clientDocumentsYear"><option value="">Todos</option></select>
+                </label>
+            </div>
+            <div class="client-documents-modal-results-bar">
+                <p id="clientDocumentsCount" role="status" aria-live="polite"></p>
+                <button id="clientDocumentsClear" type="button">Limpar filtros</button>
+            </div>
+            <ul id="clientDocumentsResults" class="client-documents-modal-results" aria-label="Documentos da categoria"></ul>
+            <p id="clientDocumentsEmpty" class="client-documents-modal-empty" hidden>Nenhum documento encontrado com os filtros selecionados.</p>
+        </div>
+    </dialog>
+
     <script src="../assets/js/api-config.js"></script>
     <script src="../assets/js/client-panel.js"></script>
     <script src="../assets/js/site-animations.js"></script>

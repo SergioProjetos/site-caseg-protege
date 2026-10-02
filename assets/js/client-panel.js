@@ -34,6 +34,18 @@ document.addEventListener("DOMContentLoaded", function () {
   const documentSearchInput = document.querySelector("#documentSearchInput");
   const clearDocumentSearchBtn = document.querySelector("#clearDocumentSearchBtn");
 
+  const clientDocumentsDialog = document.querySelector("#clientDocumentsDialog");
+  const clientDocumentsTitle = document.querySelector("#clientDocumentsTitle");
+  const clientDocumentsSearch = document.querySelector("#clientDocumentsSearch");
+  const clientDocumentsSubcategory = document.querySelector("#clientDocumentsSubcategory");
+  const clientDocumentsYear = document.querySelector("#clientDocumentsYear");
+  const clientDocumentsResults = document.querySelector("#clientDocumentsResults");
+  const clientDocumentsCount = document.querySelector("#clientDocumentsCount");
+  const clientDocumentsEmpty = document.querySelector("#clientDocumentsEmpty");
+  const pendingDocumentDownloads = new Set();
+  let categoryDocuments = [];
+  let categoryTrigger = null;
+
   const clientTopbarName = document.querySelector("#clientTopbarName");
   const clientTopbarCompany = document.querySelector("#clientTopbarCompany");
   const clientUserAvatar = document.querySelector("#clientUserAvatar");
@@ -142,6 +154,12 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   function showClientNotice(message, options = {}) {
+    const documentsDialogWasOpen = clientDocumentsDialog.open;
+
+    if (documentsDialogWasOpen) {
+      clientDocumentsDialog.close();
+    }
+
     const noticeOverlay = createClientNoticeModal();
     const noticeTitle = noticeOverlay.querySelector("#clientNoticeTitle");
     const noticeMessage = noticeOverlay.querySelector("#clientNoticeMessage");
@@ -159,6 +177,14 @@ document.addEventListener("DOMContentLoaded", function () {
     window.requestAnimationFrame(function () {
       noticeOverlay.classList.add("is-visible");
       confirmBtn.focus();
+
+      if (documentsDialogWasOpen) {
+        window.requestAnimationFrame(function () {
+          if (!noticeOverlay.hidden) {
+            confirmBtn.focus();
+          }
+        });
+      }
     });
 
     return new Promise((resolve) => {
@@ -640,6 +666,12 @@ document.addEventListener("DOMContentLoaded", function () {
       return;
     }
 
+    if (element.matches(".client-documents-modal-download")) {
+      element.disabled = isLoading;
+      element.querySelector(".client-documents-modal-download-label").textContent =
+        isLoading ? "Aguarde..." : "Baixar";
+    }
+
     if (isLoading) {
       element.classList.add("is-downloading");
       element.setAttribute("aria-busy", "true");
@@ -938,7 +970,6 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     const searchTerm = documentSearchInput ? documentSearchInput.value : "";
-    const normalizedSearch = normalizeSearchText(searchTerm);
     const filteredDocuments = filterDocumentsBySearch(allClientDocuments, searchTerm);
 
     updateClearSearchButton();
@@ -955,9 +986,7 @@ document.addEventListener("DOMContentLoaded", function () {
       return;
     }
 
-    renderGroupedDocuments(filteredDocuments, {
-      forceOpen: normalizedSearch !== ""
-    });
+    renderGroupedDocuments(filteredDocuments);
   }
 
   function setupDocumentSearch() {
@@ -1111,246 +1140,171 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   }
 
-  function renderGroupedDocuments(documents, options = {}) {
+  function renderGroupedDocuments(documents) {
     if (!documentsList) {
       return;
     }
 
-    const forceOpen = options.forceOpen === true;
-    const groupedByCategory = {};
+    const categories = new Map();
 
     documents.forEach((doc) => {
       const category = doc.category || "Sem categoria";
 
-      if (!groupedByCategory[category]) {
-        groupedByCategory[category] = [];
+      if (!categories.has(category)) {
+        categories.set(category, []);
       }
 
-      groupedByCategory[category].push(doc);
+      categories.get(category).push(doc);
     });
 
-    const groupedBySubcategory = {};
+    documentsList.replaceChildren();
 
-    Object.keys(groupedByCategory).forEach((category) => {
-      groupedBySubcategory[category] = {};
-
-      groupedByCategory[category].forEach((doc) => {
-        const subcategory = doc.subcategory ? doc.subcategory : null;
-
-        if (!groupedBySubcategory[category][subcategory]) {
-          groupedBySubcategory[category][subcategory] = [];
-        }
-
-        groupedBySubcategory[category][subcategory].push(doc);
-      });
-    });
-
-    const groupedByYear = {};
-
-    Object.keys(groupedBySubcategory).forEach((category) => {
-      groupedByYear[category] = {};
-
-      Object.keys(groupedBySubcategory[category]).forEach((subcategory) => {
-        groupedByYear[category][subcategory] = {};
-
-        groupedBySubcategory[category][subcategory].forEach((doc) => {
-          const year = doc.year || "Sem ano";
-
-          if (!groupedByYear[category][subcategory][year]) {
-            groupedByYear[category][subcategory][year] = [];
-          }
-
-          groupedByYear[category][subcategory][year].push(doc);
-        });
-      });
-    });
-
-    documentsList.innerHTML = "";
-
-    Object.keys(groupedByYear).forEach((category) => {
-      const categoryDocsTotal = groupedByCategory[category].length;
-
+    categories.forEach((matches, category) => {
+      const total = allClientDocuments.filter(
+        (doc) => (doc.category || "Sem categoria") === category
+      ).length;
       const categoryElement = document.createElement("div");
       categoryElement.className = "doc-category";
 
-      const categoryButton = document.createElement("button");
-      categoryButton.className = "doc-category-toggle";
-      categoryButton.type = "button";
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "doc-category-toggle";
+      button.setAttribute("aria-haspopup", "dialog");
+      button.setAttribute("aria-controls", "clientDocumentsDialog");
 
-      categoryButton.innerHTML = `
+      const count = matches.length === total
+        ? formatCountLabel(total)
+        : matches.length + " de " + formatCountLabel(total);
+
+      button.innerHTML = `
         <span class="doc-toggle-label">${escapeHtml(category)}</span>
-        <span class="doc-count-badge">${escapeHtml(formatCountLabel(categoryDocsTotal))}</span>
+        <span class="doc-count-badge">${escapeHtml(count)}</span>
+      `;
+      button.addEventListener("click", () => openClientDocuments(category, button));
+      categoryElement.appendChild(button);
+      documentsList.appendChild(categoryElement);
+    });
+  }
+
+  function fillClientDocumentFilter(select, values, allLabel) {
+    select.replaceChildren(new Option(allLabel, ""));
+    values.forEach((value) => select.add(new Option(value, value)));
+  }
+
+  function openClientDocuments(category, trigger) {
+    categoryDocuments = allClientDocuments.filter(
+      (doc) => (doc.category || "Sem categoria") === category
+    );
+    categoryTrigger = trigger;
+    clientDocumentsTitle.textContent = "Documentos — " + category;
+    clientDocumentsSearch.value = documentSearchInput ? documentSearchInput.value : "";
+
+    const subcategories = [...new Set(categoryDocuments.map(
+      (doc) => doc.subcategory || "Sem subcategoria"
+    ))].sort((a, b) => a.localeCompare(b, "pt-BR"));
+    const years = [...new Set(categoryDocuments.map(
+      (doc) => String(doc.year || "Sem ano")
+    ))].sort((a, b) => b.localeCompare(a, "pt-BR", { numeric: true }));
+
+    fillClientDocumentFilter(clientDocumentsSubcategory, subcategories, "Todas");
+    fillClientDocumentFilter(clientDocumentsYear, years, "Todos");
+    renderClientDocumentResults();
+    clientDocumentsDialog.showModal();
+    document.body.classList.add("client-documents-open");
+  }
+
+  function renderClientDocumentResults() {
+    const matches = filterDocumentsBySearch(
+      categoryDocuments, clientDocumentsSearch.value
+    ).filter((doc) =>
+      (!clientDocumentsSubcategory.value ||
+        (doc.subcategory || "Sem subcategoria") === clientDocumentsSubcategory.value) &&
+      (!clientDocumentsYear.value ||
+        String(doc.year || "Sem ano") === clientDocumentsYear.value)
+    );
+
+    clientDocumentsCount.textContent = matches.length === 1
+      ? "1 documento encontrado"
+      : matches.length + " documentos encontrados";
+    clientDocumentsEmpty.hidden = matches.length !== 0;
+    clientDocumentsResults.replaceChildren();
+
+    matches.forEach((doc) => {
+      const row = document.createElement("li");
+      row.className = "client-documents-modal-row";
+      row.innerHTML = `
+        <span class="client-documents-modal-file-icon" aria-hidden="true"><i class="fa-regular fa-file-pdf"></i></span>
+        <div class="client-documents-modal-file">
+          <strong>${escapeHtml(doc.file_name || "Documento sem nome")}</strong>
+          <span>${escapeHtml(doc.subcategory || "Sem subcategoria")} • ${escapeHtml(String(doc.year || "Sem ano"))}</span>
+        </div>
+        <button class="client-documents-modal-download" type="button" data-document-id="${escapeHtml(String(doc.id))}">
+          <i class="fa-solid fa-download" aria-hidden="true"></i>
+          <span class="client-documents-modal-download-label">Baixar</span>
+        </button>
       `;
 
-      const subcategoriesContainer = document.createElement("div");
-      subcategoriesContainer.className = "doc-subcategories";
+      const button = row.querySelector(".client-documents-modal-download");
+      button.setAttribute("aria-label", "Baixar " + (doc.file_name || "documento"));
+      setDownloadLoadingState(button, pendingDocumentDownloads.has(String(doc.id)));
+      clientDocumentsResults.appendChild(row);
+    });
+  }
 
-      if (forceOpen) {
-        subcategoriesContainer.classList.add("is-open");
-        categoryButton.classList.add("is-open");
+  function setupClientDocumentsModal() {
+    document.querySelector("#clientDocumentsClose").addEventListener("click", () => {
+      clientDocumentsDialog.close();
+    });
+
+    clientDocumentsDialog.addEventListener("close", () => {
+      document.body.classList.remove("client-documents-open");
+
+      const noticeOverlay = document.querySelector("#clientNoticeOverlay");
+
+      if ((!noticeOverlay || noticeOverlay.hidden) && categoryTrigger?.isConnected) {
+        categoryTrigger.focus({ preventScroll: true });
+      }
+    });
+
+    clientDocumentsDialog.addEventListener("click", (event) => {
+      if (event.target !== clientDocumentsDialog) {
+        return;
       }
 
-      categoryElement.appendChild(categoryButton);
-      categoryElement.appendChild(subcategoriesContainer);
-      documentsList.appendChild(categoryElement);
+      const rect = clientDocumentsDialog.getBoundingClientRect();
 
-      Object.keys(groupedByYear[category]).forEach((subcategory) => {
-        let yearsContainer;
-
-        if (subcategory === "null") {
-          yearsContainer = document.createElement("div");
-          yearsContainer.className = "doc-years is-open";
-          subcategoriesContainer.appendChild(yearsContainer);
-        } else {
-          const subcategoryElement = document.createElement("div");
-          subcategoryElement.className = "doc-subcategory";
-
-          const subcategoryButton = document.createElement("button");
-          subcategoryButton.className = "doc-subcategory-toggle";
-          subcategoryButton.type = "button";
-          subcategoryButton.textContent = subcategory;
-
-          yearsContainer = document.createElement("div");
-          yearsContainer.className = "doc-years";
-
-          if (forceOpen) {
-            yearsContainer.classList.add("is-open");
-            subcategoryButton.classList.add("is-open");
-          }
-
-          subcategoryElement.appendChild(subcategoryButton);
-          subcategoryElement.appendChild(yearsContainer);
-          subcategoriesContainer.appendChild(subcategoryElement);
-        }
-
-        Object.keys(groupedByYear[category][subcategory]).forEach((year) => {
-          const yearElement = document.createElement("div");
-          yearElement.className = "doc-year";
-
-          const yearButton = document.createElement("button");
-          yearButton.className = "doc-year-toggle";
-          yearButton.type = "button";
-          yearButton.textContent = year;
-
-          const filesContainer = document.createElement("div");
-          filesContainer.className = "doc-files";
-
-          if (forceOpen) {
-            filesContainer.classList.add("is-open");
-            yearButton.classList.add("is-open");
-          }
-
-          yearElement.appendChild(yearButton);
-          yearElement.appendChild(filesContainer);
-          yearsContainer.appendChild(yearElement);
-
-          groupedByYear[category][subcategory][year].forEach((doc) => {
-            const ul = document.createElement("ul");
-            const li = document.createElement("li");
-            const link = document.createElement("a");
-
-            link.href = "#";
-            link.className = "doc-file-link";
-            link.dataset.documentId = doc.id;
-            link.textContent = doc.file_name;
-
-            li.appendChild(link);
-            ul.appendChild(li);
-            filesContainer.appendChild(ul);
-          });
-        });
-      });
+      if (event.clientX < rect.left || event.clientX > rect.right ||
+          event.clientY < rect.top || event.clientY > rect.bottom) {
+        clientDocumentsDialog.close();
+      }
     });
 
-    setupDocumentToggles();
-    setupDocumentLinks();
-  }
+    clientDocumentsSearch.addEventListener("input", renderClientDocumentResults);
+    clientDocumentsSubcategory.addEventListener("change", renderClientDocumentResults);
+    clientDocumentsYear.addEventListener("change", renderClientDocumentResults);
 
-  /* ===============================
-     TOGGLES
-  ================================ */
-
-  function syncDocumentToggleButton(button, panel) {
-    if (!button || !panel) {
-      return;
-    }
-
-    if (panel.classList.contains("is-open")) {
-      button.classList.add("is-open");
-      return;
-    }
-
-    button.classList.remove("is-open");
-  }
-
-  function toggleDocumentPanel(button, panel) {
-    if (!panel) {
-      return;
-    }
-
-    panel.classList.toggle("is-open");
-    syncDocumentToggleButton(button, panel);
-  }
-
-  function setupDocumentToggles() {
-    const categoryButtons = document.querySelectorAll(".doc-category-toggle");
-
-    categoryButtons.forEach((button) => {
-      const subcategories = button.nextElementSibling;
-
-      syncDocumentToggleButton(button, subcategories);
-
-      button.addEventListener("click", () => {
-        toggleDocumentPanel(button, subcategories);
-      });
+    document.querySelector("#clientDocumentsClear").addEventListener("click", () => {
+      clientDocumentsSearch.value = "";
+      clientDocumentsSubcategory.value = "";
+      clientDocumentsYear.value = "";
+      renderClientDocumentResults();
+      clientDocumentsSearch.focus();
     });
 
-    const subcategoryButtons = document.querySelectorAll(".doc-subcategory-toggle");
+    clientDocumentsResults.addEventListener("click", async (event) => {
+      const button = event.target.closest(".client-documents-modal-download");
 
-    subcategoryButtons.forEach((button) => {
-      const years = button.nextElementSibling;
+      if (!button || button.disabled || button.classList.contains("is-downloading")) {
+        return;
+      }
 
-      syncDocumentToggleButton(button, years);
-
-      button.addEventListener("click", () => {
-        toggleDocumentPanel(button, years);
-      });
-    });
-
-    const yearButtons = document.querySelectorAll(".doc-year-toggle");
-
-    yearButtons.forEach((button) => {
-      const files = button.nextElementSibling;
-
-      syncDocumentToggleButton(button, files);
-
-      button.addEventListener("click", () => {
-        toggleDocumentPanel(button, files);
-      });
+      await downloadDocument(button.dataset.documentId, button);
     });
   }
 
   /* ===============================
      DOWNLOAD DOCUMENTOS
   ================================ */
-
-  function setupDocumentLinks() {
-    const fileLinks = document.querySelectorAll(".doc-file-link");
-
-    fileLinks.forEach((link) => {
-      link.addEventListener("click", async (event) => {
-        event.preventDefault();
-
-        if (link.classList.contains("is-downloading")) {
-          return;
-        }
-
-        const documentId = link.dataset.documentId;
-
-        await downloadDocument(documentId, link);
-      });
-    });
-  }
 
   async function downloadDocument(documentId, triggerElement = null) {
     if (!documentId) {
@@ -1362,6 +1316,13 @@ document.addEventListener("DOMContentLoaded", function () {
       return;
     }
 
+    const downloadKey = String(documentId);
+
+    if (pendingDocumentDownloads.has(downloadKey)) {
+      return;
+    }
+
+    pendingDocumentDownloads.add(downloadKey);
     setDownloadLoadingState(triggerElement, true);
 
     try {
@@ -1408,7 +1369,14 @@ document.addEventListener("DOMContentLoaded", function () {
         confirmText: "OK"
       });
     } finally {
+      pendingDocumentDownloads.delete(downloadKey);
       setDownloadLoadingState(triggerElement, false);
+
+      clientDocumentsResults.querySelectorAll(".client-documents-modal-download").forEach((button) => {
+        if (button.dataset.documentId === downloadKey) {
+          setDownloadLoadingState(button, false);
+        }
+      });
     }
   }
 
@@ -1436,6 +1404,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     setupSidebarActiveNavigation();
     setupDocumentSearch();
+    setupClientDocumentsModal();
     loadClientInfo();
     loadDocuments();
   }

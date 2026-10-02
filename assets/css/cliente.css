@@ -1951,3 +1951,245 @@ body.client-notice-open {
         width: 100%;
     }
 }
+
+/* Documentos por categoria: modal UX1. */
+body.client-documents-open { overflow: hidden; }
+
+.client-documents-dialog {
+    width: min(1040px, calc(100% - 48px));
+    max-width: none;
+    max-height: 88vh;
+    max-height: 88dvh;
+    margin: auto;
+    padding: 0;
+    border: 1px solid var(--client-border);
+    border-radius: 20px;
+    color: var(--client-text);
+    background: var(--client-white);
+    box-shadow: 0 28px 90px rgba(0, 47, 34, 0.28);
+    overflow: hidden;
+    font-family: inherit;
+}
+.client-documents-dialog[open] { display: flex; flex-direction: column; }
+.client-documents-dialog::backdrop {
+    background: rgba(15, 23, 42, 0.55);
+    backdrop-filter: blur(3px);
+}
+.client-documents-modal-header {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 22px 28px;
+    border-bottom: 1px solid #dfe9e4;
+    background: linear-gradient(135deg, #f2faf5, #ffffff);
+}
+.client-documents-modal-header > div { min-width: 0; }
+.client-documents-modal-eyebrow {
+    margin: 0 0 5px;
+    color: var(--client-green);
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+}
+.client-documents-modal-header h2 {
+    margin: 0;
+    color: var(--client-green-dark);
+    font-size: clamp(20px, 2.4vw, 26px);
+    font-weight: 900;
+    overflow-wrap: anywhere;
+}
+.client-documents-modal-close {
+    display: grid;
+    place-items: center;
+    flex: 0 0 44px;
+    width: 44px;
+    height: 44px;
+    border: 1px solid #dfe9e4;
+    border-radius: 12px;
+    background: #fff;
+    color: var(--client-green-dark);
+    cursor: pointer;
+    font-size: 21px;
+}
+.client-documents-modal-body {
+    min-height: 0;
+    padding: 24px 28px 28px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+.client-documents-modal-filters {
+    display: grid;
+    grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, 0.65fr);
+    gap: 14px;
+}
+.client-documents-modal-filters label {
+    display: grid;
+    gap: 8px;
+    min-width: 0;
+    color: var(--client-text);
+    font-size: 13px;
+    font-weight: 800;
+}
+.client-documents-modal-filters input,
+.client-documents-modal-filters select {
+    width: 100%;
+    min-width: 0;
+    min-height: 46px;
+    padding: 10px 12px;
+    border: 1px solid #d5e1d9;
+    border-radius: 10px;
+    background: #fff;
+    color: var(--client-text);
+    font: 400 14px Arial, Helvetica, sans-serif;
+}
+.client-documents-dialog :is(input, select, button):focus-visible {
+    outline: 3px solid #83bf9e;
+    outline-offset: 2px;
+}
+.client-documents-modal-results-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px 16px;
+    margin: 20px 0 12px;
+}
+.client-documents-modal-results-bar p {
+    margin: 0;
+    color: var(--client-muted);
+    font-size: 13px;
+    font-weight: 700;
+}
+#clientDocumentsClear {
+    min-height: 36px;
+    padding: 6px 0;
+    border: 0;
+    background: transparent;
+    color: var(--client-green);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    font: 700 13px Arial, Helvetica, sans-serif;
+    cursor: pointer;
+}
+.client-documents-modal-results {
+    display: grid;
+    gap: 10px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+.client-documents-modal-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    min-width: 0;
+    padding: 16px;
+    border: 1px solid #e2eae5;
+    border-radius: 12px;
+    background: #fff;
+}
+.client-documents-modal-file-icon {
+    flex: 0 0 40px;
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 44px;
+    border-radius: 10px;
+    background: var(--client-green-soft);
+    color: var(--client-green);
+    font-size: 21px;
+}
+.client-documents-modal-file {
+    display: grid;
+    gap: 7px;
+    flex: 1;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+.client-documents-modal-file strong {
+    font-size: 14px;
+    line-height: 1.5;
+    font-weight: 800;
+}
+.client-documents-modal-file > span { color: var(--client-muted); font-size: 12px; }
+.client-documents-modal-download {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 42px;
+    padding: 10px 15px;
+    border: 1px solid var(--client-green);
+    border-radius: 10px;
+    background: var(--client-green);
+    color: #fff;
+    font: 700 13px Arial, Helvetica, sans-serif;
+    cursor: pointer;
+}
+.client-documents-modal-download:hover { background: var(--client-green-dark); }
+.client-documents-modal-download.is-downloading {
+    opacity: 0.82;
+    cursor: wait;
+}
+.client-documents-modal-download:disabled { pointer-events: none; }
+.client-documents-modal-empty {
+    margin: 0 0 14px;
+    padding: 16px;
+    border: 1px solid #d5e8dc;
+    border-radius: 12px;
+    background: #f2faf5;
+    color: var(--client-green-dark);
+    font-size: 14px;
+    line-height: 1.6;
+}
+.client-documents-modal-empty { padding: 32px 18px; text-align: center; }
+.client-documents-dialog [hidden] { display: none; }
+
+@media (max-width: 700px) {
+    .client-documents-dialog {
+        width: calc(100% - 24px);
+        max-height: calc(100vh - 24px);
+        max-height: calc(100dvh - 24px);
+        border-radius: 16px;
+    }
+    .client-documents-modal-header { padding: 16px; }
+    .client-documents-modal-body { padding: 18px 16px; }
+    .client-documents-modal-filters {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: 12px;
+    }
+    .client-documents-modal-search { grid-column: 1 / -1; }
+    .client-documents-modal-filters input,
+    .client-documents-modal-filters select { font-size: 16px; }
+    .client-documents-modal-row { flex-wrap: wrap; gap: 12px; padding: 14px; }
+    .client-documents-modal-file-icon { display: none; }
+    .client-documents-modal-file { flex-basis: 100%; }
+    .client-documents-modal-download { margin-left: auto; }
+}
+
+/* Documentos recentes: leitura e rolagem em mobile/tablet. */
+@media (max-width: 1024px) {
+    .client-recent-block {
+        height: auto;
+    }
+
+    .client-recent-list {
+        flex: none;
+        max-height: 320px;
+        grid-auto-rows: max-content;
+    }
+
+    .client-recent-item {
+        min-width: 0;
+    }
+
+    .client-recent-name {
+        white-space: normal;
+        overflow: visible;
+        text-overflow: clip;
+        overflow-wrap: anywhere;
+    }
+}
