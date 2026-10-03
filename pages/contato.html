@@ -913,13 +913,14 @@
 
                         <div class="form-row">
                             <div class="form-group">
-                                <label for="telefone">Telefone / WhatsApp</label>
+                                <label for="email">E-mail</label>
                                 <input
-                                    type="tel"
-                                    id="telefone"
-                                    name="telefone"
-                                    placeholder="(00) 00000-0000"
-                                />
+                                    type="email"
+                                    id="email"
+                                    name="email"
+                                    placeholder="Seu e-mail"
+                                    required
+                                 />
                             </div>
 
                             <div class="form-group">
@@ -941,7 +942,6 @@
                                 id="mensagem"
                                 name="mensagem"
                                 placeholder="Descreva brevemente como podemos ajudar..."
-                                required
                             ></textarea>
                         </div>
 
@@ -1089,19 +1089,18 @@
 
             const nome = document.getElementById("nome").value.trim();
             const empresa = document.getElementById("empresa").value.trim();
-            const telefone = document.getElementById("telefone").value.trim();
+            const email = document.getElementById("email").value.trim();
             const assuntoSelect = document.getElementById("assunto");
             const assuntoTexto = assuntoSelect.options[assuntoSelect.selectedIndex].text;
             const mensagem = document.getElementById("mensagem").value.trim();
 
             const textoWhatsApp =
                 `Olá, CASEG Protege!\n\n` +
-                `Vim pelo site e gostaria de atendimento.\n\n` +
+                `Gostaria de mais informações sobre ${assuntoTexto}.\n\n` +
                 `Nome: ${nome}\n` +
                 `Empresa: ${empresa || "Não informado"}\n` +
-                `Telefone/WhatsApp: ${telefone || "Não informado"}\n` +
-                `Assunto: ${assuntoTexto}\n\n` +
-                `Mensagem:\n${mensagem}`;
+                `E-mail: ${email}\n` +
+                (mensagem ? `\n\nMensagem:\n${mensagem}` : "");
 
             const linkWhatsApp =
                 `https://wa.me/${whatsappCaseg}?text=${encodeURIComponent(textoWhatsApp)}`;
