@@ -3541,6 +3541,16 @@ document.addEventListener("DOMContentLoaded", async () => {
     setElementText(item, "[data-document-release-date]", formatDate(getDocumentReleaseDate(documentItem)));
     setElementText(item, "[data-document-expiration-date]", formatDate(getDocumentExpirationDate(documentItem)));
 
+    const downloadRequestCount = documentItem.download_request_count;
+
+    setElementText(
+      item,
+      "[data-document-download-count]",
+      Number.isInteger(downloadRequestCount) && downloadRequestCount >= 0
+        ? String(downloadRequestCount)
+        : "-"
+    );
+
     setElementDataset(item, "[data-document-menu-toggle]", "documentId", documentId);
 
     const actions = item.querySelector("[data-document-actions]");

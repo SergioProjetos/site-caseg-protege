@@ -4076,7 +4076,36 @@ app.get("/clients/:clientId/documents", async (req, res) => {
       });
     }
 
-    return res.status(200).json(data || []);
+    const documents = data || [];
+    const documentsWithDownloadCounts = [];
+    const batchSize = 4;
+
+    for (let index = 0; index < documents.length; index += batchSize) {
+      const batch = documents.slice(index, index + batchSize);
+
+      const documentsWithCounts = await Promise.all(
+        batch.map(async (document) => {
+          const downloadRequestCount = await getTableCount(
+            "system_events",
+            (query) =>
+              query
+                .eq("event_type", "document_download")
+                .eq("page", "cliente")
+                .eq("client_id", clientId)
+                .eq("document_id", document.id)
+          );
+
+          return {
+            ...document,
+            download_request_count: downloadRequestCount
+          };
+        })
+      );
+
+      documentsWithDownloadCounts.push(...documentsWithCounts);
+    }
+
+    return res.status(200).json(documentsWithDownloadCounts);
   } catch (error) {
     console.error("ERRO EM GET /clients/:clientId/documents:", error);
 
