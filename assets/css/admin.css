@@ -2540,9 +2540,9 @@ body.admin-panel-page::selection {
 .document-item {
   min-height: 84px;
   background: #ffffff;
-  border: 1px solid #dfe9e4;
-  border-radius: 12px;
-  box-shadow: 0 7px 20px rgba(15, 23, 42, 0.038);
+  border: 1px solid #e5ece8;
+  border-radius: 14px;
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.035);
   padding: 13px 14px;
   overflow: visible;
   position: relative;
@@ -2558,8 +2558,8 @@ body.admin-panel-page::selection {
 
 .document-item:hover {
   transform: translateY(-1px);
-  border-color: rgba(0, 107, 47, 0.18);
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.055);
+  border-color: rgba(0, 107, 47, 0.14);
+  box-shadow: 0 7px 20px rgba(15, 23, 42, 0.05);
 }
 
 .document-item-top {
@@ -2573,10 +2573,26 @@ body.admin-panel-page::selection {
 
 .document-item-grid {
   min-width: 0;
+  position: relative;
+  padding-left: 28px;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
+}
+
+.document-item-icon {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 18px;
+  color: var(--admin-green);
+  font-size: 18px;
+  line-height: 1;
+  text-align: center;
+  transform: translateY(-50%);
+  opacity: 0.8;
+  pointer-events: none;
 }
 
 .document-item-field {
@@ -2685,6 +2701,36 @@ body.admin-panel-page::selection {
     border-color 0.2s ease,
     box-shadow 0.2s ease,
     transform 0.2s ease;
+}
+
+.document-item .document-action-btn {
+  padding-inline: 5px;
+  gap: 3px;
+}
+
+.document-item .document-action-btn::before {
+  flex: 0 0 9px;
+  font-family: "Font Awesome 6 Free";
+  font-size: 9px;
+  font-weight: 900;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.document-item .download-document-btn::before {
+  content: "\f019" / "";
+}
+
+.document-item .replace-document-btn::before {
+  content: "\f021" / "";
+}
+
+.document-item .delete-document-btn::before {
+  content: "\f1f8" / "";
+}
+
+.document-item .document-action-btn:disabled::before {
+  content: none;
 }
 
 .download-document-btn {
