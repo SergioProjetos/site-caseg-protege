@@ -1309,7 +1309,14 @@ if (typeof recoveryRequestIpCleanupTimer.unref === "function") {
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 15 * 1024 * 1024
+    fileSize: 15 * 1024 * 1024,
+    files: 1,
+    fields: 6,
+    parts: 7,
+    fieldNameSize: 100,
+    fieldSize: 1 * 1024 * 1024,
+    fieldNestingDepth: 0,
+    fieldArrayIndexLimit: 0
   }
 });
 
@@ -1509,7 +1516,98 @@ async function getClientSessionProfile(userId) {
   return { profile: data };
 }
 
-async function validateAdminAccess(req, res) {
+function isActiveAdminProfile(profile) {
+  return profile?.role === "admin" && profile.is_active === true;
+}
+
+const ADMIN_SESSION_RPC_TIMEOUT_MS = 5000;
+const ADMIN_ACTIVITY_INTERVAL_MS = 5000;
+const adminActivityAttempts = new Map();
+
+function isAdminSessionVersion(value) {
+  return typeof value === "string" && /^[1-9][0-9]{0,18}$/.test(value) &&
+    BigInt(value) <= 9223372036854775807n;
+}
+
+// Call only with an access token already validated by Auth.
+function getAdminSessionIdentity(user, accessToken) {
+  const userId = normalizeUuid(user?.id);
+  const sessionId = extractSessionIdFromAccessToken(accessToken);
+  if (!userId || !sessionId) return null;
+  try {
+    const payload = JSON.parse(Buffer.from(accessToken.split(".")[1], "base64url").toString("utf8"));
+    return normalizeUuid(payload.sub) === userId ? { userId, sessionId } : null;
+  } catch {
+    return null;
+  }
+}
+
+async function callAdminSessionRpc(operation, identity, expectedVersion) {
+  const unavailable = { allowed: false, code: "ADMIN_SESSION_UNAVAILABLE", status: 503 };
+  const invalidContract = { allowed: false, code: "ADMIN_SESSION_INVALID_RESPONSE", status: 502 };
+  if (!identity || !["initialize", "check", "touch", "close"].includes(operation)) {
+    return { allowed: false, code: "ADMIN_SESSION_INVALID", status: 401 };
+  }
+  if (operation === "touch" && !isAdminSessionVersion(expectedVersion)) {
+    return { allowed: false, code: "INVALID_ARGUMENT", status: 400 };
+  }
+  const parameters = { p_session_id: identity.sessionId, p_user_id: identity.userId };
+  if (operation === "touch") parameters.p_expected_version = expectedVersion;
+  try {
+    const { data, error } = await adminSupabase
+      .rpc(`caseg_admin_session_${operation}`, parameters)
+      .abortSignal(AbortSignal.timeout(ADMIN_SESSION_RPC_TIMEOUT_MS));
+    if (error) return unavailable;
+    if (!data || typeof data !== "object" || Array.isArray(data) ||
+        typeof data.allowed !== "boolean" || typeof data.result_code !== "string") return invalidContract;
+    const code = data.result_code;
+    const successes = {
+      initialize: ["INITIALIZED", "OK"], check: ["OK"],
+      touch: ["ACTIVITY_RECORDED"], close: ["CLOSED"]
+    };
+    const negatives = {
+      INVALID_ARGUMENT: 400, DENIED: 403, SESSION_CLOSED: 401,
+      NOT_INITIALIZED: 401, IDLE_EXPIRED: 401, CLOCK_REGRESSION: 401
+    };
+    if (data.allowed && !successes[operation].includes(code)) return invalidContract;
+    if (!data.allowed && code !== "STALE_VERSION") {
+      if (!Object.hasOwn(negatives, code)) return invalidContract;
+      return { allowed: false, code, status: negatives[code] };
+    }
+    if (code === "CLOSED") return { allowed: true, code, status: 200 };
+    if (code === "STALE_VERSION" && (operation !== "touch" || data.allowed)) return invalidContract;
+    const now = typeof data.server_now === "string" ? Date.parse(data.server_now) : NaN;
+    const expires = typeof data.idle_expires_at === "string" ? Date.parse(data.idle_expires_at) : NaN;
+    if (!isAdminSessionVersion(data.version) || !Number.isFinite(now) ||
+        !Number.isFinite(expires) || expires <= now || expires - now > 60 * 60 * 1000) return invalidContract;
+    return {
+      allowed: data.allowed, code, status: data.allowed ? 200 : 409,
+      state: { session_id: identity.sessionId, version: data.version,
+        server_now: data.server_now, idle_expires_at: data.idle_expires_at }
+    };
+  } catch {
+    return unavailable;
+  }
+}
+
+function sendAdminSessionFailure(res, result) {
+  return res.status(result.status).json({
+    error: "Não foi possível autorizar a sessão administrativa.",
+    code: result.code,
+    ...(result.state ? { admin_session: result.state } : {})
+  });
+}
+
+async function trySignOutAdminSession(accessToken) {
+  try {
+    const { error } = await adminSupabase.auth.admin.signOut(accessToken, "local");
+    return !error;
+  } catch {
+    return false;
+  }
+}
+
+async function validateAdminAccess(req, res, operation = "check", expectedVersion) {
   const authResult = await getAuthenticatedUser(req);
 
   if (authResult.error) {
@@ -1531,16 +1629,42 @@ async function validateAdminAccess(req, res) {
 
   const adminProfile = profileResult.profile;
 
-  if (adminProfile.role !== "admin") {
+  if (!isActiveAdminProfile(adminProfile)) {
     res.status(403).json({
       error: "Acesso restrito a administradores."
     });
     return null;
   }
 
+  if (adminProfile.must_change_password !== false) {
+    res.status(403).json({ error: "Conclua o primeiro acesso antes de administrar.", code: "FIRST_ACCESS_REQUIRED" });
+    return null;
+  }
+
+  const identity = getAdminSessionIdentity(authResult.user, authResult.accessToken);
+  if (operation === "touch" && identity) {
+    // Per-instance bound; the database version remains the concurrency authority.
+    const now = Date.now();
+    for (const [key, expires] of adminActivityAttempts) {
+      if (expires <= now) adminActivityAttempts.delete(key);
+    }
+    if (adminActivityAttempts.has(identity.sessionId) || adminActivityAttempts.size >= 10000) {
+      res.setHeader("Retry-After", "5");
+      res.status(429).json({ error: "Aguarde antes de informar nova atividade.", code: "ACTIVITY_RATE_LIMITED" });
+      return null;
+    }
+    adminActivityAttempts.set(identity.sessionId, now + ADMIN_ACTIVITY_INTERVAL_MS);
+  }
+  const sessionResult = await callAdminSessionRpc(operation, identity, expectedVersion);
+  if (!sessionResult.allowed) {
+    sendAdminSessionFailure(res, sessionResult);
+    return null;
+  }
+
   return {
     adminUser: authResult.user,
-    adminProfile
+    adminProfile,
+    adminSession: sessionResult.state
   };
 }
 
@@ -1570,9 +1694,22 @@ function createTemporaryPasswordExpiresAt(nowMs = Date.now()) {
   return new Date(nowMs + TEMPORARY_PASSWORD_TTL_MS).toISOString();
 }
 
+function isFirstAccessRole(role) {
+  return role === "client" || role === "admin";
+}
+
+function isValidAdminFirstAccess(profile, user, accessToken) {
+  const identity = getAdminSessionIdentity(user, accessToken);
+  return isActiveAdminProfile(profile) && profile.must_change_password === true &&
+    !isTemporaryPasswordExpired(profile) &&
+    !!normalizeUuid(profile.temporary_password_generation_id) && !!identity &&
+    identity.userId === normalizeUuid(profile.user_id) &&
+    identity.sessionId === normalizeUuid(profile.temporary_password_session_id);
+}
+
 function isTemporaryPasswordExpired(profile, nowMs = Date.now()) {
   if (
-    profile?.role !== "client" ||
+    !isFirstAccessRole(profile?.role) ||
     profile.must_change_password !== true
   ) {
     return false;
@@ -1669,6 +1806,7 @@ function getProfileForResponse(profile) {
 
 async function compareAndSetFirstAccessProfile({
   userId,
+  expectedRole = "client",
   expectedGenerationId,
   expectedExpiresAt,
   expectedSessionId,
@@ -1676,11 +1814,12 @@ async function compareAndSetFirstAccessProfile({
   unexpiredAfter = null,
   selectColumns = "user_id"
 }) {
+  if (!isFirstAccessRole(expectedRole)) throw new Error("Invalid first access role.");
   let query = adminSupabase
     .from("profiles")
     .update(updates)
     .eq("user_id", userId)
-    .eq("role", "client")
+    .eq("role", expectedRole)
     .eq("is_active", true)
     .eq("must_change_password", true)
     .eq("temporary_password_expires_at", expectedExpiresAt);
@@ -2897,7 +3036,10 @@ app.post("/login", async (req, res) => {
       });
     }
 
-    if (profile.role === "client" && profile.is_active !== true) {
+    if (
+      (profile.role === "client" && profile.is_active !== true) ||
+      (profile.role === "admin" && (!isActiveAdminProfile(profile) || typeof profile.must_change_password !== "boolean"))
+    ) {
       recordLoginIdentityFailure(loginIdentityKey);
 
       return res.status(401).json({
@@ -2948,9 +3090,17 @@ app.post("/login", async (req, res) => {
     }
 
     if (
-      profile.role === "client" &&
+      isFirstAccessRole(profile.role) &&
       profile.must_change_password === true
     ) {
+      if (profile.role === "admin") {
+        const verified = await getAuthenticatedUser({ headers: { authorization: `Bearer ${loginData.session.access_token}` } });
+        const identity = verified.error ? null : getAdminSessionIdentity(verified.user, verified.accessToken);
+        if (!identity || identity.userId !== normalizeUuid(profile.user_id) || identity.userId !== normalizeUuid(loginData.user?.id)) {
+          await trySignOutAdminSession(loginData.session.access_token);
+          return res.status(401).json({ error: "CPF/CNPJ ou senha inválidos." });
+        }
+      }
       const observedGenerationId = normalizeUuid(
         profile.temporary_password_generation_id
       );
@@ -2982,6 +3132,7 @@ app.post("/login", async (req, res) => {
       const { data: sessionBinding, error: sessionBindingError } =
         await compareAndSetFirstAccessProfile({
           userId: profile.user_id,
+          expectedRole: profile.role,
           expectedGenerationId: observedGenerationId,
           expectedExpiresAt: profile.temporary_password_expires_at,
           expectedSessionId: observedSessionId,
@@ -3011,6 +3162,26 @@ app.post("/login", async (req, res) => {
           code: FIRST_ACCESS_STATE_CHANGED_CODE
         });
       }
+    }
+
+    let adminSession;
+    if (profile.role === "admin" && profile.must_change_password === false) {
+      const verified = await getAuthenticatedUser({
+        headers: { authorization: `Bearer ${loginData.session.access_token}` }
+      });
+      const identity = verified.error ? null : getAdminSessionIdentity(verified.user, verified.accessToken);
+      if (!identity || identity.userId !== normalizeUuid(profile.user_id) ||
+          identity.userId !== normalizeUuid(loginData.user?.id)) {
+        await trySignOutAdminSession(loginData.session.access_token);
+        return res.status(401).json({ error: "CPF/CNPJ ou senha inválidos." });
+      }
+      const initialized = await callAdminSessionRpc("initialize", identity);
+      if (!initialized.allowed) {
+        await trySignOutAdminSession(loginData.session.access_token);
+        return res.status(initialized.status >= 500 ? initialized.status : 401)
+          .json({ error: "Não foi possível concluir o login." });
+      }
+      adminSession = initialized.state;
     }
 
     let responseSession = loginData.session;
@@ -3051,7 +3222,11 @@ app.post("/login", async (req, res) => {
     return res.status(200).json({
       message: "Login realizado com sucesso.",
       session: responseSession,
-      profile: getProfileForResponse(profile)
+      profile: getProfileForResponse(profile),
+      ...(adminSession ? { admin_session: adminSession } : {}),
+      ...(profile.role === "admin" && profile.must_change_password === true ? {
+        first_access: { required: true, mode: "admin", expires_at: profile.temporary_password_expires_at }
+      } : {})
     });
   } catch (error) {
     console.error("ERRO EM /login:", error);
@@ -3082,6 +3257,27 @@ app.post("/logout", async (req, res) => {
       });
     }
 
+    const verified = await getAuthenticatedUser(req);
+    if (verified.error) {
+      await trySignOutAdminSession(accessToken);
+      return res.status(verified.status).json({ error: "Não foi possível confirmar o encerramento da sessão." });
+    }
+    const profileResult = await getUserProfile(verified.user.id);
+    if (profileResult.error && profileResult.status !== 404) {
+      await trySignOutAdminSession(accessToken);
+      return res.status(503).json({ error: "Não foi possível confirmar o encerramento da sessão." });
+    }
+    // Clients retain their Auth logout without depending on the session RPCs.
+    // Missing, inactive or changed profiles must not prevent closing old admin state.
+    if (profileResult.profile?.role !== "client") {
+      const closed = await callAdminSessionRpc("close",
+        getAdminSessionIdentity(verified.user, verified.accessToken));
+      if (!closed.allowed) {
+        await trySignOutAdminSession(accessToken);
+        return sendAdminSessionFailure(res, closed);
+      }
+    }
+
     const { error } =
       await adminSupabase.auth.admin.signOut(accessToken, "local");
 
@@ -3103,6 +3299,11 @@ app.post("/logout", async (req, res) => {
   }
 });
 
+function isAdminAuthUnavailable(error) {
+  return isAuthRetryableFetchError(error) ||
+    (Number.isInteger(error?.status) && error.status >= 500 && error.status <= 599);
+}
+
 app.post("/admin/refresh-session", async (req, res) => {
   try {
     const refreshToken = normalizeText(req.body.refresh_token);
@@ -3117,6 +3318,10 @@ app.post("/admin/refresh-session", async (req, res) => {
     const { data, error } = await adminSessionSupabase.auth.refreshSession({
       refresh_token: refreshToken
     });
+
+    if (error && isAdminAuthUnavailable(error)) {
+      return res.status(503).json({ error: "Não foi possível renovar a sessão no momento." });
+    }
 
     if (error || !data?.session?.access_token || !data?.user?.id) {
       return res.status(401).json({
@@ -3134,23 +3339,79 @@ app.post("/admin/refresh-session", async (req, res) => {
 
     const profile = profileResult.profile;
 
-    if (profile.role !== "admin") {
+    if (!isActiveAdminProfile(profile)) {
       return res.status(403).json({
         error: "Acesso restrito a administradores."
       });
     }
 
+    if (profile.must_change_password !== false) {
+      return res.status(403).json({ error: "Conclua o primeiro acesso.", code: "FIRST_ACCESS_REQUIRED" });
+    }
+
+    const verified = await getAuthenticatedUser({
+      headers: { authorization: `Bearer ${data.session.access_token}` }
+    });
+    const identity = verified.error ? null : getAdminSessionIdentity(verified.user, verified.accessToken);
+    if (!identity || identity.userId !== normalizeUuid(data.user.id)) {
+      await trySignOutAdminSession(data.session.access_token);
+      return sendAdminSessionFailure(res, { status: 401, code: "ADMIN_SESSION_INVALID" });
+    }
+    const checked = await callAdminSessionRpc("check", identity);
+    if (!checked.allowed) {
+      if (checked.status < 500) await trySignOutAdminSession(data.session.access_token);
+      return sendAdminSessionFailure(res, checked);
+    }
+
     return res.status(200).json({
       message: "Sessão renovada com sucesso.",
       session: data.session,
-      profile: getProfileForResponse(profile)
+      profile: getProfileForResponse(profile),
+      admin_session: checked.state
     });
   } catch (error) {
+    if (isAdminAuthUnavailable(error)) {
+      return res.status(503).json({ error: "Não foi possível renovar a sessão no momento." });
+    }
     console.error("ERRO EM POST /admin/refresh-session:", error);
 
     res.status(500).json({
       error: "Erro interno ao renovar sessão."
     });
+  }
+});
+
+app.post("/admin/session/activity", async (req, res) => {
+  if (!req.body || Array.isArray(req.body) ||
+      Object.keys(req.body).some((key) => key !== "expected_version") ||
+      !isAdminSessionVersion(req.body.expected_version)) {
+    return sendAdminSessionFailure(res, { status: 400, code: "INVALID_ARGUMENT" });
+  }
+  const adminAccess = await validateAdminAccess(req, res, "touch", req.body.expected_version);
+  if (!adminAccess) return;
+  return res.status(200).json({ code: "ACTIVITY_RECORDED", admin_session: adminAccess.adminSession });
+});
+
+app.post("/admin/first-access/refresh-session", async (req, res) => {
+  try {
+    const refreshToken = normalizeText(req.body.refresh_token);
+    if (!refreshToken) return res.status(400).json({ error: "Sessão de primeiro acesso indisponível." });
+    const auth = createClientSessionAuthClient();
+    const { data, error } = await auth.auth.refreshSession({ refresh_token: refreshToken });
+    if (error && isAdminAuthUnavailable(error)) return res.status(503).json({ error: "Tente novamente mais tarde." });
+    if (error || !data?.session?.access_token || !data?.user?.id) return res.status(401).json({ error: "Faça login novamente." });
+    const verified = await getAuthenticatedUser({ headers: { authorization: `Bearer ${data.session.access_token}` } });
+    if (verified.error) return res.status(verified.status).json({ error: "Não foi possível validar a sessão." });
+    const found = await getUserProfile(verified.user.id);
+    if (found.error) return res.status(found.status).json({ error: "Não foi possível validar o perfil." });
+    if (verified.user.id !== data.user.id || !isValidAdminFirstAccess(found.profile, verified.user, verified.accessToken)) {
+      await trySignOutAdminSession(data.session.access_token);
+      return res.status(403).json({ error: FIRST_ACCESS_SESSION_INVALID_MESSAGE, code: FIRST_ACCESS_SESSION_INVALID_CODE });
+    }
+    return res.status(200).json({ session: data.session, profile: getProfileForResponse(found.profile),
+      first_access: { required: true, mode: "admin", expires_at: found.profile.temporary_password_expires_at } });
+  } catch {
+    return res.status(503).json({ error: "Não foi possível renovar o primeiro acesso." });
   }
 });
 
@@ -3329,7 +3590,7 @@ app.put("/update-password", async (req, res) => {
     const profile = profileResult.profile;
 
     if (
-      profile.role !== "client" ||
+      !isFirstAccessRole(profile.role) ||
       profile.is_active !== true ||
       profile.must_change_password !== true
     ) {
@@ -3383,11 +3644,35 @@ app.put("/update-password", async (req, res) => {
       });
     }
 
+    if (profile.role === "admin") {
+      if (!isValidAdminFirstAccess(profile, authResult.user, authResult.accessToken)) {
+        return res.status(403).json({ error: FIRST_ACCESS_SESSION_INVALID_MESSAGE, code: FIRST_ACCESS_SESSION_INVALID_CODE });
+      }
+      // A successful probe proves the proposed password is still the current one.
+      // Never accept an ambiguous Auth error as proof that the passwords differ.
+      let probe;
+      try {
+        const auth = createClientSessionAuthClient();
+        probe = await auth.auth.signInWithPassword({ email: profile.email, password: newPassword });
+      } catch {
+        return res.status(503).json({ error: "Não foi possível validar a nova senha." });
+      }
+      if (probe.data?.session?.access_token) {
+        const { error } = await adminSupabase.auth.admin.signOut(probe.data.session.access_token, "local");
+        if (error) return res.status(503).json({ error: "Não foi possível encerrar a verificação da senha." });
+        return res.status(400).json({ error: "A nova senha deve ser diferente da senha temporária.", code: "PASSWORD_UNCHANGED" });
+      }
+      if (probe.error?.code !== "invalid_credentials") {
+        return res.status(503).json({ error: "Não foi possível validar a nova senha." });
+      }
+    }
+
     const casNowMs = Date.now();
     const lockExpiresAt = new Date(casNowMs - 1000).toISOString();
     const { data: acquiredProfile, error: acquireError } =
       await compareAndSetFirstAccessProfile({
         userId,
+        expectedRole: profile.role,
         expectedGenerationId,
         expectedExpiresAt: profile.temporary_password_expires_at,
         expectedSessionId,
@@ -3428,9 +3713,16 @@ app.put("/update-password", async (req, res) => {
       });
     }
 
+    if (profile.role === "admin") {
+      // The profile stays locked if Auth logout fails; never report partial success.
+      const { error: logoutError } = await adminSupabase.auth.admin.signOut(authResult.accessToken, "local");
+      if (logoutError) return res.status(503).json({ error: FIRST_ACCESS_RECOVERY_REQUIRED_MESSAGE, code: FIRST_ACCESS_RECOVERY_REQUIRED_CODE });
+    }
+
     const { data: updatedProfile, error: updateProfileError } =
       await compareAndSetFirstAccessProfile({
         userId,
+        expectedRole: profile.role,
         expectedGenerationId: null,
         expectedExpiresAt: lockExpiresAt,
         expectedSessionId: null,
@@ -3481,6 +3773,13 @@ app.post("/clients", async (req, res) => {
     const email = normalizeText(req.body.email).toLowerCase();
     const phone = normalizeText(req.body.phone).replace(/\D/g, "");
     const whatsapp = normalizeText(req.body.whatsapp).replace(/\D/g, "");
+    const address_zip = normalizeOptionalText(req.body.address_zip);
+    const address_street = normalizeOptionalText(req.body.address_street);
+    const address_number = normalizeOptionalText(req.body.address_number);
+    const address_complement = normalizeOptionalText(req.body.address_complement);
+    const address_neighborhood = normalizeOptionalText(req.body.address_neighborhood);
+    const address_city = normalizeOptionalText(req.body.address_city);
+    const address_state = normalizeOptionalText(req.body.address_state);
 
     if (
       !full_name ||
@@ -3564,6 +3863,13 @@ app.post("/clients", async (req, res) => {
           email,
           phone: phone || null,
           whatsapp: whatsapp || null,
+          address_zip,
+          address_street,
+          address_number,
+          address_complement,
+          address_neighborhood,
+          address_city,
+          address_state,
           role: "client",
           is_active: true,
           must_change_password: true,
@@ -3820,6 +4126,112 @@ app.post("/admin/clients/:clientId/reissue-temporary-password", async (req, res)
     }
 
     return res.status(500).json({
+      error: "Erro interno do servidor"
+    });
+  }
+});
+
+app.put("/admin/clients/:clientId/address", async (req, res) => {
+  try {
+    const adminAccess = await validateAdminAccess(req, res);
+
+    if (!adminAccess) {
+      return;
+    }
+
+    const { clientId } = req.params;
+
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(clientId || "")) {
+      return res.status(400).json({
+        error: "clientId deve ser um UUID válido."
+      });
+    }
+
+    const addressFields = [
+      "full_name",
+      "phone",
+      "whatsapp",
+      "address_zip",
+      "address_street",
+      "address_number",
+      "address_complement",
+      "address_neighborhood",
+      "address_city",
+      "address_state"
+    ];
+    const body = req.body;
+
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      return res.status(400).json({
+        error: "Informe um objeto com os dez campos cadastrais editáveis."
+      });
+    }
+
+    if (Object.keys(body).some((field) => !addressFields.includes(field))) {
+      return res.status(400).json({
+        error: "Somente responsável, telefone, WhatsApp e os sete campos de endereço são permitidos."
+      });
+    }
+
+    const addressUpdates = {};
+
+    for (const field of addressFields) {
+      if (!Object.prototype.hasOwnProperty.call(body, field)) {
+        return res.status(400).json({
+          error: "Todos os dez campos cadastrais editáveis devem ser enviados."
+        });
+      }
+
+      if (body[field] !== null && typeof body[field] !== "string") {
+        return res.status(400).json({
+          error: "Os campos editáveis devem conter texto ou null."
+        });
+      }
+
+      addressUpdates[field] = normalizeOptionalText(body[field]);
+    }
+
+    if (!addressUpdates.full_name) {
+      return res.status(400).json({ error: "Informe o nome do responsável." });
+    }
+
+    for (const field of ["phone", "whatsapp"]) {
+      const value = addressUpdates[field];
+      if (value && (!/^[+()\d.\s-]+$/.test(value) || !/\d/.test(value))) {
+        return res.status(400).json({ error: "Telefone e WhatsApp devem conter números e apenas sinais de formatação." });
+      }
+      addressUpdates[field] = value ? value.replace(/\D/g, "") : null;
+    }
+
+    const { data: updatedClient, error: updateError } =
+      await adminSupabase
+        .from("profiles")
+        .update(addressUpdates)
+        .eq("user_id", clientId)
+        .eq("role", "client")
+        .select("*")
+        .maybeSingle();
+
+    if (updateError) {
+      return res.status(500).json({
+        error: "Erro ao atualizar cadastro do cliente."
+      });
+    }
+
+    if (!updatedClient) {
+      return res.status(404).json({
+        error: "Cliente não encontrado."
+      });
+    }
+
+    return res.status(200).json({
+      message: "Cadastro do cliente atualizado com sucesso.",
+      client: getProfileForResponse(updatedClient)
+    });
+  } catch (error) {
+    console.error("ERRO EM PUT /admin/clients/:clientId/address.");
+
+    res.status(500).json({
       error: "Erro interno do servidor"
     });
   }

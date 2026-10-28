@@ -1,5 +1,5 @@
 document.addEventListener("DOMContentLoaded", function () {
-    const ADMIN_SESSION_EXPIRES_AT_KEY = "admin_session_expires_at";
+    const ADMIN_SESSION_STATE_KEY = "caseg_admin_session_state";
 
     function showRevealAnimations() {
         const elements = document.querySelectorAll(".reveal-on-load, .reveal-fade");
@@ -21,18 +21,9 @@ document.addEventListener("DOMContentLoaded", function () {
         }
     }
 
-    function clearStoredSession() {
-        localStorage.removeItem("access_token");
-        localStorage.removeItem("refresh_token");
-        localStorage.removeItem("session_expires_at");
-        localStorage.removeItem("session_expires_in");
-        localStorage.removeItem("profile");
-        localStorage.removeItem(ADMIN_SESSION_EXPIRES_AT_KEY);
-    }
-
-    function isAdminSessionValid() {
+    function hasAdminNavigationHint() {
         const profile = getStoredProfile();
-        const role = String(profile.role || "").toLowerCase();
+        const role = String(profile?.role || "").toLowerCase();
 
         if (role !== "admin") {
             return false;
@@ -40,34 +31,20 @@ document.addEventListener("DOMContentLoaded", function () {
 
         const accessToken = localStorage.getItem("access_token");
         const refreshToken = localStorage.getItem("refresh_token");
-        const adminExpiresAt = Number(localStorage.getItem(ADMIN_SESSION_EXPIRES_AT_KEY) || 0);
-
         if (!accessToken && !refreshToken) {
             return false;
         }
 
-        if (!adminExpiresAt || !Number.isFinite(adminExpiresAt)) {
+        // Navigation hint only. Backend/admin.js enforce authorization and inactivity.
+        // This shared presentation script must never clear or renew authentication.
+        try {
+            const state = JSON.parse(localStorage.getItem(ADMIN_SESSION_STATE_KEY) || "null");
+            return typeof state?.session_id === "string" &&
+                /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(state.session_id) &&
+                typeof state.version === "string" && /^[1-9][0-9]{0,18}$/.test(state.version);
+        } catch (error) {
             return false;
         }
-
-        return Date.now() <= adminExpiresAt;
-    }
-
-    function clearExpiredAdminSessionIfNeeded() {
-        const profile = getStoredProfile();
-        const role = String(profile.role || "").toLowerCase();
-
-        if (role !== "admin") {
-            return;
-        }
-
-        const adminExpiresAt = Number(localStorage.getItem(ADMIN_SESSION_EXPIRES_AT_KEY) || 0);
-
-        if (adminExpiresAt && Number.isFinite(adminExpiresAt) && Date.now() <= adminExpiresAt) {
-            return;
-        }
-
-        clearStoredSession();
     }
 
     function getAdminPagePath() {
@@ -138,9 +115,7 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     function updateTopLoginButtonForAdmin() {
-        clearExpiredAdminSessionIfNeeded();
-
-        if (!isAdminSessionValid()) {
+        if (!hasAdminNavigationHint()) {
             return;
         }
 

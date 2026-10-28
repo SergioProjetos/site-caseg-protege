@@ -849,6 +849,161 @@
   </div>
 
   <div
+    id="editClientAddressModal"
+    class="admin-modal hidden"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="editClientAddressModalTitle"
+    aria-describedby="editClientAddressModalDescription"
+    aria-hidden="true"
+  >
+    <div id="editClientAddressModalBackdrop" class="admin-modal-backdrop"></div>
+
+    <section class="admin-modal-panel">
+      <header class="admin-modal-header">
+        <div class="admin-modal-title-group">
+          <span class="section-kicker">Clientes</span>
+
+          <h2 id="editClientAddressModalTitle">Editar cadastro</h2>
+
+          <p id="editClientAddressModalDescription">
+            Atualize responsável, contatos e endereço. E-mail, CPF/CNPJ e empresa não podem ser alterados.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          id="closeEditClientAddressModalBtn"
+          class="admin-modal-close-btn"
+          aria-label="Fechar edição cadastral"
+        >
+          <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+        </button>
+      </header>
+
+      <div id="editClientAddressModalBody" class="admin-modal-body">
+        <form id="editClientAddressForm" class="admin-form">
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="editClientFullName">Nome do responsável</label>
+              <input type="text" id="editClientFullName" name="editClientFullName" required />
+            </div>
+
+            <div class="form-group">
+              <label for="editClientPhone">Telefone</label>
+              <input type="tel" id="editClientPhone" name="editClientPhone" />
+            </div>
+
+            <div class="form-group">
+              <label for="editClientWhatsapp">WhatsApp</label>
+              <input type="tel" id="editClientWhatsapp" name="editClientWhatsapp" />
+            </div>
+
+            <div class="form-group">
+              <label for="editClientEmail">E-mail principal</label>
+              <input type="text" id="editClientEmail" name="editClientEmail" readonly />
+            </div>
+
+            <div class="form-group">
+              <label for="editClientCpfCnpj">CPF/CNPJ</label>
+              <input type="text" id="editClientCpfCnpj" name="editClientCpfCnpj" readonly />
+            </div>
+
+            <div class="form-group">
+              <label for="editClientCompanyName">Nome da empresa</label>
+              <input type="text" id="editClientCompanyName" name="editClientCompanyName" readonly />
+            </div>
+
+            <div class="form-group">
+              <label for="editClientAddressZip">CEP</label>
+              <input
+                type="text"
+                id="editClientAddressZip"
+                name="editClientAddressZip"
+                placeholder="Digite o CEP"
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="editClientAddressStreet">Rua / Logradouro</label>
+              <input
+                type="text"
+                id="editClientAddressStreet"
+                name="editClientAddressStreet"
+                placeholder="Digite a rua"
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="editClientAddressNumber">Número</label>
+              <input
+                type="text"
+                id="editClientAddressNumber"
+                name="editClientAddressNumber"
+                placeholder="Digite o número"
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="editClientAddressComplement">Complemento</label>
+              <input
+                type="text"
+                id="editClientAddressComplement"
+                name="editClientAddressComplement"
+                placeholder="Digite o complemento"
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="editClientAddressNeighborhood">Bairro</label>
+              <input
+                type="text"
+                id="editClientAddressNeighborhood"
+                name="editClientAddressNeighborhood"
+                placeholder="Digite o bairro"
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="editClientAddressCity">Cidade</label>
+              <input
+                type="text"
+                id="editClientAddressCity"
+                name="editClientAddressCity"
+                placeholder="Digite a cidade"
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="editClientAddressState">Estado</label>
+              <input
+                type="text"
+                id="editClientAddressState"
+                name="editClientAddressState"
+                placeholder="Digite o estado"
+              />
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button type="submit" id="saveClientAddressBtn">Salvar</button>
+
+            <button
+              type="button"
+              id="cancelEditClientAddressModalBtn"
+              class="secondary-action-btn"
+            >
+              Cancelar
+            </button>
+          </div>
+
+          <p id="editClientAddressMessage" class="form-message" role="status" aria-live="polite"></p>
+        </form>
+      </div>
+    </section>
+  </div>
+
+  <div
     id="temporaryPasswordResultModal"
     class="admin-modal temporary-password-result-modal hidden"
     role="dialog"

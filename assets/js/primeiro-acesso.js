@@ -13,6 +13,48 @@ const ruleMinLength = document.querySelector("#ruleMinLength");
 const ruleUppercase = document.querySelector("#ruleUppercase");
 const ruleNumber = document.querySelector("#ruleNumber");
 let isFirstAccessLogoutInProgress = false;
+const ADMIN_FIRST_ACCESS_KEY = "caseg_admin_first_access";
+const isAdminFirstAccess = sessionStorage.getItem(ADMIN_FIRST_ACCESS_KEY) !== null;
+let adminFirstAccessSubmitting = false;
+let adminFirstAccessRefreshPromise = null;
+
+function readAdminFirstAccess() {
+  try { return JSON.parse(sessionStorage.getItem(ADMIN_FIRST_ACCESS_KEY) || "null"); }
+  catch { return null; }
+}
+
+async function refreshAdminFirstAccess() {
+  if (adminFirstAccessRefreshPromise) return adminFirstAccessRefreshPromise;
+  adminFirstAccessRefreshPromise = (async () => {
+    const current = readAdminFirstAccess();
+    if (!current?.session?.refresh_token || current.submission_started) return { status: 403, data: null };
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+    try {
+      const response = await fetch(`${window.CASEG_CONFIG.API_BASE_URL}/admin/first-access/refresh-session`, {
+        method: "POST", headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({refresh_token: current.session.refresh_token}), signal: controller.signal
+      });
+      const data = await response.json();
+      if (response.ok) {
+        if (data.admin_session || data.profile?.role !== "admin" || data.profile.must_change_password !== true ||
+            data.first_access?.required !== true || data.first_access.mode !== "admin" ||
+            !data.session?.access_token || !data.session.refresh_token ||
+            !Number.isFinite(data.session.expires_at) || data.session.expires_at <= Date.now()/1000 ||
+            !Number.isFinite(Date.parse(data.first_access.expires_at)) || Date.parse(data.first_access.expires_at) <= Date.now()) {
+          return {status: 502, data: null};
+        }
+        sessionStorage.setItem(ADMIN_FIRST_ACCESS_KEY, JSON.stringify(data));
+        savedAccessToken = data.session.access_token;
+        savedProfile = data.profile;
+      }
+      return {status: response.status, data};
+    } catch { return {status: 503, data: null}; }
+    finally { clearTimeout(timeout); }
+  })();
+  try { return await adminFirstAccessRefreshPromise; }
+  finally { adminFirstAccessRefreshPromise = null; }
+}
 
 const LOGOUT_REQUEST_TIMEOUT_MS = 4000;
 const CLIENT_SESSION_REFRESH_TIMEOUT_MS = 8000;
@@ -77,6 +119,7 @@ function isValidClientSessionRefreshData(data) {
 }
 
 function clearFirstAccessSession() {
+  if (isAdminFirstAccess) { sessionStorage.removeItem(ADMIN_FIRST_ACCESS_KEY); return; }
   localStorage.removeItem("access_token");
   localStorage.removeItem("refresh_token");
   localStorage.removeItem("profile");
@@ -225,6 +268,17 @@ let savedProfile = null;
 let isFirstAccessSessionReady = false;
 
 async function initializeFirstAccessSession() {
+  if (isAdminFirstAccess) {
+    const result = await refreshAdminFirstAccess();
+    if (result.status !== 200) {
+      setMessage(result.status >= 500 ? "Não foi possível validar a sessão. Recarregue para tentar novamente." : "Primeiro acesso indisponível. Faça novo login; se persistir, solicite atendimento ao responsável.", "error");
+      return false;
+    }
+    const name = document.querySelector("#clientName");
+    if (name) name.textContent = savedProfile.full_name || "administrador";
+    isFirstAccessSessionReady = true;
+    return true;
+  }
   let refreshResult = await refreshClientSession();
 
   if (
@@ -312,7 +366,7 @@ if (firstAccessForm) {
   firstAccessForm.addEventListener("submit", async function (event) {
     event.preventDefault();
 
-    if (!isFirstAccessSessionReady) {
+    if (!isFirstAccessSessionReady || adminFirstAccessSubmitting) {
       return;
     }
 
@@ -338,10 +392,30 @@ if (firstAccessForm) {
       return;
     }
 
+    if (isAdminFirstAccess) {
+      adminFirstAccessSubmitting = true;
+      const current = readAdminFirstAccess();
+      if (current?.submission_started) {
+        setMessage("Uma troca anterior tem resultado incerto. Faça novo login; se persistir, solicite atendimento.", "error");
+        return;
+      }
+      if (!current || current.session.expires_at <= Date.now()/1000 + 60) {
+        const refreshed = await refreshAdminFirstAccess();
+        if (refreshed.status !== 200) {
+          adminFirstAccessSubmitting = false;
+          setMessage("Não foi possível renovar o primeiro acesso. Seus campos foram preservados.", "error");
+          return;
+        }
+      }
+      sessionStorage.setItem(ADMIN_FIRST_ACCESS_KEY, JSON.stringify({...readAdminFirstAccess(), submission_started:true}));
+    }
     setMessage("Salvando nova senha...", "info");
 
+    const updateController = isAdminFirstAccess ? new AbortController() : null;
+    const updateTimeout = updateController ? setTimeout(() => updateController.abort(), 10000) : null;
     try {
       const response = await fetch(`${window.CASEG_CONFIG.API_BASE_URL}/update-password`, {
+        ...(updateController ? {signal:updateController.signal} : {}),
         method: "PUT",
         credentials: "include",
         headers: {
@@ -361,6 +435,11 @@ if (firstAccessForm) {
       }
 
       if (!response.ok) {
+        if (isAdminFirstAccess && response.status === 400) {
+          const current = readAdminFirstAccess();
+          if (current) { delete current.submission_started; sessionStorage.setItem(ADMIN_FIRST_ACCESS_KEY, JSON.stringify(current)); }
+          adminFirstAccessSubmitting = false;
+        }
         setMessage(data.error || "Erro ao atualizar a senha.", "error");
         return;
       }
@@ -379,7 +458,7 @@ if (firstAccessForm) {
         try {
           localStorage.setItem("password_updated", "true");
           accessToken = savedAccessToken || "";
-          await attemptRemoteLogout(accessToken);
+          if (!isAdminFirstAccess) await attemptRemoteLogout(accessToken);
         } finally {
           clearFirstAccessSession();
           window.location.href = "login.html";
@@ -389,7 +468,9 @@ if (firstAccessForm) {
 
     } catch (error) {
       console.error("Erro ao atualizar senha:", error);
-      setMessage("Erro ao conectar com o servidor.", "error");
+      setMessage(isAdminFirstAccess ? "Resultado da troca não confirmado. Não reenvie automaticamente; faça novo login ou solicite atendimento." : "Erro ao conectar com o servidor.", "error");
+    } finally {
+      if (updateTimeout !== null) clearTimeout(updateTimeout);
     }
   });
 }

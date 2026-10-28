@@ -891,7 +891,8 @@
 
     <script src="../assets/js/api-config.js"></script>
     <script>
-        const ADMIN_SESSION_DURATION_MS = 10 * 60 * 60 * 1000;
+        const ADMIN_SESSION_STATE_KEY = "caseg_admin_session_state";
+        const ADMIN_SESSION_LOCK = "caseg_admin_session_lock";
         const ADMIN_SESSION_EXPIRES_AT_KEY = "admin_session_expires_at";
 
         function hasOnlyFiscalInputCharacters(value) {
@@ -1042,6 +1043,7 @@
             localStorage.removeItem("session_expires_in");
             localStorage.removeItem("profile");
             localStorage.removeItem(ADMIN_SESSION_EXPIRES_AT_KEY);
+            localStorage.removeItem(ADMIN_SESSION_STATE_KEY);
         }
 
         function createStoredProfile(profile) {
@@ -1070,45 +1072,48 @@
             return storedProfile;
         }
 
-        function saveSession(data) {
+        async function saveSession(data) {
             if (data.profile && data.profile.role === "client") {
+                sessionStorage.removeItem("caseg_admin_first_access");
                 clearSession();
                 return;
             }
-
-            localStorage.removeItem("refresh_token");
-            localStorage.setItem("access_token", data.session.access_token);
-
-            if (
-                data.profile &&
-                data.profile.role === "admin" &&
-                typeof data.session.refresh_token === "string" &&
-                data.session.refresh_token.length > 0
-            ) {
+            if (data.profile?.role === "admin" && data.profile.must_change_password === true) {
+                if (data.admin_session || data.first_access?.required !== true || data.first_access.mode !== "admin" ||
+                    !data.session?.access_token || !data.session.refresh_token ||
+                    !Number.isFinite(data.session.expires_at) || !Number.isFinite(Date.parse(data.first_access.expires_at))) {
+                    throw new Error("Resposta de primeiro acesso inválida.");
+                }
+                clearSession();
+                sessionStorage.setItem("caseg_admin_first_access", JSON.stringify({session: data.session, profile: createStoredProfile(data.profile), first_access: data.first_access}));
+                return;
+            }
+            sessionStorage.removeItem("caseg_admin_first_access");
+            const state = data.admin_session;
+            const now = Date.parse(state?.server_now), end = Date.parse(state?.idle_expires_at);
+            if (data.profile?.role !== "admin" || !data.session?.access_token || !data.session.refresh_token ||
+                !Number.isFinite(data.session.expires_at) || !state ||
+                typeof state.session_id !== "string" ||
+                !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(state.session_id) ||
+                typeof state.version !== "string" || !/^[1-9][0-9]{0,18}$/.test(state.version) ||
+                BigInt(state.version) > 9223372036854775807n ||
+                !Number.isFinite(now) || !Number.isFinite(end) || end <= now || end - now > 3600000) {
+                throw new Error("Resposta administrativa inválida.");
+            }
+            if (!navigator.locks?.request) throw new Error("Sincronização segura entre abas indisponível.");
+            await navigator.locks.request(ADMIN_SESSION_LOCK, () => {
+                localStorage.setItem("access_token", data.session.access_token);
                 localStorage.setItem("refresh_token", data.session.refresh_token);
-            }
-
-            localStorage.setItem(
-                "profile",
-                JSON.stringify(createStoredProfile(data.profile))
-            );
-
-            if (data.session.expires_at) {
                 localStorage.setItem("session_expires_at", String(data.session.expires_at));
-            }
-
-            if (data.session.expires_in) {
-                localStorage.setItem("session_expires_in", String(data.session.expires_in));
-            }
-
-            if (data.profile && data.profile.role === "admin") {
-                localStorage.setItem(
-                    ADMIN_SESSION_EXPIRES_AT_KEY,
-                    String(Date.now() + ADMIN_SESSION_DURATION_MS)
-                );
-            } else {
+                localStorage.setItem("session_expires_in", String(data.session.expires_in || 0));
+                localStorage.setItem("profile", JSON.stringify(createStoredProfile(data.profile)));
                 localStorage.removeItem(ADMIN_SESSION_EXPIRES_AT_KEY);
-            }
+                localStorage.setItem(ADMIN_SESSION_STATE_KEY, JSON.stringify({
+                    session_id: state.session_id, version: state.version,
+                    server_now: state.server_now, idle_expires_at: state.idle_expires_at,
+                    received_at: Date.now(), last_signal_at: 0
+                }));
+            });
         }
 
         function setLoginMessage(message, color) {
@@ -1122,6 +1127,10 @@
                 return;
             }
 
+            if (profile.role === "admin" && profile.must_change_password === true) {
+                window.location.href = "primeiro-acesso.html";
+                return;
+            }
             if (profile.role === "admin") {
                 window.location.href = "admin.html";
                 return;
@@ -1232,7 +1241,7 @@
                     return;
                 }
 
-                saveSession(data);
+                await saveSession(data);
 
                 setLoginMessage("Login realizado com sucesso!", "green");
 

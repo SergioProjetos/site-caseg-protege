@@ -9,6 +9,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     profile = {};
   }
 
+  if (profile.must_change_password === true || sessionStorage.getItem("caseg_admin_first_access")) {
+    window.location.href = "primeiro-acesso.html";
+    return;
+  }
+
   if (!token && !localStorage.getItem("refresh_token")) {
     window.location.href = "login.html";
     return;
@@ -21,7 +26,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     "A imagem do banner deve estar na proporção 16:5. Exemplos aceitos: 5120x1600, 3200x1000, 2560x800, 1920x600 ou 1600x500.";
 
   const SESSION_REFRESH_MARGIN_SECONDS = 5 * 60;
-  const ADMIN_SESSION_EXPIRES_AT_KEY = "admin_session_expires_at";
+  const ADMIN_SESSION_STATE_KEY = "caseg_admin_session_state";
+  const ADMIN_SESSION_LOCK = "caseg_admin_session_lock";
+  const ADMIN_ACTIVITY_INTERVAL_MS = 30000;
   const LOGOUT_REQUEST_TIMEOUT_MS = 4000;
 
   const adminNameElement = document.getElementById("adminName");
@@ -45,6 +52,27 @@ document.addEventListener("DOMContentLoaded", async () => {
   const createClientModalBackdrop = document.getElementById("createClientModalBackdrop");
   const closeCreateClientModalBtn = document.getElementById("closeCreateClientModalBtn");
   const cancelCreateClientModalBtn = document.getElementById("cancelCreateClientModalBtn");
+
+  const editClientAddressModal = document.getElementById("editClientAddressModal");
+  const editClientAddressModalBackdrop = document.getElementById("editClientAddressModalBackdrop");
+  const editClientAddressModalTitle = document.getElementById("editClientAddressModalTitle");
+  const closeEditClientAddressModalBtn = document.getElementById("closeEditClientAddressModalBtn");
+  const cancelEditClientAddressModalBtn = document.getElementById("cancelEditClientAddressModalBtn");
+  const editClientAddressForm = document.getElementById("editClientAddressForm");
+  const editClientAddressMessage = document.getElementById("editClientAddressMessage");
+  const saveClientAddressBtn = document.getElementById("saveClientAddressBtn");
+  const editClientAddressInputs = {
+    full_name: document.getElementById("editClientFullName"),
+    phone: document.getElementById("editClientPhone"),
+    whatsapp: document.getElementById("editClientWhatsapp"),
+    address_zip: document.getElementById("editClientAddressZip"),
+    address_street: document.getElementById("editClientAddressStreet"),
+    address_number: document.getElementById("editClientAddressNumber"),
+    address_complement: document.getElementById("editClientAddressComplement"),
+    address_neighborhood: document.getElementById("editClientAddressNeighborhood"),
+    address_city: document.getElementById("editClientAddressCity"),
+    address_state: document.getElementById("editClientAddressState")
+  };
 
   const clientDocumentsModal = document.getElementById("clientDocumentsModal");
   const clientDocumentsModalBackdrop = document.getElementById("clientDocumentsModalBackdrop");
@@ -190,6 +218,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   let adminSessionRefreshTimer = null;
   let adminSessionRefreshingPromise = null;
   let adminMaxSessionTimer = null;
+  let adminSessionId = null;
+  let adminSessionBlocked = false;
+  let adminActivityTimer = null;
+  let adminActivityPending = false;
   let isAdminLogoutInProgress = false;
 
   let adminActionModalResolver = null;
@@ -201,6 +233,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   let clientUploadModalTrigger = null;
   let clientDocumentsRequestId = 0;
   let isClientDocumentUploadActive = false;
+  let activeAddressClientId = "";
+  let clientAddressModalTrigger = null;
+  let isClientAddressSaving = false;
 
   function cloneTemplate(templateElement) {
     if (!templateElement) {
@@ -641,103 +676,93 @@ document.addEventListener("DOMContentLoaded", async () => {
     return String(profile?.role || "").toLowerCase() === "admin";
   }
 
-  function getAdminSessionExpiresAtMs() {
-    const expiresAt = Number(localStorage.getItem(ADMIN_SESSION_EXPIRES_AT_KEY) || 0);
+  function readAdminSessionState() {
+    try { return JSON.parse(localStorage.getItem(ADMIN_SESSION_STATE_KEY) || "null"); }
+    catch { return null; }
+  }
 
-    return Number.isFinite(expiresAt) ? expiresAt : 0;
+  function validAdminSessionState(state) {
+    const now = Date.parse(state?.server_now), end = Date.parse(state?.idle_expires_at);
+    return state && typeof state.session_id === "string" &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(state.session_id) &&
+      typeof state.version === "string" && /^[1-9][0-9]{0,18}$/.test(state.version) &&
+      BigInt(state.version) <= 9223372036854775807n &&
+      Number.isFinite(now) && Number.isFinite(end) && end > now && end - now <= 3600000;
+  }
+
+  function sessionError(message = "Sessão indisponível. Os dados em edição foram mantidos.") {
+    return new Error(message);
+  }
+
+  function assertAdminSession() {
+    const state = readAdminSessionState();
+    if (adminSessionBlocked || !adminSessionId || !validAdminSessionState(state) || state.session_id !== adminSessionId) {
+      redirectToLoginBecauseSessionExpired();
+      throw sessionError("Sessão encerrada ou alterada. Faça login novamente.");
+    }
+    return state;
+  }
+
+  function getAdminSessionExpiresAtMs() {
+    const state = readAdminSessionState();
+    if (!validAdminSessionState(state) || !Number.isFinite(state.received_at)) return 0;
+    return state.received_at + Date.parse(state.idle_expires_at) - Date.parse(state.server_now);
   }
 
   function hasAdminSessionExpired() {
-    if (!isCurrentProfileAdmin()) {
-      return false;
-    }
-
-    const expiresAt = getAdminSessionExpiresAtMs();
-
-    if (!expiresAt) {
-      return true;
-    }
-
-    return Date.now() > expiresAt;
+    const expires = getAdminSessionExpiresAtMs();
+    return !expires || Date.now() >= expires;
   }
 
   function clearAdminMaxSessionTimer() {
-    if (adminMaxSessionTimer) {
-      clearTimeout(adminMaxSessionTimer);
-      adminMaxSessionTimer = null;
-    }
+    clearTimeout(adminMaxSessionTimer);
+    adminMaxSessionTimer = null;
   }
 
   function scheduleAdminMaxSessionExpiration() {
     clearAdminMaxSessionTimer();
-
-    if (!isCurrentProfileAdmin()) {
-      return;
-    }
-
-    const expiresAt = getAdminSessionExpiresAtMs();
-
-    if (!expiresAt) {
-      return;
-    }
-
-    const delay = expiresAt - Date.now();
-
-    if (delay <= 0) {
-      redirectToLoginBecauseSessionExpired();
-      return;
-    }
-
-    adminMaxSessionTimer = setTimeout(() => {
-      redirectToLoginBecauseSessionExpired();
-    }, delay);
+    if (adminSessionBlocked) return;
+    // Local time is only a hint. Confirm expiry with the backend, never touch.
+    adminMaxSessionTimer = setTimeout(async () => {
+      try { await refreshAdminSession(); }
+      catch { if (!adminSessionBlocked) showAdminFeedback("Não foi possível verificar a sessão. Os dados em edição foram mantidos.", "error", false); }
+    }, Math.max(1000, getAdminSessionExpiresAtMs() - Date.now()));
   }
 
   function enforceAdminSessionLimit() {
-    if (!hasAdminSessionExpired()) {
-      return true;
-    }
-
-    redirectToLoginBecauseSessionExpired();
-    return false;
+    try { assertAdminSession(); return true; } catch { return false; }
   }
 
   function clearAdminSession() {
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("refresh_token");
-    localStorage.removeItem("session_expires_at");
-    localStorage.removeItem("session_expires_in");
-    localStorage.removeItem("profile");
-    localStorage.removeItem(ADMIN_SESSION_EXPIRES_AT_KEY);
+    // An old tab must never clear credentials saved by a different login.
+    const stored = readAdminSessionState();
+    if (!stored || !adminSessionId || stored.session_id === adminSessionId) {
+      for (const key of ["access_token", "refresh_token", "session_expires_at", "session_expires_in", "profile", "admin_session_expires_at", ADMIN_SESSION_STATE_KEY]) localStorage.removeItem(key);
+    }
+    token = null;
     clearAdminMaxSessionTimer();
+    clearTimeout(adminSessionRefreshTimer);
+    clearTimeout(adminActivityTimer);
+    adminActivityPending = false;
   }
 
   function redirectToLoginBecauseSessionExpired() {
+    if (adminSessionBlocked) return;
+    adminSessionBlocked = true;
     clearAdminSession();
-    window.location.href = "login.html";
+    bindAdminActionModalEvents();
+    showAdminFeedback("Acesso bloqueado. Faça novo login. Os dados em edição permanecem nesta aba.", "error", false);
+    // Do not navigate automatically or discard a form on a late response.
+    void showAdminActionConfirm({type: "warning", title: "Acesso administrativo bloqueado",
+      message: "É necessário entrar novamente. Ir ao login descarta os dados não salvos desta aba.",
+      confirmText: "Ir ao login", cancelText: "Permanecer nesta aba"})
+      .then((confirmed) => { if (confirmed) window.location.href = "login.html"; }).catch(() => {});
   }
 
-  function getRefreshToken() {
-    return localStorage.getItem("refresh_token") || "";
-  }
-
-  function getSessionExpiresAtSeconds() {
-    const rawExpiresAt = localStorage.getItem("session_expires_at");
-    const expiresAt = Number(rawExpiresAt || 0);
-
-    return Number.isFinite(expiresAt) ? expiresAt : 0;
-  }
-
+  function getRefreshToken() { return localStorage.getItem("refresh_token") || ""; }
+  function getSessionExpiresAtSeconds() { return Number(localStorage.getItem("session_expires_at") || 0); }
   function shouldRefreshAdminSession() {
-    const expiresAt = getSessionExpiresAtSeconds();
-
-    if (!expiresAt) {
-      return false;
-    }
-
-    const nowInSeconds = Math.floor(Date.now() / 1000);
-
-    return expiresAt - nowInSeconds <= SESSION_REFRESH_MARGIN_SECONDS;
+    return !getSessionExpiresAtSeconds() || getSessionExpiresAtSeconds() - Date.now() / 1000 <= SESSION_REFRESH_MARGIN_SECONDS;
   }
 
   function createStoredProfile(profile) {
@@ -766,183 +791,200 @@ document.addEventListener("DOMContentLoaded", async () => {
       return storedProfile;
   }
 
-  function saveAdminSessionFromResponse(data) {
-    if (!data || !data.session || !data.session.access_token) {
-      throw new Error("Resposta inválida ao renovar sessão.");
-    }
-
-    token = data.session.access_token;
-
-    localStorage.setItem("access_token", data.session.access_token);
-
-    if (data.session.refresh_token) {
-      localStorage.setItem("refresh_token", data.session.refresh_token);
-    }
-
-    if (data.session.expires_at) {
-      localStorage.setItem("session_expires_at", String(data.session.expires_at));
-    }
-
-    if (data.session.expires_in) {
-      localStorage.setItem("session_expires_in", String(data.session.expires_in));
-    }
-
-    if (data.profile) {
-      profile = data.profile;
-      localStorage.setItem(
-        "profile",
-        JSON.stringify(createStoredProfile(data.profile))
-      );
-      loadAdminInfo();
-    }
-
+  function saveAdminState(state) {
+    const stored = assertAdminSession();
+    if (!validAdminSessionState(state) || state.session_id !== adminSessionId) throw sessionError("Resposta de sessão inválida.");
+    // A slower reply cannot roll back a version or the server's last observation.
+    if (BigInt(state.version) < BigInt(stored.version) ||
+        (state.version === stored.version && Date.parse(state.server_now) < Date.parse(stored.server_now))) return;
+    localStorage.setItem(ADMIN_SESSION_STATE_KEY, JSON.stringify({
+      session_id: state.session_id, version: state.version, server_now: state.server_now,
+      idle_expires_at: state.idle_expires_at, received_at: Date.now(),
+      last_signal_at: stored.last_signal_at || 0
+    }));
     scheduleAdminMaxSessionExpiration();
+  }
+
+  function saveAdminSessionFromResponse(data) {
+    assertAdminSession();
+    if (!data?.session?.access_token || !data.session.refresh_token || data.profile?.role !== "admin" ||
+        !Number.isFinite(data.session.expires_at) || !validAdminSessionState(data.admin_session) ||
+        data.admin_session.session_id !== adminSessionId) throw sessionError("Resposta de renovação inválida.");
+    saveAdminState(data.admin_session);
+    token = data.session.access_token;
+    localStorage.setItem("access_token", token);
+    localStorage.setItem("refresh_token", data.session.refresh_token);
+    localStorage.setItem("session_expires_at", String(data.session.expires_at));
+    localStorage.setItem("session_expires_in", String(data.session.expires_in || 0));
+    profile = data.profile;
+    localStorage.setItem("profile", JSON.stringify(createStoredProfile(profile)));
+    loadAdminInfo();
     scheduleAdminSessionRefresh();
   }
 
-  async function refreshAdminSession() {
-    if (!enforceAdminSessionLimit()) {
-      throw new Error("Sessão administrativa expirada. Faça login novamente.");
+  function withAdminSessionLock(action) {
+    if (!navigator.locks?.request) {
+      showAdminFeedback("Este navegador precisa oferecer sincronização segura entre abas em HTTPS para usar o painel.", "error", false);
+      return Promise.reject(sessionError("Sincronização segura entre abas indisponível."));
     }
-
-    if (adminSessionRefreshingPromise) {
-      return adminSessionRefreshingPromise;
-    }
-
-    adminSessionRefreshingPromise = (async () => {
-      const refreshToken = getRefreshToken();
-
-      if (!refreshToken) {
-        throw new Error("Refresh token não encontrado.");
-      }
-
-      const response = await fetch(`${window.CASEG_CONFIG.API_BASE_URL}/admin/refresh-session`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          refresh_token: refreshToken
-        })
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || "Sessão expirada. Faça login novamente.");
-      }
-
-      saveAdminSessionFromResponse(result);
-
-      return result.session.access_token;
-    })();
-
-    try {
-      return await adminSessionRefreshingPromise;
-    } finally {
-      adminSessionRefreshingPromise = null;
-    }
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 15000);
+    return navigator.locks.request(ADMIN_SESSION_LOCK, {signal: controller.signal}, async () => {
+      clearTimeout(timer);
+      assertAdminSession();
+      return action();
+    }).finally(() => clearTimeout(timer));
   }
 
-  async function ensureValidAdminSession() {
-    if (!enforceAdminSessionLimit()) {
-      throw new Error("Sessão administrativa expirada. Faça login novamente.");
+  async function fetchAdminSession(url, options) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 10000);
+    try {
+      const response = await fetch(url, {...options, signal: controller.signal});
+      const result = await response.json();
+      return {response, result};
     }
+    finally { clearTimeout(timer); }
+  }
 
-    token = localStorage.getItem("access_token");
+  function isTerminalAdminResponse(response, data) {
+    return response.status === 403 || ["IDLE_EXPIRED", "SESSION_CLOSED", "NOT_INITIALIZED", "CLOCK_REGRESSION", "ADMIN_SESSION_INVALID", "DENIED"].includes(data?.code);
+  }
 
-    if (!token && getRefreshToken()) {
-      await refreshAdminSession();
-      return localStorage.getItem("access_token");
+  async function refreshAdminSessionUnlocked() {
+    assertAdminSession();
+    const refreshToken = getRefreshToken();
+    if (!refreshToken) { redirectToLoginBecauseSessionExpired(); throw sessionError(); }
+    const {response, result} = await fetchAdminSession(`${window.CASEG_CONFIG.API_BASE_URL}/admin/refresh-session`, {
+      method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({refresh_token: refreshToken})
+    });
+    assertAdminSession();
+    if (!response.ok) {
+      if (isTerminalAdminResponse(response, result) || response.status === 401) redirectToLoginBecauseSessionExpired();
+      throw sessionError(result.error || undefined);
     }
-
-    if (token && shouldRefreshAdminSession() && getRefreshToken()) {
-      await refreshAdminSession();
-      return localStorage.getItem("access_token");
-    }
-
+    saveAdminSessionFromResponse(result);
     return token;
   }
 
+  async function refreshAdminSession(previousAccessToken) {
+    if (adminSessionRefreshingPromise) return adminSessionRefreshingPromise;
+    adminSessionRefreshingPromise = withAdminSessionLock(async () => {
+      const current = localStorage.getItem("access_token");
+      if (previousAccessToken && current !== previousAccessToken && !shouldRefreshAdminSession() && !hasAdminSessionExpired()) return current;
+      return refreshAdminSessionUnlocked();
+    });
+    try { return await adminSessionRefreshingPromise; }
+    finally { adminSessionRefreshingPromise = null; }
+  }
+
+  async function ensureValidAdminSessionUnlocked() {
+    assertAdminSession();
+    token = localStorage.getItem("access_token");
+    if (!token || shouldRefreshAdminSession() || hasAdminSessionExpired()) return refreshAdminSessionUnlocked();
+    return token;
+  }
+
+  async function ensureValidAdminSession() { return withAdminSessionLock(ensureValidAdminSessionUnlocked); }
+
   async function adminFetch(url, options = {}) {
     const validToken = await ensureValidAdminSession();
-
-    if (!validToken) {
-      redirectToLoginBecauseSessionExpired();
-      throw new Error("Sessão expirada. Faça login novamente.");
-    }
-
     const headers = new Headers(options.headers || {});
     headers.set("Authorization", `Bearer ${validToken}`);
-
-    let response = await fetch(url, {
-      ...options,
-      headers
-    });
-
-    if (response.status !== 401) {
-      return response;
-    }
-
-    if (!getRefreshToken()) {
+    let response = await fetch(url, {...options, headers});
+    assertAdminSession();
+    let result = await response.clone().json().catch(() => null);
+    if (isTerminalAdminResponse(response, result)) {
       redirectToLoginBecauseSessionExpired();
-      throw new Error("Sessão expirada. Faça login novamente.");
+      throw sessionError("Sessão encerrada. Faça login novamente.");
     }
-
-    const refreshedToken = await refreshAdminSession();
-
-    const retryHeaders = new Headers(options.headers || {});
-    retryHeaders.set("Authorization", `Bearer ${refreshedToken}`);
-
-    response = await fetch(url, {
-      ...options,
-      headers: retryHeaders
-    });
-
-    if (response.status === 401) {
+    if (response.status !== 401) return response;
+    // Only a non-terminal authentication 401 can retry, once, after refresh.
+    const refreshedToken = await refreshAdminSession(validToken);
+    assertAdminSession();
+    headers.set("Authorization", `Bearer ${refreshedToken}`);
+    response = await fetch(url, {...options, headers});
+    assertAdminSession();
+    result = await response.clone().json().catch(() => null);
+    if (response.status === 401 || isTerminalAdminResponse(response, result)) {
       redirectToLoginBecauseSessionExpired();
-      throw new Error("Sessão expirada. Faça login novamente.");
+      throw sessionError("Sessão encerrada. Faça login novamente.");
     }
-
     return response;
   }
 
-  function scheduleAdminSessionRefresh() {
-    if (isCurrentProfileAdmin() && hasAdminSessionExpired()) {
-      redirectToLoginBecauseSessionExpired();
-      return;
-    }
-
-    if (adminSessionRefreshTimer) {
-      clearTimeout(adminSessionRefreshTimer);
-      adminSessionRefreshTimer = null;
-    }
-
-    const expiresAt = getSessionExpiresAtSeconds();
-    const refreshToken = getRefreshToken();
-
-    if (!expiresAt || !refreshToken) {
-      return;
-    }
-
-    const nowInSeconds = Math.floor(Date.now() / 1000);
-
-    const delaySeconds = Math.max(
-      30,
-      expiresAt - nowInSeconds - SESSION_REFRESH_MARGIN_SECONDS
-    );
-
+  function scheduleAdminSessionRefresh(retry = false) {
+    clearTimeout(adminSessionRefreshTimer);
+    if (adminSessionBlocked) return;
+    const delay = retry ? 30000 : Math.max(30000, getSessionExpiresAtSeconds() * 1000 - Date.now() - SESSION_REFRESH_MARGIN_SECONDS * 1000);
     adminSessionRefreshTimer = setTimeout(async () => {
-      try {
-        if (!enforceAdminSessionLimit()) {
+      try { await withAdminSessionLock(ensureValidAdminSessionUnlocked); scheduleAdminSessionRefresh(); }
+      catch {
+        if (!adminSessionBlocked) {
+          showAdminFeedback("Comunicação temporariamente indisponível. Os dados em edição foram mantidos.", "error", false);
+          scheduleAdminSessionRefresh(true);
+        }
+      }
+    }, delay);
+  }
+
+  function queueAdminActivity(event) {
+    if (adminSessionBlocked || isAdminLogoutInProgress || !event.isTrusted || document.visibilityState !== "visible") return;
+    adminActivityPending = true;
+    if (!adminActivityTimer) adminActivityTimer = setTimeout(flushAdminActivity, 0);
+  }
+
+  async function flushAdminActivity() {
+    adminActivityTimer = null;
+    if (!adminActivityPending || adminSessionBlocked || document.visibilityState !== "visible") return;
+    try {
+      await withAdminSessionLock(async () => {
+        if (!adminActivityPending || document.visibilityState !== "visible") return;
+        const state = assertAdminSession();
+        const delay = (state.last_signal_at || 0) + ADMIN_ACTIVITY_INTERVAL_MS - Date.now();
+        if (delay > 0) {
+          if (!adminActivityTimer) adminActivityTimer = setTimeout(flushAdminActivity, delay);
           return;
         }
+        adminActivityPending = false; // Consume once; no replay after error or STALE_VERSION.
+        const accessToken = await ensureValidAdminSessionUnlocked();
+        const latest = assertAdminSession();
+        localStorage.setItem(ADMIN_SESSION_STATE_KEY, JSON.stringify({...latest, last_signal_at: Date.now()}));
+        const {response, result} = await fetchAdminSession(`${window.CASEG_CONFIG.API_BASE_URL}/admin/session/activity`, {
+          method: "POST", headers: {"Content-Type": "application/json", Authorization: `Bearer ${accessToken}`},
+          body: JSON.stringify({expected_version: latest.version})
+        });
+        assertAdminSession();
+        if ((response.ok && result.code === "ACTIVITY_RECORDED") ||
+            (response.status === 409 && result.code === "STALE_VERSION")) {
+          saveAdminState(result.admin_session);
+        } else {
+          if (isTerminalAdminResponse(response, result)) redirectToLoginBecauseSessionExpired();
+          throw sessionError();
+        }
+      });
+    } catch {
+      if (!adminSessionBlocked) showAdminFeedback("Não foi possível registrar atividade. Os dados em edição foram mantidos.", "error", false);
+    }
+  }
 
-        await refreshAdminSession();
-      } catch (error) {
-        console.error("ERRO AO RENOVAR SESSÃO ADMINISTRATIVA:", error);
+  function bindAdminSessionEvents() {
+    for (const type of ["click", "keydown", "input", "change"]) document.addEventListener(type, queueAdminActivity, {capture: true, passive: true});
+    window.addEventListener("storage", (event) => {
+      if (event.key !== ADMIN_SESSION_STATE_KEY && event.key !== null) return;
+      if (!enforceAdminSessionLimit()) return;
+      scheduleAdminMaxSessionExpiration();
+      scheduleAdminSessionRefresh();
+    });
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState !== "visible") {
+        adminActivityPending = false;
+        clearTimeout(adminActivityTimer);
+        adminActivityTimer = null;
+      } else if (enforceAdminSessionLimit()) {
+        void refreshAdminSession().catch(() => {});
       }
-    }, delaySeconds * 1000);
+    });
   }
 
   function setTextByIds(ids, value) {
@@ -1204,25 +1246,26 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   async function logoutAdmin() {
-    if (isAdminLogoutInProgress) {
-      return;
-    }
-
+    if (isAdminLogoutInProgress) return;
     isAdminLogoutInProgress = true;
-
-    const accessToken = localStorage.getItem("access_token") || token || "";
-
+    let remoteConfirmed = false;
     try {
-      await attemptRemoteLogout(accessToken);
+      remoteConfirmed = await withAdminSessionLock(async () => {
+        const accessToken = localStorage.getItem("access_token") || token || "";
+        return attemptRemoteLogout(accessToken);
+      });
+    } catch {
+      remoteConfirmed = false;
     } finally {
+      adminSessionBlocked = true;
       clearAdminSession();
     }
-
     try {
       await showAdminActionMessage({
-        type: "success",
-        title: "Sessão encerrada",
-        message: "Você saiu do painel administrativo com segurança.",
+        type: remoteConfirmed ? "success" : "warning",
+        title: remoteConfirmed ? "Sessão encerrada" : "Saída local concluída",
+        message: remoteConfirmed ? "O encerramento da sessão foi confirmado pelo servidor." :
+          "Os dados de acesso foram removidos desta sessão no navegador, mas o encerramento no servidor não foi confirmado.",
         confirmText: "OK"
       });
     } finally {
@@ -1994,6 +2037,167 @@ document.addEventListener("DOMContentLoaded", async () => {
     return Boolean(createClientModal && !createClientModal.classList.contains("hidden"));
   }
 
+  function isEditClientAddressModalOpen() {
+    return Boolean(editClientAddressModal && !editClientAddressModal.classList.contains("hidden"));
+  }
+
+  function openEditClientAddressModal(clientId, trigger = document.activeElement) {
+    if (isClientAddressSaving || isEditClientAddressModalOpen()) return false;
+    if (
+      !editClientAddressModal || !editClientAddressForm ||
+      !editClientAddressModalTitle || !editClientAddressMessage ||
+      !saveClientAddressBtn || Object.values(editClientAddressInputs).some((input) => !input)
+    ) {
+      return false;
+    }
+
+    const client = allClientsCache.find((item) => getClientId(item) === clientId);
+    if (!client) return false;
+    if (!closeClientUploadModal({ restoreFocus: false })) return false;
+    closeClientDocumentsModal({ restoreFocus: false });
+
+    activeAddressClientId = clientId;
+    clientAddressModalTrigger = trigger;
+    editClientAddressForm.reset();
+    document.getElementById("editClientEmail").value = client.email || "";
+    document.getElementById("editClientCpfCnpj").value = formatOptionalCpfCnpj(client.cpf_cnpj);
+    document.getElementById("editClientCompanyName").value = client.company_name || "";
+
+    for (const [field, input] of Object.entries(editClientAddressInputs)) {
+      input.value = client[field] ?? "";
+    }
+
+    editClientAddressMessage.textContent = "";
+    editClientAddressMessage.className = "form-message";
+    editClientAddressModalTitle.textContent = `Editar cadastro — ${getClientModalDisplayName(client)}`;
+    editClientAddressModal.classList.remove("hidden");
+    editClientAddressModal.setAttribute("aria-hidden", "false");
+
+    setTimeout(() => {
+      if (isEditClientAddressModalOpen() && activeAddressClientId === clientId) {
+        editClientAddressInputs.full_name.focus();
+      }
+    }, 80);
+
+    return true;
+  }
+
+  function closeEditClientAddressModal() {
+    if (isClientAddressSaving || !isEditClientAddressModalOpen()) return false;
+
+    const trigger = clientAddressModalTrigger;
+    editClientAddressModal.classList.add("hidden");
+    editClientAddressModal.setAttribute("aria-hidden", "true");
+    editClientAddressModalTitle.textContent = "Editar cadastro";
+    editClientAddressForm.reset();
+    editClientAddressMessage.textContent = "";
+    editClientAddressMessage.className = "form-message";
+    activeAddressClientId = "";
+    clientAddressModalTrigger = null;
+
+    if (trigger?.isConnected) {
+      trigger.focus();
+    }
+
+    return true;
+  }
+
+  async function handleSaveClientAddress(event) {
+    event.preventDefault();
+    if (isClientAddressSaving || !isEditClientAddressModalOpen() || !activeAddressClientId) return;
+
+    const clientId = activeAddressClientId;
+    const payload = {};
+    for (const [field, input] of Object.entries(editClientAddressInputs)) {
+      payload[field] = input.value.trim() || null;
+    }
+
+    if (!payload.full_name) {
+      editClientAddressMessage.className = "form-message error";
+      editClientAddressMessage.textContent = "Informe o nome do responsável.";
+      editClientAddressInputs.full_name.focus();
+      return;
+    }
+    for (const field of ["phone", "whatsapp"]) {
+      const value = payload[field];
+      if (value && (!/^[+()\d.\s-]+$/.test(value) || !/\d/.test(value))) {
+        editClientAddressMessage.className = "form-message error";
+        editClientAddressMessage.textContent = "Telefone e WhatsApp devem conter números e apenas sinais de formatação.";
+        editClientAddressInputs[field].focus();
+        return;
+      }
+      payload[field] = value ? onlyDigits(value) : null;
+    }
+
+    isClientAddressSaving = true;
+    setButtonLoading(saveClientAddressBtn, true, "Salvando...");
+    editClientAddressForm.setAttribute("aria-busy", "true");
+    for (const input of Object.values(editClientAddressInputs)) {
+      input.readOnly = true;
+    }
+    for (const button of [closeEditClientAddressModalBtn, cancelEditClientAddressModalBtn]) {
+      if (button) button.disabled = true;
+    }
+    editClientAddressMessage.className = "form-message";
+    editClientAddressMessage.textContent = "Salvando cadastro...";
+    let saved = false;
+
+    try {
+      const response = await adminFetch(
+        `${window.CASEG_CONFIG.API_BASE_URL}/admin/clients/${encodeURIComponent(clientId)}/address`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        }
+      );
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result?.error || "Não foi possível salvar o cadastro do cliente.");
+      }
+
+      const updatedClient = result?.client;
+      if (
+        getClientId(updatedClient) !== clientId ||
+        Object.keys(editClientAddressInputs).some((field) =>
+          !Object.prototype.hasOwnProperty.call(updatedClient, field) ||
+          (updatedClient[field] !== null && typeof updatedClient[field] !== "string")
+        )
+      ) {
+        throw new Error("Não foi possível confirmar os dados retornados pelo servidor. Recarregue a lista antes de tentar novamente.");
+      }
+
+      for (const client of allClientsCache) {
+        if (getClientId(client) === clientId) {
+          for (const field of Object.keys(editClientAddressInputs)) {
+            client[field] = updatedClient[field];
+          }
+        }
+      }
+      saved = true;
+    } catch (error) {
+      editClientAddressMessage.className = "form-message error";
+      editClientAddressMessage.textContent = error.message || "Não foi possível salvar o cadastro do cliente.";
+    } finally {
+      isClientAddressSaving = false;
+      setButtonLoading(saveClientAddressBtn, false);
+      editClientAddressForm.removeAttribute("aria-busy");
+      for (const input of Object.values(editClientAddressInputs)) {
+        input.readOnly = false;
+      }
+      for (const button of [closeEditClientAddressModalBtn, cancelEditClientAddressModalBtn]) {
+        if (button) button.disabled = false;
+      }
+    }
+
+    if (saved) {
+      closeEditClientAddressModal();
+      renderClientsList(allClientsCache);
+      renderClientsMessage("Cadastro do cliente atualizado com sucesso.", "success");
+    }
+  }
+
   function clearTemporaryPasswordResult() {
     if (reissuedTemporaryPasswordField) {
       reissuedTemporaryPasswordField.value = "";
@@ -2544,6 +2748,34 @@ document.addEventListener("DOMContentLoaded", async () => {
       statusBadge.textContent = getClientStatusLabel(isActive);
       statusBadge.classList.toggle("active", isActive);
       statusBadge.classList.toggle("inactive", !isActive);
+    }
+
+    const clientActions = card.querySelector(".client-card-actions");
+
+    if (clientActions) {
+      const editAddressBtn = document.createElement("button");
+      editAddressBtn.type = "button";
+      editAddressBtn.className = "client-action-btn edit-client-address-btn";
+      editAddressBtn.dataset.action = "edit-address";
+      editAddressBtn.dataset.clientId = clientId;
+      editAddressBtn.disabled = !clientId;
+      editAddressBtn.setAttribute("aria-haspopup", "dialog");
+      editAddressBtn.setAttribute("aria-controls", "editClientAddressModal");
+
+      const icon = document.createElement("i");
+      icon.className = "fa-solid fa-pen";
+      icon.setAttribute("aria-hidden", "true");
+
+      const label = document.createElement("span");
+      label.dataset.actionLabel = "";
+      label.textContent = "Editar";
+
+      editAddressBtn.append(icon, label);
+      editAddressBtn.addEventListener("click", () => {
+        openEditClientAddressModal(clientId, editAddressBtn);
+      });
+      const deleteAction = clientActions.querySelector('[data-action="delete"], .delete-client-btn');
+      clientActions.insertBefore(editAddressBtn, deleteAction);
     }
 
     const documentsBtn = card.querySelector('[data-action="documents"], .show-documents-btn, .toggle-documents-btn');
@@ -4832,6 +5064,38 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
+  function bindEditClientAddressModalEvents() {
+    for (const element of [closeEditClientAddressModalBtn, cancelEditClientAddressModalBtn, editClientAddressModalBackdrop]) {
+      if (element && element.dataset.bound !== "true") {
+        element.dataset.bound = "true";
+        element.addEventListener("click", closeEditClientAddressModal);
+      }
+    }
+
+    if (editClientAddressForm && editClientAddressForm.dataset.bound !== "true") {
+      editClientAddressForm.dataset.bound = "true";
+      editClientAddressForm.addEventListener("submit", handleSaveClientAddress);
+    }
+
+    if (editClientAddressModal && editClientAddressModal.dataset.bound !== "true") {
+      editClientAddressModal.dataset.bound = "true";
+      editClientAddressModal.addEventListener("keydown", (event) => {
+        if (event.key !== "Tab" || !isEditClientAddressModalOpen()) return;
+
+        const controls = editClientAddressModal.querySelectorAll("button:not(:disabled), input:not(:disabled)");
+        const first = controls[0];
+        const last = controls[controls.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last?.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first?.focus();
+        }
+      });
+    }
+  }
+
   function bindTemporaryPasswordResultModalEvents() {
     const closeButtons = [
       closeTemporaryPasswordResultModalBtn,
@@ -5221,6 +5485,11 @@ document.addEventListener("DOMContentLoaded", async () => {
           return;
         }
 
+        if (isEditClientAddressModalOpen()) {
+          closeEditClientAddressModal();
+          return;
+        }
+
         if (isCreateClientModalOpen()) {
           hideCreateClientForm();
           return;
@@ -5266,12 +5535,14 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   async function initializeAdminPanel() {
+    adminSessionId = readAdminSessionState()?.session_id || null;
     if (!validateAdminAccess()) {
       return;
     }
 
     bindAdminActionModalEvents();
     bindCreateClientModalEvents();
+    bindEditClientAddressModalEvents();
     bindTemporaryPasswordResultModalEvents();
     bindClientDocumentModalEvents();
     bindNavigationEvents();
@@ -5285,6 +5556,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     setBannerFormCreateMode();
     updateBannerActionFieldsVisibility();
 
+    bindAdminSessionEvents();
     scheduleAdminMaxSessionExpiration();
     scheduleAdminSessionRefresh();
 
